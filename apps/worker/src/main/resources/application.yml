@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: northstar-worker
+  main:
+    # No web server; run as a background process.
+    web-application-type: none
+  datasource:
+    url: ${NORTHSTAR_DB_URL:jdbc:postgresql://localhost:5432/northstar}
+    username: ${NORTHSTAR_DB_USER:northstar}
+    password: ${NORTHSTAR_DB_PASSWORD:northstar}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: false

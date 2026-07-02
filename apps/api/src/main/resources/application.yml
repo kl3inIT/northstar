@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: northstar-api
+  datasource:
+    url: ${NORTHSTAR_DB_URL:jdbc:postgresql://localhost:5432/northstar}
+    username: ${NORTHSTAR_DB_USER:northstar}
+    password: ${NORTHSTAR_DB_PASSWORD:northstar}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate.format_sql: true
+  flyway:
+    enabled: true
+    # Migrations ship on the classpath from :core (core/src/main/resources/db/migration).
+    locations: classpath:db/migration
+
+server:
+  port: ${NORTHSTAR_API_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,modulith

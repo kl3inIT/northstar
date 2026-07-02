@@ -1,0 +1,40 @@
+# --- Gradle / JVM ---
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+bin/
+out/
+*.log
+HELP.md
+
+# --- IDE ---
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# --- Node / web ---
+node_modules/
+web/dist/
+web/.vite/
+*.local
+.env
+.env.*
+!.env.example
+
+# --- Tooling scratch / MCP output ---
+.playwright-mcp/
+tmp/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Generated API clients (regenerated from contracts/openapi.json) ---
+web/src/lib/api.gen.d.ts
+mobile/lib/api/generated/

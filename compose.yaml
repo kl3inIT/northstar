@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: northstar
+      POSTGRES_USER: northstar
+      POSTGRES_PASSWORD: northstar
+    ports:
+      - '5432:5432'
+    volumes:
+      - northstar_pg:/var/lib/postgresql/data
+    labels:
+      # Lets Spring Boot's docker-compose support treat this pgvector image as a
+      # standard Postgres service and auto-wire the datasource during bootRun.
+      org.springframework.boot.service-connection: postgres
+
+  adminer:
+    image: adminer:latest
+    ports:
+      - '8090:8080'
+    depends_on:
+      - postgres
+
+volumes:
+  northstar_pg:

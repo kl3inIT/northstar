@@ -1,0 +1,11 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="NorthStarApi" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="northstar.apps.api.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.northstar.api.NorthstarApiApplication" />
+    <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="false" />
+    <option name="ACTIVE_PROFILES" value="" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>
