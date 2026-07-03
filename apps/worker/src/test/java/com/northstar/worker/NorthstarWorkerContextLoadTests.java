@@ -21,7 +21,7 @@ class NorthstarWorkerContextLoadTests {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer postgres = new PostgreSQLContainer("pgvector/pgvector:pg17");
+    static PostgreSQLContainer postgres = new PostgreSQLContainer("pgvector/pgvector:pg18");
 
     @Test
     void contextLoads() {

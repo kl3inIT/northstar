@@ -1,6 +1,6 @@
 services:
   postgres:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:pg18
     environment:
       POSTGRES_DB: northstar
       POSTGRES_USER: northstar
@@ -8,7 +8,9 @@ services:
     ports:
       - '5432:5432'
     volumes:
-      - northstar_pg:/var/lib/postgresql/data
+      # PG18+ images want the mount at /var/lib/postgresql (data lives in a
+      # subdir) so future major upgrades can use pg_upgrade --link.
+      - northstar_pg:/var/lib/postgresql
     labels:
       # Lets Spring Boot's docker-compose support treat this pgvector image as a
       # standard Postgres service and auto-wire the datasource during bootRun.
