@@ -1,0 +1,15 @@
+# Normalize line endings: everything text is LF in the repo and in working
+# copies (kills the per-commit CRLF warnings on Windows); Windows-only scripts
+# keep CRLF. Binary assets are left untouched.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.jar binary
+gradle/wrapper/gradle-wrapper.jar binary

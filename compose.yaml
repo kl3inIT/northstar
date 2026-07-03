@@ -16,12 +16,5 @@ services:
       # standard Postgres service and auto-wire the datasource during bootRun.
       org.springframework.boot.service-connection: postgres
 
-  adminer:
-    image: adminer:latest
-    ports:
-      - '8090:8080'
-    depends_on:
-      - postgres
-
 volumes:
   northstar_pg:
