@@ -58,6 +58,17 @@ public class NoteService {
         return detail(note);
     }
 
+    /** Deletes the note; inbound wiki-links become dangling again (title kept). */
+    @Transactional
+    public void delete(UUID id) {
+        Note note = notes.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
+        links.deleteBySourceNoteId(id);
+        List<NoteLink> inbound = links.findByTargetNoteId(id);
+        inbound.forEach(link -> link.resolveTo(null));
+        links.saveAll(inbound);
+        notes.delete(note);
+    }
+
     @Transactional(readOnly = true)
     public Optional<NoteDetail> getBySlug(String slug) {
         return notes.findBySlug(slug).map(this::detail);

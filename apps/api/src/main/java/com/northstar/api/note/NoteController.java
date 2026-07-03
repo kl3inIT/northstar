@@ -7,8 +7,7 @@ import com.northstar.core.note.NoteSummary;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ProblemDetail;
-import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,16 +58,16 @@ class NoteController {
                 request.contentMarkdown(), request.tags());
     }
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(@PathVariable UUID id) {
+        notes.delete(id);
+    }
+
     private static String requireTitle(String title) {
         if (title == null || title.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "title is required");
         }
         return title;
-    }
-
-    @ExceptionHandler(NoteNotFoundException.class)
-    @ResponseStatus(HttpStatus.NOT_FOUND)
-    ProblemDetail notFound(NoteNotFoundException e) {
-        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
 }

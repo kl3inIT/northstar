@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.northstar.core.capture.CaptureDraft;
 import com.northstar.core.capture.CaptureService;
-import com.northstar.core.capture.NoteDraft;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -25,7 +25,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 /**
  * Proves the capture wiring end-to-end minus the network: a mocked ChatModel
  * returns the JSON the real model would, and the ChatClient structured-output
- * path must map it into a {@link NoteDraft}. Catches broken prompt plumbing,
+ * path must map it into a {@link CaptureDraft}. Catches broken prompt plumbing,
  * bean wiring and entity conversion without spending tokens.
  */
 @SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
@@ -42,22 +42,40 @@ class CaptureServiceIntegrationTests {
     @Autowired
     CaptureService capture;
 
-    @Test
-    void draftMapsStructuredOutputIntoNoteDraft() {
-        String json = """
-                {"title":"HSK 4 listening tips","folderPath":"English/HSK",
-                 "tags":["hsk","listening"],
-                 "contentMarkdown":"Practice with [[HSK 4 Grammar]] daily."}
-                """;
+    private void modelReturns(String json) {
         when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
         when(chatModel.call(any(Prompt.class)))
                 .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(json)))));
+    }
 
-        NoteDraft draft = capture.draft("mẹo luyện nghe hsk4: nghe mỗi ngày, học ngữ pháp");
+    @Test
+    void noteCaptureMapsIntoNoteDraft() {
+        modelReturns("""
+                {"kind":"NOTE",
+                 "note":{"title":"HSK 4 listening tips","folderPath":"English/HSK",
+                         "tags":["hsk","listening"],
+                         "contentMarkdown":"Practice with [[HSK 4 Grammar]] daily."}}
+                """);
 
-        assertThat(draft.title()).isEqualTo("HSK 4 listening tips");
-        assertThat(draft.folderPath()).isEqualTo("English/HSK");
-        assertThat(draft.tags()).containsExactly("hsk", "listening");
-        assertThat(draft.contentMarkdown()).contains("[[HSK 4 Grammar]]");
+        CaptureDraft draft = capture.draft("mẹo luyện nghe hsk4: nghe mỗi ngày, học ngữ pháp");
+
+        assertThat(draft.kind()).isEqualTo(CaptureDraft.Kind.NOTE);
+        assertThat(draft.note().title()).isEqualTo("HSK 4 listening tips");
+        assertThat(draft.note().contentMarkdown()).contains("[[HSK 4 Grammar]]");
+    }
+
+    @Test
+    void taskCaptureMapsIntoTaskDraftWithResolvedDate() {
+        modelReturns("""
+                {"kind":"TASK",
+                 "task":{"title":"Làm docs MLN121","dueDate":"2026-07-03","dueTime":"14:00"}}
+                """);
+
+        CaptureDraft draft = capture.draft("hôm nay 2h chiều tôi phải làm docs MLN121");
+
+        assertThat(draft.kind()).isEqualTo(CaptureDraft.Kind.TASK);
+        assertThat(draft.task().title()).isEqualTo("Làm docs MLN121");
+        assertThat(draft.task().dueDate()).isEqualTo("2026-07-03");
+        assertThat(draft.task().dueTime()).isEqualTo("14:00");
     }
 }

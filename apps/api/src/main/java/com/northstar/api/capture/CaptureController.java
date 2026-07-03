@@ -1,7 +1,7 @@
 package com.northstar.api.capture;
 
+import com.northstar.core.capture.CaptureDraft;
 import com.northstar.core.capture.CaptureService;
-import com.northstar.core.capture.NoteDraft;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,7 +26,7 @@ class CaptureController {
     }
 
     @PostMapping("/draft")
-    NoteDraft draft(@RequestBody CaptureRequest request) {
+    CaptureDraft draft(@RequestBody CaptureRequest request) {
         if (request.text() == null || request.text().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "text is required");
         }

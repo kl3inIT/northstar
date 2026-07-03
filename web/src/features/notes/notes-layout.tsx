@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
-import { FolderTree as FolderTreeIcon, Plus, Search, Sparkles, X } from 'lucide-react'
+import { FolderTree as FolderTreeIcon, Plus, Search, X } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -7,7 +7,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { buildFolderTree } from '@/lib/folder-tree'
 import { useCreateNote, useNotes } from '@/lib/notes-api'
-import { CaptureDialog } from './capture-dialog'
 import { FolderTree } from './folder-tree'
 import { SearchPanel } from './search-panel'
 
@@ -24,7 +23,6 @@ export function NotesLayout() {
   const [mode, setMode] = useState<SidebarMode>('files')
   const [filter, setFilter] = useState('')
   const [query, setQuery] = useState('')
-  const [captureOpen, setCaptureOpen] = useState(false)
   const { data: notes = [], isLoading } = useNotes('')
   const params = useParams({ strict: false }) as { slug?: string }
   const navigate = useNavigate()
@@ -76,14 +74,9 @@ export function NotesLayout() {
                 <Search className="size-4" />
               </ToggleGroupItem>
             </ToggleGroup>
-            <div className="flex items-center gap-1.5">
-              <Button size="sm" onClick={() => setCaptureOpen(true)}>
-                <Sparkles className="size-4" /> Capture
-              </Button>
-              <Button size="sm" variant="outline" onClick={onNew} disabled={createNote.isPending}>
-                <Plus className="size-4" /> New
-              </Button>
-            </div>
+            <Button size="sm" variant="outline" onClick={onNew} disabled={createNote.isPending}>
+              <Plus className="size-4" /> New
+            </Button>
           </div>
           <div className="relative">
             <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -125,7 +118,6 @@ export function NotesLayout() {
       <div className="flex min-w-0 flex-1">
         <Outlet />
       </div>
-      <CaptureDialog open={captureOpen} onOpenChange={setCaptureOpen} />
     </div>
   )
 }

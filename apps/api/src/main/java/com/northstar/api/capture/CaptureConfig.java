@@ -2,6 +2,7 @@ package com.northstar.api.capture;
 
 import com.northstar.core.capture.CaptureService;
 import com.northstar.core.note.NoteService;
+import java.time.ZoneId;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,6 @@ class CaptureConfig {
 
     @Bean
     CaptureService captureService(ChatClient captureChatClient, NoteService notes) {
-        return new CaptureService(captureChatClient, notes);
+        return new CaptureService(captureChatClient, notes, ZoneId.systemDefault());
     }
 }

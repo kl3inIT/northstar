@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { FileText, Plus } from 'lucide-react'
+import { FileText, Plus, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import {
   CommandDialog,
@@ -17,7 +17,7 @@ import { useCreateNote, useNotes } from '@/lib/notes-api'
  * subsequence scorer), plus a "New note" action. Navigation only; full-text
  * body search lives in the notes sidebar's Search mode.
  */
-export function CommandMenu() {
+export function CommandMenu({ onCapture }: { onCapture?: () => void }) {
   const [open, setOpen] = useState(false)
   const { data: notes = [] } = useNotes('')
   const navigate = useNavigate()
@@ -73,6 +73,17 @@ export function CommandMenu() {
         </CommandGroup>
         <CommandSeparator />
         <CommandGroup heading="Actions">
+          {onCapture && (
+            <CommandItem
+              onSelect={() => {
+                setOpen(false)
+                onCapture()
+              }}
+            >
+              <Sparkles className="text-muted-foreground" />
+              Capture (AI)
+            </CommandItem>
+          )}
           <CommandItem onSelect={onNew}>
             <Plus className="text-muted-foreground" />
             New note
