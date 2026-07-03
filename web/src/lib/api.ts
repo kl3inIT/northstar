@@ -1,12 +1,7 @@
 import createClient from 'openapi-fetch'
+import type { paths } from './api.gen'
 
-// Typed HTTP client against the Spring api.
-//
-// After the api exposes OpenAPI and you run `pnpm gen:api`, a `src/lib/api.gen.d.ts`
-// file appears with a `paths` type. Switch the two lines below to make every call
-// type-checked against the backend contract:
-//
-//   import type { paths } from './api.gen'
-//   export const api = createClient<paths>({ baseUrl: '/' })
-
-export const api = createClient({ baseUrl: '/' })
+// Typed HTTP client generated from the api's OpenAPI contract (springdoc → openapi.json
+// → `pnpm gen:api`). Requests and responses are checked against the backend contract;
+// never hand-write these types — regenerate after changing the api.
+export const api = createClient<paths>({ baseUrl: '/' })
