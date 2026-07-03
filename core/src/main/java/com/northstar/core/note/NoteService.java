@@ -150,6 +150,6 @@ public class NoteService {
 
     private NoteSummary summary(Note note, String snippet) {
         return new NoteSummary(note.getId(), note.getTitle(), note.getSlug(), note.getFolderPath(),
-                snippet, List.copyOf(note.getTags()), note.getUpdatedAt());
+                snippet, List.copyOf(note.getTags()), note.getCreatedAt(), note.getUpdatedAt());
     }
 }

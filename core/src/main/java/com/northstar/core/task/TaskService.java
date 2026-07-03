@@ -84,6 +84,16 @@ public class TaskService {
                 .stream().map(this::summary).toList();
     }
 
+    /** Dated tasks (any status) with due date inside [from, to] — calendar/board. */
+    @Transactional(readOnly = true)
+    public List<TaskSummary> range(LocalDate from, LocalDate to) {
+        if (to.isBefore(from)) {
+            throw new IllegalArgumentException("to must not be before from");
+        }
+        return tasks.findByDueDateBetweenOrderByDueDateAscDueTimeAscCreatedAtAsc(from, to)
+                .stream().map(this::summary).toList();
+    }
+
     /** Undated open tasks — "someday". */
     @Transactional(readOnly = true)
     public List<TaskSummary> someday() {

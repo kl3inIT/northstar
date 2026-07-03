@@ -12,5 +12,6 @@ public record NoteSummary(
         String folderPath,
         String snippet,
         List<String> tags,
+        Instant createdAt,
         Instant updatedAt) {
 }

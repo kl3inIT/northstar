@@ -1,10 +1,9 @@
-import { Link, Outlet, useLocation } from '@tanstack/react-router'
+import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router'
 import {
   BookOpen,
   Calendar,
   CheckSquare,
   FileText,
-  Inbox,
   LogOut,
   Settings,
   Sparkles,
@@ -14,8 +13,7 @@ import {
   Wallet,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { CaptureBar } from '@/components/capture-bar'
+import { useEffect } from 'react'
 import { CommandMenu } from '@/components/command-menu'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
@@ -36,20 +34,19 @@ import {
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/' | '/notes'
+  to?: '/' | '/notes' | '/tasks'
   exact?: boolean
 }
 
 const NAV: NavItem[] = [
   { label: 'Today', icon: Sun, to: '/', exact: true },
-  { label: 'Inbox', icon: Inbox },
+  { label: 'Tasks', icon: CheckSquare, to: '/tasks' },
   { label: 'Calendar', icon: Calendar },
   { label: 'Notes', icon: FileText, to: '/notes' },
   { label: 'Study', icon: BookOpen },
   { label: 'Scholarships', icon: Trophy },
   { label: 'Finance', icon: Wallet },
   { label: 'Habits', icon: Target },
-  { label: 'Tasks', icon: CheckSquare },
 ]
 
 /**
@@ -59,24 +56,26 @@ const NAV: NavItem[] = [
  */
 export function AppShell() {
   const pathname = useLocation({ select: (l) => l.pathname })
-  const [captureOpen, setCaptureOpen] = useState(false)
+  const navigate = useNavigate()
 
-  // Global capture hotkey — Ctrl/Cmd+Shift+K (plain Ctrl+K is the quick switcher).
+  // Global capture hotkey — Ctrl/Cmd+Shift+K jumps to the Capture page and
+  // focuses the composer (plain Ctrl+K is the quick switcher).
   useEffect(() => {
     function down(e: KeyboardEvent) {
       if (e.key.toLowerCase() === 'k' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
-        setCaptureOpen((v) => !v)
+        navigate({ to: '/capture' }).then(() => {
+          document.querySelector<HTMLTextAreaElement>('[data-capture-input]')?.focus()
+        })
       }
     }
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
-  }, [])
+  }, [navigate])
 
   return (
     <SidebarProvider>
-      <CommandMenu onCapture={() => setCaptureOpen(true)} />
-      <CaptureBar open={captureOpen} onOpenChange={setCaptureOpen} />
+      <CommandMenu onCapture={() => navigate({ to: '/capture' })} />
       <Toaster position="bottom-right" richColors />
       <Sidebar collapsible="icon">
         <SidebarHeader>
@@ -87,12 +86,14 @@ export function AppShell() {
             </span>
           </div>
           <Button
-            onClick={() => setCaptureOpen(true)}
+            asChild
             className="mt-1 w-full justify-start gap-2 group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
           >
-            <Sparkles className="size-4 shrink-0" />
-            <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">Capture</span>
-            <kbd className="text-[10px] opacity-70 group-data-[collapsible=icon]:hidden">⌃⇧K</kbd>
+            <Link to="/capture">
+              <Sparkles className="size-4 shrink-0" />
+              <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">Capture</span>
+              <kbd className="text-[10px] opacity-70 group-data-[collapsible=icon]:hidden">⌃⇧K</kbd>
+            </Link>
           </Button>
         </SidebarHeader>
         <SidebarContent>

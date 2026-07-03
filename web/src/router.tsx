@@ -3,6 +3,8 @@ import { AppShell } from '@/components/app-shell'
 import { NoteView } from '@/features/notes/note-view'
 import { NotesEmpty } from '@/features/notes/notes-empty'
 import { NotesLayout } from '@/features/notes/notes-layout'
+import { CapturePage } from '@/pages/capture'
+import { TasksPage } from '@/pages/tasks'
 import { TodayPage } from '@/pages/today'
 
 const rootRoute = createRootRoute({ component: AppShell })
@@ -11,6 +13,18 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   component: TodayPage,
+})
+
+const captureRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'capture',
+  component: CapturePage,
+})
+
+const tasksRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'tasks',
+  component: TasksPage,
 })
 
 const notesRoute = createRoute({
@@ -33,6 +47,8 @@ const noteRoute = createRoute({
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  captureRoute,
+  tasksRoute,
   notesRoute.addChildren([notesIndexRoute, noteRoute]),
 ])
 

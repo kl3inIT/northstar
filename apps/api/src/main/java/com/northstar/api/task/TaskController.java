@@ -2,6 +2,7 @@ package com.northstar.api.task;
 
 import com.northstar.core.task.TaskService;
 import com.northstar.core.task.TaskSummary;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
@@ -50,6 +51,16 @@ class TaskController {
     @GetMapping("/someday")
     List<TaskSummary> someday() {
         return tasks.someday();
+    }
+
+    @GetMapping("/range")
+    List<TaskSummary> range(
+            @RequestParam("from") LocalDate from,
+            @RequestParam("to") LocalDate to) {
+        if (to.isBefore(from) || from.plusDays(400).isBefore(to)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid range");
+        }
+        return tasks.range(from, to);
     }
 
     @PostMapping

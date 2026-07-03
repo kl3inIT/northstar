@@ -22,4 +22,7 @@ interface TaskRepository extends JpaRepository<Task, UUID> {
     /** Tasks completed on/after {@code since} — Today keeps just-finished items visible. */
     List<Task> findByStatusAndCompletedAtGreaterThanEqualOrderByCompletedAtDesc(
             TaskStatus status, java.time.Instant since);
+
+    /** Dated tasks in a window, any status — calendar cells and board columns. */
+    List<Task> findByDueDateBetweenOrderByDueDateAscDueTimeAscCreatedAtAsc(LocalDate from, LocalDate to);
 }

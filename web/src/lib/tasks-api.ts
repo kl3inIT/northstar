@@ -51,6 +51,20 @@ export async function upcomingTasks(days = 7): Promise<Task[]> {
   return (data ?? []).map(toTask)
 }
 
+export async function rangeTasks(from: string, to: string): Promise<Task[]> {
+  const { data, error } = await api.GET('/api/tasks/range', {
+    params: { query: { from, to } },
+  })
+  if (error) throw error
+  return (data ?? []).map(toTask)
+}
+
+export async function somedayTasks(): Promise<Task[]> {
+  const { data, error } = await api.GET('/api/tasks/someday')
+  if (error) throw error
+  return (data ?? []).map(toTask)
+}
+
 export async function createTask(body: TaskInput): Promise<Task> {
   const { data, error } = await api.POST('/api/tasks', { body })
   if (error) throw error
@@ -77,6 +91,14 @@ export function useTodayTasks() {
 
 export function useUpcomingTasks(days = 7) {
   return useQuery({ queryKey: ['tasks', 'upcoming', days], queryFn: () => upcomingTasks(days) })
+}
+
+export function useRangeTasks(from: string, to: string) {
+  return useQuery({ queryKey: ['tasks', 'range', from, to], queryFn: () => rangeTasks(from, to) })
+}
+
+export function useSomedayTasks() {
+  return useQuery({ queryKey: ['tasks', 'someday'], queryFn: somedayTasks })
 }
 
 export function useCreateTask() {
