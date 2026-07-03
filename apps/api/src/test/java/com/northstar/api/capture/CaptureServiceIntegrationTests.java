@@ -2,12 +2,14 @@ package com.northstar.api.capture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.northstar.core.capture.CaptureDraft;
 import com.northstar.core.capture.CaptureService;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -62,6 +64,21 @@ class CaptureServiceIntegrationTests {
         assertThat(draft.kind()).isEqualTo(CaptureDraft.Kind.NOTE);
         assertThat(draft.note().title()).isEqualTo("HSK 4 listening tips");
         assertThat(draft.note().contentMarkdown()).contains("[[HSK 4 Grammar]]");
+    }
+
+    @Test
+    void forcedKindSkipsClassificationInThePrompt() {
+        modelReturns("""
+                {"kind":"TASK","task":{"title":"Mua bút dạ quang","dueDate":"2026-07-04"}}
+                """);
+
+        CaptureDraft draft = capture.draft("mua bút dạ quang, hạn ngày mai", CaptureDraft.Kind.TASK);
+
+        assertThat(draft.kind()).isEqualTo(CaptureDraft.Kind.TASK);
+        ArgumentCaptor<Prompt> prompt = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(prompt.capture());
+        assertThat(prompt.getValue().getSystemMessage().getText())
+                .contains("already chose the kind: TASK");
     }
 
     @Test

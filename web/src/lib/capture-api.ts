@@ -5,11 +5,13 @@ import { createTask, deleteTask } from './tasks-api'
 
 type Schemas = components['schemas']
 
+export type CaptureKind = 'TASK' | 'NOTE'
+
 export type CaptureResult =
   | { kind: 'TASK'; id: string; title: string; dueDate: string | null; undo: () => Promise<void> }
   | { kind: 'NOTE'; id: string; title: string; slug: string; folderPath: string; undo: () => Promise<void> }
 
-async function deleteNote(id: string): Promise<void> {
+export async function deleteNote(id: string): Promise<void> {
   const { error } = await api.DELETE('/api/notes/{id}', { params: { path: { id } } })
   if (error) throw error
 }
@@ -17,11 +19,12 @@ async function deleteNote(id: string): Promise<void> {
 /**
  * Fire-and-forget capture: classify with one LLM call, then create the task or
  * note immediately. The caller shows a toast with the returned {@code undo}
- * (deletes what was just created) instead of a review dialog.
+ * (deletes what was just created) instead of a review dialog. Passing
+ * {@code kind} (the "Thêm task"/"Thêm note" chips) skips classification.
  */
-export async function capture(text: string): Promise<CaptureResult> {
+export async function capture(text: string, kind?: CaptureKind): Promise<CaptureResult> {
   const { data, error } = await api.POST('/api/capture/draft', {
-    body: { text } satisfies Schemas['CaptureRequest'],
+    body: { text, kind } satisfies Schemas['CaptureRequest'],
   })
   if (error) throw error
   const draft = data as Schemas['CaptureDraft']

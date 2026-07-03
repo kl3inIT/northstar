@@ -73,6 +73,14 @@ public class CaptureService {
 
     /** One LLM round-trip: raw text in, classified reviewable draft out. */
     public CaptureDraft draft(String rawText) {
+        return draft(rawText, null);
+    }
+
+    /**
+     * Like {@link #draft(String)}, but when {@code forcedKind} is non-null the
+     * user already chose task-vs-note — the model only shapes the draft.
+     */
+    public CaptureDraft draft(String rawText, CaptureDraft.Kind forcedKind) {
         List<NoteSummary> existing = notes.list();
         Set<String> folders = new LinkedHashSet<>();
         Set<String> tags = new LinkedHashSet<>();
@@ -87,10 +95,18 @@ public class CaptureService {
             }
         }
         LocalDate today = LocalDate.now(zone);
+        String system = SYSTEM_PROMPT.formatted(
+                today, today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH),
+                bulleted(folders), bulleted(tags), bulleted(titles));
+        if (forcedKind != null) {
+            system += """
+
+                    The user already chose the kind: %s. Do NOT reclassify — set kind
+                    to %s and shape the matching draft following the rules above.
+                    """.formatted(forcedKind, forcedKind);
+        }
         return chat.prompt()
-                .system(SYSTEM_PROMPT.formatted(
-                        today, today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH),
-                        bulleted(folders), bulleted(tags), bulleted(titles)))
+                .system(system)
                 .user(rawText)
                 .call()
                 .entity(CaptureDraft.class);

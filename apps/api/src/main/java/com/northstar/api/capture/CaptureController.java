@@ -30,6 +30,6 @@ class CaptureController {
         if (request.text() == null || request.text().isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "text is required");
         }
-        return capture.draft(request.text().strip());
+        return capture.draft(request.text().strip(), request.kind());
     }
 }
