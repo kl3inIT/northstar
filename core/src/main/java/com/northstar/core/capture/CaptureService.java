@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 /**
  * Classifies raw captured text (task vs note) and shapes it into a reviewable
@@ -25,6 +27,7 @@ import org.springframework.ai.chat.client.ChatClient;
 public class CaptureService {
 
     private static final int MAX_CONTEXT_TITLES = 100;
+    private static final int MAX_CONTEXT_NOTES = 300;
 
     private static final String SYSTEM_PROMPT = """
             You are the capture inbox of a personal knowledge base + task manager.
@@ -81,7 +84,9 @@ public class CaptureService {
      * user already chose task-vs-note — the model only shapes the draft.
      */
     public CaptureDraft draft(String rawText, CaptureDraft.Kind forcedKind) {
-        List<NoteSummary> existing = notes.list();
+        List<NoteSummary> existing = notes
+                .list(PageRequest.of(0, MAX_CONTEXT_NOTES, Sort.by(Sort.Direction.DESC, "updatedAt")))
+                .getContent();
         Set<String> folders = new LinkedHashSet<>();
         Set<String> tags = new LinkedHashSet<>();
         Set<String> titles = new LinkedHashSet<>();

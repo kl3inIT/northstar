@@ -2,6 +2,7 @@ package com.northstar.api.task;
 
 import com.northstar.core.task.TaskService;
 import com.northstar.core.task.TaskSummary;
+import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
@@ -24,7 +25,8 @@ import org.springframework.web.server.ResponseStatusException;
 /**
  * REST delivery for the task module. "Today" is timezone-sensitive, so list
  * endpoints take the browser zone via the {@code X-Timezone} header (IANA id),
- * defaulting to the server zone.
+ * defaulting to the server zone. Body validation is Bean Validation on
+ * {@link TaskRequest}; violations become 400 ProblemDetail via the global advice.
  */
 @RestController
 @RequestMapping("/api/tasks")
@@ -65,15 +67,13 @@ class TaskController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    TaskSummary create(@RequestBody TaskRequest request) {
-        return tasks.create(requireTitle(request.title()), request.notes(),
-                request.dueDate(), request.dueTime());
+    TaskSummary create(@Valid @RequestBody TaskRequest request) {
+        return tasks.create(request.title(), request.notes(), request.dueDate(), request.dueTime());
     }
 
     @PutMapping("/{id}")
-    TaskSummary update(@PathVariable UUID id, @RequestBody TaskRequest request) {
-        return tasks.update(id, requireTitle(request.title()), request.notes(),
-                request.dueDate(), request.dueTime());
+    TaskSummary update(@PathVariable UUID id, @Valid @RequestBody TaskRequest request) {
+        return tasks.update(id, request.title(), request.notes(), request.dueDate(), request.dueTime());
     }
 
     @PatchMapping("/{id}/status")
@@ -93,12 +93,5 @@ class TaskController {
         } catch (Exception e) {
             return ZoneId.systemDefault();
         }
-    }
-
-    private static String requireTitle(String title) {
-        if (title == null || title.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "title is required");
-        }
-        return title;
     }
 }

@@ -2,14 +2,15 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
 import type { NoteDetail, NoteInput, NoteSummary, NoteUpdate } from './notes-types'
 
+/** First page of notes, newest-first. 500 covers a personal KB; page further when needed. */
 export async function listNotes(): Promise<NoteSummary[]> {
-  const { data, error } = await api.GET('/api/notes')
+  const { data, error } = await api.GET('/api/notes', { params: { query: { page: 0, size: 500 } } })
   if (error) throw error
-  return (data ?? []) as NoteSummary[]
+  return (data?.content ?? []) as NoteSummary[]
 }
 
 export async function searchNotes(query: string): Promise<NoteSummary[]> {
-  const { data, error } = await api.GET('/api/notes', { params: { query: { q: query } } })
+  const { data, error } = await api.GET('/api/notes/search', { params: { query: { q: query } } })
   if (error) throw error
   return (data ?? []) as NoteSummary[]
 }

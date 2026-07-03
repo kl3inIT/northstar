@@ -38,7 +38,16 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
   function save() {
     if (!canSave) return
     update.mutate(
-      { id: note.id, body: { title: title.trim(), folderPath, contentMarkdown: content, tags: textToTags(tagsText) } },
+      {
+        id: note.id,
+        body: {
+          title: title.trim(),
+          folderPath,
+          contentMarkdown: content,
+          tags: textToTags(tagsText),
+          version: note.version,
+        },
+      },
       {
         onSuccess: (next) => {
           onDone()
@@ -99,7 +108,11 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
           </div>
         </div>
         {update.isError && (
-          <p className="text-sm text-destructive">Lưu thất bại. Kiểm tra tiêu đề rồi thử lại.</p>
+          <p className="text-sm text-destructive">
+            {(update.error as { status?: number } | null)?.status === 409
+              ? 'Note đã bị sửa ở nơi khác — đóng editor và mở lại để lấy bản mới nhất.'
+              : 'Lưu thất bại. Kiểm tra tiêu đề rồi thử lại.'}
+          </p>
         )}
       </header>
       <div className="grid min-h-0 flex-1 grid-cols-2 divide-x">

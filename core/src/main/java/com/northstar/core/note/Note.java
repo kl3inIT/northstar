@@ -1,14 +1,13 @@
 package com.northstar.core.note;
 
+import com.northstar.core.shared.BaseEntity;
 import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
-import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -17,15 +16,12 @@ import java.util.UUID;
  * A note. The Markdown body is the portable content; wiki links inside it are
  * derived into {@code note_link} for backlinks and graph views. Organisation is
  * Obsidian-style: a {@code folderPath} bucket (the tree is derived from paths),
- * {@code tags} that cut across folders, and the link graph.
+ * {@code tags} that cut across folders, and the link graph. Identity, audit
+ * timestamps and optimistic locking come from {@link BaseEntity}.
  */
 @Entity
 @Table(name = "note")
-public class Note {
-
-    @Id
-    @Column(nullable = false, updatable = false)
-    private UUID id;
+public class Note extends BaseEntity {
 
     @NotBlank
     @Column(nullable = false)
@@ -45,30 +41,18 @@ public class Note {
     @Column(name = "tag")
     private Set<String> tags = new LinkedHashSet<>();
 
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
-
-    @Column(name = "updated_at", nullable = false)
-    private Instant updatedAt;
-
     protected Note() {
         // for JPA
     }
 
     public Note(UUID id, String title, String slug, String folderPath,
-                String contentMarkdown, Set<String> tags, Instant now) {
-        this.id = id;
+                String contentMarkdown, Set<String> tags) {
+        super(id);
         this.title = title;
         this.slug = slug;
         this.folderPath = folderPath == null ? "" : folderPath;
         this.contentMarkdown = contentMarkdown == null ? "" : contentMarkdown;
         this.tags = tags == null ? new LinkedHashSet<>() : new LinkedHashSet<>(tags);
-        this.createdAt = now;
-        this.updatedAt = now;
-    }
-
-    public UUID getId() {
-        return id;
     }
 
     public String getTitle() {
@@ -91,15 +75,7 @@ public class Note {
         return tags;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public void edit(String title, String folderPath, String contentMarkdown, Set<String> tags, Instant now) {
+    public void edit(String title, String folderPath, String contentMarkdown, Set<String> tags) {
         this.title = title;
         this.folderPath = folderPath == null ? "" : folderPath;
         this.contentMarkdown = contentMarkdown == null ? "" : contentMarkdown;
@@ -107,6 +83,5 @@ public class Note {
         if (tags != null) {
             this.tags.addAll(tags);
         }
-        this.updatedAt = now;
     }
 }

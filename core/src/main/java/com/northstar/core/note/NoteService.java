@@ -1,6 +1,5 @@
 package com.northstar.core.note;
 
-import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -9,7 +8,9 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.data.domain.Sort;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,20 +42,32 @@ public class NoteService {
 
     @Transactional
     public NoteDetail create(String title, String folderPath, String markdown, Collection<String> tags) {
-        Instant now = Instant.now();
         Note note = new Note(UUID.randomUUID(), title.strip(), uniqueSlug(title),
-                NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags), now);
+                NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags));
         notes.save(note);
         syncOutgoingLinks(note);
         resolveInboundLinks(note);
         return detail(note);
     }
 
+    /**
+     * {@code expectedVersion} (when given) is the version the client loaded; a
+     * mismatch means someone else saved in between — fail with a conflict
+     * instead of silently overwriting their edit.
+     */
     @Transactional
-    public NoteDetail update(UUID id, String title, String folderPath, String markdown, Collection<String> tags) {
+    public NoteDetail update(UUID id, String title, String folderPath, String markdown,
+                             Collection<String> tags, Long expectedVersion) {
         Note note = notes.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
-        note.edit(title.strip(), NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags), Instant.now());
+        if (expectedVersion != null && note.getVersion() != expectedVersion) {
+            throw new OptimisticLockingFailureException(
+                    "Note " + id + " was modified concurrently (expected version " + expectedVersion
+                            + ", is " + note.getVersion() + ")");
+        }
+        note.edit(title.strip(), NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags));
         syncOutgoingLinks(note);
+        // Flush now so @LastModifiedDate/@Version are current in the response.
+        notes.saveAndFlush(note);
         return detail(note);
     }
 
@@ -74,9 +87,10 @@ public class NoteService {
         return notes.findBySlug(slug).map(this::detail);
     }
 
+    /** Notes newest-first, bounded: callers page instead of pulling the whole table. */
     @Transactional(readOnly = true)
-    public List<NoteSummary> list() {
-        return notes.findAll(Sort.by(Sort.Direction.DESC, "updatedAt")).stream().map(this::summary).toList();
+    public Page<NoteSummary> list(Pageable pageable) {
+        return notes.findAll(pageable).map(this::summary);
     }
 
     @Transactional(readOnly = true)
@@ -132,7 +146,7 @@ public class NoteService {
                 .toList();
         return new NoteDetail(note.getId(), note.getTitle(), note.getSlug(), note.getFolderPath(),
                 note.getContentMarkdown(), List.copyOf(note.getTags()), note.getCreatedAt(), note.getUpdatedAt(),
-                outgoing, backlinks);
+                note.getVersion(), outgoing, backlinks);
     }
 
     private NoteRef outgoingRef(NoteLink link) {

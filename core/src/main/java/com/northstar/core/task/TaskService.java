@@ -28,7 +28,7 @@ public class TaskService {
     public TaskSummary create(String title, String notes, LocalDate dueDate, LocalTime dueTime) {
         Task task = new Task(UUID.randomUUID(), title.strip(),
                 notes == null || notes.isBlank() ? null : notes.strip(),
-                dueDate, dueTime, Instant.now());
+                dueDate, dueTime);
         tasks.save(task);
         return summary(task);
     }
@@ -37,7 +37,7 @@ public class TaskService {
     public TaskSummary update(UUID id, String title, String notes, LocalDate dueDate, LocalTime dueTime) {
         Task task = tasks.findById(id).orElseThrow(() -> new TaskNotFoundException(id));
         task.edit(title.strip(), notes == null || notes.isBlank() ? null : notes.strip(),
-                dueDate, dueTime, Instant.now());
+                dueDate, dueTime);
         return summary(task);
     }
 
@@ -47,7 +47,7 @@ public class TaskService {
         if (done) {
             task.complete(Instant.now());
         } else {
-            task.reopen(Instant.now());
+            task.reopen();
         }
         return summary(task);
     }

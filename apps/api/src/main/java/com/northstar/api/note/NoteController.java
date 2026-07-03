@@ -4,8 +4,12 @@ import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteNotFoundException;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteSummary;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,17 +21,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
- * REST delivery for the note module (Phase 1). Thin adapter: it only translates
- * HTTP to {@link NoteService} calls — all note logic (wiki-link parse, backlinks,
- * search) lives in {@code :core}. {@code GET /api/notes?q=} runs keyword search;
- * without {@code q} it lists notes newest-first.
+ * REST delivery for the note module. Thin adapter: it only translates HTTP to
+ * {@link NoteService} calls — all note logic (wiki-link parse, backlinks,
+ * search) lives in {@code :core}. Listing is paged (newest-first); keyword
+ * search is its own endpoint so both have a precise OpenAPI schema. Input
+ * validation is Bean Validation on the request records; violations become 400
+ * ProblemDetail via the global advice.
  */
 @RestController
 @RequestMapping("/api/notes")
 class NoteController {
+
+    private static final int MAX_PAGE_SIZE = 500;
 
     private final NoteService notes;
 
@@ -36,8 +43,17 @@ class NoteController {
     }
 
     @GetMapping
-    List<NoteSummary> list(@RequestParam(name = "q", required = false) String q) {
-        return (q == null || q.isBlank()) ? notes.list() : notes.search(q);
+    PagedModel<NoteSummary> list(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "100") int size) {
+        var pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
+                Sort.by(Sort.Direction.DESC, "updatedAt"));
+        return new PagedModel<>(notes.list(pageable));
+    }
+
+    @GetMapping("/search")
+    List<NoteSummary> search(@RequestParam("q") String q) {
+        return notes.search(q);
     }
 
     @GetMapping("/{slug}")
@@ -47,27 +63,19 @@ class NoteController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    NoteDetail create(@RequestBody CreateNoteRequest request) {
-        return notes.create(requireTitle(request.title()), request.folderPath(),
-                request.contentMarkdown(), request.tags());
+    NoteDetail create(@Valid @RequestBody CreateNoteRequest request) {
+        return notes.create(request.title(), request.folderPath(), request.contentMarkdown(), request.tags());
     }
 
     @PutMapping("/{id}")
-    NoteDetail update(@PathVariable UUID id, @RequestBody UpdateNoteRequest request) {
-        return notes.update(id, requireTitle(request.title()), request.folderPath(),
-                request.contentMarkdown(), request.tags());
+    NoteDetail update(@PathVariable UUID id, @Valid @RequestBody UpdateNoteRequest request) {
+        return notes.update(id, request.title(), request.folderPath(),
+                request.contentMarkdown(), request.tags(), request.version());
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void delete(@PathVariable UUID id) {
         notes.delete(id);
-    }
-
-    private static String requireTitle(String title) {
-        if (title == null || title.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "title is required");
-        }
-        return title;
     }
 }

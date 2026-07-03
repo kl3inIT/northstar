@@ -2,12 +2,11 @@ package com.northstar.api.capture;
 
 import com.northstar.core.capture.CaptureDraft;
 import com.northstar.core.capture.CaptureService;
-import org.springframework.http.HttpStatus;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * REST delivery for AI capture. Interactive by design: the user pastes text and
@@ -26,10 +25,7 @@ class CaptureController {
     }
 
     @PostMapping("/draft")
-    CaptureDraft draft(@RequestBody CaptureRequest request) {
-        if (request.text() == null || request.text().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "text is required");
-        }
+    CaptureDraft draft(@Valid @RequestBody CaptureRequest request) {
         return capture.draft(request.text().strip(), request.kind());
     }
 }
