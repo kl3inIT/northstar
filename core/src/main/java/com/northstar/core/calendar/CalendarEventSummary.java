@@ -6,9 +6,11 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Read model for calendar events. {@code notes} and {@code disciplineId} are
- * genuinely nullable; the {@code @NotNull} marks make the rest required in the
- * generated OpenAPI client.
+ * Read model for calendar events. {@code notes}, {@code disciplineId} and
+ * {@code rrule} are genuinely nullable; the {@code @NotNull} marks make the
+ * rest required in the generated OpenAPI client. A recurring master expands
+ * into one summary per occurrence: same {@code id}, occurrence start/end,
+ * {@code rrule} carried so clients know it is one buổi of a series.
  */
 public record CalendarEventSummary(
         @NotNull UUID id,
@@ -18,5 +20,6 @@ public record CalendarEventSummary(
         @NotNull Instant endAt,
         boolean allDay,
         @NotNull ColorName color,
-        UUID disciplineId) {
+        UUID disciplineId,
+        String rrule) {
 }

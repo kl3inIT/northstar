@@ -2,14 +2,19 @@ package com.northstar.core.calendar;
 
 import com.northstar.core.shared.BaseEntity;
 import com.northstar.core.shared.ColorName;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -49,12 +54,22 @@ public class CalendarEvent extends BaseEntity {
     @Column(name = "discipline_id")
     private UUID disciplineId;
 
+    /** RFC 5545 recurrence rule (subset, see {@link RecurrenceRule}); null = one-off event. */
+    @Column(length = 512)
+    private String rrule;
+
+    /** Occurrence starts the user deleted ("chỉ buổi này") — skipped at expansion. */
+    @ElementCollection
+    @CollectionTable(name = "calendar_event_exception", joinColumns = @JoinColumn(name = "event_id"))
+    @Column(name = "occurrence_start", nullable = false)
+    private Set<Instant> cancelledOccurrences = new HashSet<>();
+
     protected CalendarEvent() {
         // for JPA
     }
 
     public CalendarEvent(UUID id, String title, String notes, Instant startAt, Instant endAt,
-            boolean allDay, ColorName color, UUID disciplineId) {
+            boolean allDay, ColorName color, UUID disciplineId, String rrule) {
         super(id);
         this.title = title;
         this.notes = notes;
@@ -63,6 +78,7 @@ public class CalendarEvent extends BaseEntity {
         this.allDay = allDay;
         this.color = color;
         this.disciplineId = disciplineId;
+        this.rrule = rrule;
     }
 
     public String getTitle() {
@@ -93,8 +109,20 @@ public class CalendarEvent extends BaseEntity {
         return disciplineId;
     }
 
+    public String getRrule() {
+        return rrule;
+    }
+
+    public boolean isRecurring() {
+        return rrule != null;
+    }
+
+    public Set<Instant> getCancelledOccurrences() {
+        return Set.copyOf(cancelledOccurrences);
+    }
+
     public void edit(String title, String notes, Instant startAt, Instant endAt,
-            boolean allDay, ColorName color, UUID disciplineId) {
+            boolean allDay, ColorName color, UUID disciplineId, String rrule) {
         this.title = title;
         this.notes = notes;
         this.startAt = startAt;
@@ -102,6 +130,12 @@ public class CalendarEvent extends BaseEntity {
         this.allDay = allDay;
         this.color = color;
         this.disciplineId = disciplineId;
+        this.rrule = rrule;
+    }
+
+    /** "Chỉ buổi này": drop one generated occurrence, keep the rest of the series. */
+    public void cancelOccurrence(Instant occurrenceStart) {
+        cancelledOccurrences.add(occurrenceStart);
     }
 
     /** Drag-drop / resize: move the block without touching the text fields. */

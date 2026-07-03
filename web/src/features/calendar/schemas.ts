@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const WEEKDAY_CODES = ["MO", "TU", "WE", "TH", "FR", "SA", "SU"] as const;
+
 /** Combine a picked day with an "HH:mm" time-input value. */
 export function combine(date: Date, time: string): Date {
   const [hour = 0, minute = 0] = time.split(":").map(Number);
@@ -21,6 +23,10 @@ export const eventSchema = z
       error: "Chọn màu",
     }),
     disciplineId: z.string().optional(),
+    // Recurrence (lịch lặp): weekly defaults byDay to the start date's weekday on submit.
+    repeat: z.enum(["none", "daily", "weekly"]),
+    byDay: z.array(z.enum(WEEKDAY_CODES)),
+    until: z.date().optional(),
   })
   .refine(data => combine(data.startDate, data.startTime) < combine(data.endDate, data.endTime), {
     message: "Kết thúc phải sau bắt đầu",

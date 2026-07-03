@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogHeader, DialogClose, DialogContent, DialogTrigger, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 import { combine, eventSchema } from "@/features/calendar/schemas";
+import { buildRrule } from "@/features/calendar/recurrence";
 import { EventFormFields } from "@/features/calendar/components/dialogs/event-form-fields";
 
 import type { EventColor } from "@/lib/calendar-api";
@@ -34,6 +35,9 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
       allDay: false,
       color: "blue",
       disciplineId: undefined,
+      repeat: "none",
+      byDay: [],
+      until: undefined,
       startDate,
       startTime: startTime ? `${pad(startTime.hour)}:${pad(startTime.minute)}` : "",
       endDate: startDate,
@@ -51,6 +55,7 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
         allDay: values.allDay,
         color: values.color.toUpperCase() as EventColor,
         disciplineId: values.disciplineId,
+        rrule: buildRrule(values, values.startDate),
       },
       {
         onSuccess: () => toast.success("Đã tạo event"),

@@ -1,8 +1,9 @@
 import { format, parseISO } from "date-fns";
-import { Calendar, CheckCircle2, Clock, ListTodo, Tag, Text, Trash2, Undo2 } from "lucide-react";
+import { Calendar, CheckCircle2, Clock, ListTodo, Repeat, Tag, Text, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useDeleteEvent } from "@/lib/calendar-api";
+import { humanizeRrule } from "@/features/calendar/recurrence";
 import { useOpenTasksByDiscipline, useSetTaskDone } from "@/lib/tasks-api";
 import { useDisclosure } from "@/hooks/use-disclosure";
 
@@ -26,14 +27,29 @@ export function EventDetailsDialog({ event, children }: IProps) {
   const startDate = parseISO(event.startDate);
   const endDate = parseISO(event.endDate);
   const isTask = event.kind === "task";
+  const isRecurring = !!event.rrule;
   // LDP agenda: a block for a discipline shows that discipline's open tasks.
   const { data: agenda = [] } = useOpenTasksByDiscipline(
     isOpen && !isTask ? event.disciplineId : undefined,
   );
   const timeFormat = event.allDay || isTask ? "MMM d, yyyy" : "MMM d, yyyy h:mm a";
 
+  /** One-off event, or "cả chuỗi" on a recurring one. */
   const handleDelete = () => {
-    deleteEvent.mutate(event.id, { onSuccess: () => toast.success("Đã xóa event") });
+    deleteEvent.mutate(
+      { id: event.masterId ?? event.id },
+      { onSuccess: () => toast.success(isRecurring ? "Đã xóa cả chuỗi" : "Đã xóa event") },
+    );
+    onClose();
+  };
+
+  /** "Chỉ buổi này": the series keeps every other occurrence. */
+  const handleDeleteOccurrence = () => {
+    if (!event.masterId || !event.occurrenceStart) return;
+    deleteEvent.mutate(
+      { id: event.masterId, occurrenceStart: event.occurrenceStart },
+      { onSuccess: () => toast.success("Đã xóa buổi này") },
+    );
     onClose();
   };
 
@@ -66,6 +82,16 @@ export function EventDetailsDialog({ event, children }: IProps) {
               <div>
                 <p className="text-sm font-medium">Kết thúc</p>
                 <p className="text-sm text-muted-foreground">{format(endDate, timeFormat)}</p>
+              </div>
+            </div>
+          )}
+
+          {isRecurring && (
+            <div className="flex items-start gap-2">
+              <Repeat className="mt-1 size-4 shrink-0" />
+              <div>
+                <p className="text-sm font-medium">Lặp lại</p>
+                <p className="text-sm text-muted-foreground">{humanizeRrule(event.rrule!)}</p>
               </div>
             </div>
           )}
@@ -133,8 +159,13 @@ export function EventDetailsDialog({ event, children }: IProps) {
             </Button>
           ) : (
             <>
+              {isRecurring && (
+                <Button type="button" variant="outline" onClick={handleDeleteOccurrence}>
+                  <Trash2 /> Xóa buổi này
+                </Button>
+              )}
               <Button type="button" variant="outline" onClick={handleDelete}>
-                <Trash2 /> Xóa
+                <Trash2 /> {isRecurring ? "Xóa cả chuỗi" : "Xóa"}
               </Button>
               <EditEventDialog event={event}>
                 <Button type="button" variant="outline">

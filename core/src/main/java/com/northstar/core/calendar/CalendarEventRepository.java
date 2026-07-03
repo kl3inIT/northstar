@@ -8,6 +8,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 /** Repository for {@link CalendarEvent}. Other modules go through {@link CalendarEventService}. */
 interface CalendarEventRepository extends JpaRepository<CalendarEvent, UUID> {
 
-    /** Events overlapping the visible window [from, to). */
-    List<CalendarEvent> findByStartAtLessThanAndEndAtGreaterThanOrderByStartAtAsc(Instant to, Instant from);
+    /** One-off events overlapping the visible window [from, to). */
+    List<CalendarEvent> findByRruleIsNullAndStartAtLessThanAndEndAtGreaterThanOrderByStartAtAsc(Instant to, Instant from);
+
+    /** Recurring masters whose series has started before the window's end — expanded in code. */
+    List<CalendarEvent> findByRruleIsNotNullAndStartAtLessThan(Instant to);
 }

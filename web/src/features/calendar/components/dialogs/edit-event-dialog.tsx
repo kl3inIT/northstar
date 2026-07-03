@@ -1,15 +1,17 @@
+import { useEffect } from "react";
 import { format, parseISO } from "date-fns";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 
 import { useDisclosure } from "@/hooks/use-disclosure";
-import { useUpdateEventMutation } from "@/lib/calendar-api";
+import { useEventMaster, useUpdateEventMutation } from "@/lib/calendar-api";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogHeader, DialogClose, DialogContent, DialogTrigger, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogHeader, DialogClose, DialogContent, DialogTrigger, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 import { combine, eventSchema } from "@/features/calendar/schemas";
+import { buildRrule, parseRrule } from "@/features/calendar/recurrence";
 import { EventFormFields } from "@/features/calendar/components/dialogs/event-form-fields";
 
 import type { EventColor } from "@/lib/calendar-api";
@@ -21,9 +23,15 @@ interface IProps {
   event: IEvent;
 }
 
+/**
+ * Edits the event ROW — for a recurring series that is the whole chuỗi, so the
+ * form prefills from the master (fetched on open), not from the clicked buổi.
+ */
 export function EditEventDialog({ children, event }: IProps) {
   const { isOpen, onClose, onToggle } = useDisclosure();
   const updateEvent = useUpdateEventMutation();
+  const isRecurring = !!event.rrule;
+  const { data: master } = useEventMaster(isOpen && isRecurring ? (event.masterId ?? event.id) : undefined);
 
   const form = useForm<TEventFormData>({
     resolver: zodResolver(eventSchema),
@@ -37,13 +45,32 @@ export function EditEventDialog({ children, event }: IProps) {
       endTime: format(parseISO(event.endDate), "HH:mm"),
       color: event.color,
       disciplineId: event.disciplineId,
+      ...parseRrule(event.rrule),
     },
   });
+
+  // Recurring: swap the occurrence prefill for the series anchor once it loads,
+  // otherwise saving would silently re-anchor the chuỗi at the clicked buổi.
+  useEffect(() => {
+    if (!master) return;
+    form.reset({
+      title: master.title,
+      description: master.notes ?? "",
+      allDay: master.allDay ?? false,
+      startDate: parseISO(master.startAt),
+      startTime: format(parseISO(master.startAt), "HH:mm"),
+      endDate: parseISO(master.endAt),
+      endTime: format(parseISO(master.endAt), "HH:mm"),
+      color: master.color.toLowerCase() as TEventFormData["color"],
+      disciplineId: master.disciplineId,
+      ...parseRrule(master.rrule ?? undefined),
+    });
+  }, [master, form]);
 
   const onSubmit = (values: TEventFormData) => {
     updateEvent.mutate(
       {
-        id: event.id,
+        id: event.masterId ?? event.id,
         body: {
           title: values.title,
           notes: values.description?.trim() ? values.description : undefined,
@@ -52,10 +79,11 @@ export function EditEventDialog({ children, event }: IProps) {
           allDay: values.allDay,
           color: values.color.toUpperCase() as EventColor,
           disciplineId: values.disciplineId,
+          rrule: buildRrule(values, values.startDate),
         },
       },
       {
-        onSuccess: () => toast.success("Đã lưu event"),
+        onSuccess: () => toast.success(isRecurring ? "Đã lưu cả chuỗi" : "Đã lưu event"),
       },
     );
     onClose();
@@ -67,7 +95,10 @@ export function EditEventDialog({ children, event }: IProps) {
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Sửa event</DialogTitle>
+          <DialogTitle>{isRecurring ? "Sửa chuỗi lặp" : "Sửa event"}</DialogTitle>
+          {isRecurring && (
+            <DialogDescription>Thay đổi áp dụng cho CẢ CHUỖI; ngày bắt đầu là mốc neo của chuỗi.</DialogDescription>
+          )}
         </DialogHeader>
 
         <EventFormFields form={form} onSubmit={onSubmit} />

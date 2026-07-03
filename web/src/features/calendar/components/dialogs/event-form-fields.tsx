@@ -5,7 +5,9 @@ import { SingleDayPicker } from "@/components/ui/single-day-picker";
 import { Form, FormField, FormLabel, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+import { cn } from "@/lib/utils";
 import { useDisciplines } from "@/lib/disciplines-api";
+import { WEEKDAYS, weekdayCodeOf } from "@/features/calendar/recurrence";
 
 import type { UseFormReturn } from "react-hook-form";
 import type { TEventFormData } from "@/features/calendar/schemas";
@@ -30,6 +32,7 @@ interface IProps {
 /** The shared add/edit event form body — one source for both dialogs. */
 export function EventFormFields({ form, onSubmit }: IProps) {
   const allDay = form.watch("allDay");
+  const repeat = form.watch("repeat");
   const { data: disciplines = [] } = useDisciplines();
 
   return (
@@ -145,6 +148,95 @@ export function EventFormFields({ form, onSubmit }: IProps) {
             />
           )}
         </div>
+
+        <div className="flex items-start gap-2">
+          <FormField
+            control={form.control}
+            name="repeat"
+            render={({ field }) => (
+              <FormItem className="flex-1">
+                <FormLabel>Lặp lại</FormLabel>
+                <FormControl>
+                  <Select
+                    value={field.value}
+                    onValueChange={value => {
+                      field.onChange(value);
+                      // Weekly seeds the toggle row with the start date's weekday.
+                      if (value === "weekly" && form.getValues("byDay").length === 0) {
+                        const start = form.getValues("startDate");
+                        if (start) form.setValue("byDay", [weekdayCodeOf(start)]);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Không lặp" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Không lặp</SelectItem>
+                      <SelectItem value="daily">Hàng ngày</SelectItem>
+                      <SelectItem value="weekly">Hàng tuần</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {repeat !== "none" && (
+            <FormField
+              control={form.control}
+              name="until"
+              render={({ field }) => (
+                <FormItem className="flex-1">
+                  <FormLabel>Đến ngày (tùy chọn)</FormLabel>
+                  <FormControl>
+                    <SingleDayPicker value={field.value} onSelect={date => field.onChange(date)} placeholder="Mãi mãi" />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+        </div>
+
+        {repeat === "weekly" && (
+          <FormField
+            control={form.control}
+            name="byDay"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Vào các thứ</FormLabel>
+                <FormControl>
+                  <div className="flex gap-1.5">
+                    {WEEKDAYS.map(day => {
+                      const active = field.value.includes(day.code);
+                      return (
+                        <button
+                          key={day.code}
+                          type="button"
+                          aria-pressed={active}
+                          onClick={() =>
+                            field.onChange(
+                              active ? field.value.filter(code => code !== day.code) : [...field.value, day.code],
+                            )
+                          }
+                          className={cn(
+                            "flex size-8 items-center justify-center rounded-full border text-xs font-medium transition-colors",
+                            active ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+                          )}
+                        >
+                          {day.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         <FormField
           control={form.control}
