@@ -1,7 +1,6 @@
-import { ChevronLeft, ChevronRight, Clock } from 'lucide-react'
+import { Clock } from 'lucide-react'
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -19,9 +18,10 @@ function addDays(isoDate: string, days: number): string {
 }
 
 /**
- * Tasks — one store, three projections (Todoist-style): List and Board group by
- * due date, Calendar lays the same rows onto a month grid. Toggling a checkbox
- * works identically in every view.
+ * Tasks — one store, two projections (Todoist-style): List and Board group by
+ * due date. The time view lives on the Calendar page, which overlays these
+ * same tasks onto the real calendar. Toggling a checkbox works identically in
+ * every view.
  */
 export function TasksPage() {
   const today = iso(new Date())
@@ -35,11 +35,10 @@ export function TasksPage() {
           <TabsList>
             <TabsTrigger value="list">List</TabsTrigger>
             <TabsTrigger value="board">Board</TabsTrigger>
-            <TabsTrigger value="calendar">Calendar</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
-      {view === 'calendar' ? <CalendarView today={today} /> : <GroupedViews today={today} board={view === 'board'} />}
+      <GroupedViews today={today} board={view === 'board'} />
     </div>
   )
 }
@@ -150,112 +149,6 @@ function TaskLine({ task, overdue, compact }: { task: Task; overdue?: boolean; c
           <Clock className="size-3" /> {task.dueTime.slice(0, 5)}
         </Badge>
       )}
-    </div>
-  )
-}
-
-function CalendarView({ today }: { today: string }) {
-  const [monthStart, setMonthStart] = useState(() => {
-    const d = new Date()
-    return new Date(d.getFullYear(), d.getMonth(), 1)
-  })
-
-  // Monday-first grid covering the whole month.
-  const gridStart = new Date(monthStart)
-  gridStart.setDate(1 - ((monthStart.getDay() + 6) % 7))
-  const cells: Date[] = Array.from({ length: 42 }, (_, i) => {
-    const d = new Date(gridStart)
-    d.setDate(gridStart.getDate() + i)
-    return d
-  })
-  const weeks = cells.slice(35).some((d) => d.getMonth() === monthStart.getMonth()) ? cells : cells.slice(0, 35)
-
-  const from = iso(weeks[0])
-  const to = iso(weeks[weeks.length - 1])
-  const { data: tasks = [] } = useRangeTasks(from, to)
-  const byDate = new Map<string, Task[]>()
-  for (const t of tasks) {
-    if (!t.dueDate) continue
-    byDate.set(t.dueDate, [...(byDate.get(t.dueDate) ?? []), t])
-  }
-
-  function shiftMonth(delta: number) {
-    setMonthStart((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1))
-  }
-
-  const monthLabel = monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-
-  return (
-    <div className="mt-6">
-      <div className="mb-3 flex items-center justify-end gap-1">
-        <Button size="icon" variant="ghost" onClick={() => shiftMonth(-1)} aria-label="Previous month">
-          <ChevronLeft className="size-4" />
-        </Button>
-        <span className="w-36 text-center text-sm font-medium">{monthLabel}</span>
-        <Button size="icon" variant="ghost" onClick={() => shiftMonth(1)} aria-label="Next month">
-          <ChevronRight className="size-4" />
-        </Button>
-      </div>
-      <div className="grid grid-cols-7 overflow-hidden rounded-xl border text-sm">
-        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
-          <div key={d} className="border-b bg-muted/50 px-2 py-1.5 text-xs font-medium text-muted-foreground">
-            {d}
-          </div>
-        ))}
-        {weeks.map((d) => {
-          const key = iso(d)
-          const inMonth = d.getMonth() === monthStart.getMonth()
-          const isToday = key === today
-          const dayTasks = byDate.get(key) ?? []
-          return (
-            <div
-              key={key}
-              className={cn(
-                'min-h-24 border-b border-r p-1.5 [&:nth-child(7n+8)]:border-l-0',
-                !inMonth && 'bg-muted/30',
-              )}
-            >
-              <div className="mb-1 flex justify-end">
-                <span
-                  className={cn(
-                    'inline-flex size-6 items-center justify-center rounded-full text-xs',
-                    isToday ? 'bg-primary font-semibold text-primary-foreground' : 'text-muted-foreground',
-                    !inMonth && 'opacity-50',
-                  )}
-                >
-                  {d.getDate()}
-                </span>
-              </div>
-              <div className="space-y-1">
-                {dayTasks.slice(0, 3).map((t) => (
-                  <CalendarChip key={t.id} task={t} overdue={t.status === 'OPEN' && key < today} />
-                ))}
-                {dayTasks.length > 3 && (
-                  <div className="px-1 text-xs text-muted-foreground">+{dayTasks.length - 3} more</div>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-function CalendarChip({ task, overdue }: { task: Task; overdue: boolean }) {
-  const done = task.status === 'DONE'
-  return (
-    <div
-      title={task.title}
-      className={cn(
-        'truncate rounded-md px-1.5 py-0.5 text-xs',
-        done && 'bg-muted text-muted-foreground line-through',
-        !done && overdue && 'bg-destructive/10 text-destructive',
-        !done && !overdue && 'bg-primary/10 text-primary',
-      )}
-    >
-      {task.dueTime ? `${task.dueTime.slice(0, 5)} ` : ''}
-      {task.title}
     </div>
   )
 }

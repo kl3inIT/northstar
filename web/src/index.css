@@ -64,6 +64,11 @@
   --sidebar-ring: oklch(0.585 0.233 277.117);
 }
 
+/* Hatched background for non-working hours on the calendar week/day grids. */
+@utility bg-calendar-disabled-hour {
+  background-image: repeating-linear-gradient(-60deg, var(--border) 0 0.5px, transparent 0.5px 8px);
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

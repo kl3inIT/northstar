@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { CommandMenu } from '@/components/command-menu'
+import { ModeToggle } from '@/components/mode-toggle'
 import { Button } from '@/components/ui/button'
 import { Toaster } from '@/components/ui/sonner'
 import {
@@ -34,14 +35,14 @@ import {
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/' | '/notes' | '/tasks'
+  to?: '/' | '/notes' | '/tasks' | '/calendar'
   exact?: boolean
 }
 
 const NAV: NavItem[] = [
   { label: 'Today', icon: Sun, to: '/', exact: true },
   { label: 'Tasks', icon: CheckSquare, to: '/tasks' },
-  { label: 'Calendar', icon: Calendar },
+  { label: 'Calendar', icon: Calendar, to: '/calendar' },
   { label: 'Notes', icon: FileText, to: '/notes' },
   { label: 'Study', icon: BookOpen },
   { label: 'Scholarships', icon: Trophy },
@@ -123,6 +124,9 @@ export function AppShell() {
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
+            <SidebarMenuItem>
+              <ModeToggle />
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton tooltip="Settings" className="cursor-default opacity-60">
                 <Settings />
