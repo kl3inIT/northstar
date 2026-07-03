@@ -8,17 +8,20 @@ springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
 springModulith = "2.1.0"
 springdoc = "3.0.3"                 # OpenAPI 3 generation; 3.x is the Spring Boot 4 line (2.8.x = Boot 3.5)
+springAi = "2.0.0"                  # capture extraction now; embeddings + MCP tools later
 # Deferred until their features are implemented (kept here as the intended pins):
 # shedlock   -> distributed lock for @Scheduled jobs in :apps:worker
-# springAi   -> capture extraction + embeddings + MCP tools (add later)
 
 [libraries]
 # BOMs
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
 spring-modulith-bom = { module = "org.springframework.modulith:spring-modulith-bom", version.ref = "springModulith" }
+spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "springAi" }
 
 # Non-Spring libraries (need explicit versions — not in the Boot BOM)
 springdoc-webmvc = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api", version.ref = "springdoc" }
+spring-ai-client-chat = { module = "org.springframework.ai:spring-ai-client-chat" }
+spring-ai-starter-openai = { module = "org.springframework.ai:spring-ai-starter-model-openai" }
 
 # Convention-plugin build dependencies (used by :build-logic)
 plugin-spring-boot = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "springBoot" }

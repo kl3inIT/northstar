@@ -11,5 +11,6 @@ plugins {
 dependencyManagement {
     imports {
         mavenBom("org.springframework.modulith:spring-modulith-bom:2.1.0")
+        mavenBom("org.springframework.ai:spring-ai-bom:2.0.0")
     }
 }

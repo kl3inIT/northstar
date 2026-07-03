@@ -1,6 +1,9 @@
 spring:
   application:
     name: northstar-mcp
+  threads:
+    virtual:
+      enabled: true
   datasource:
     url: ${NORTHSTAR_DB_URL:jdbc:postgresql://localhost:5432/northstar}
     username: ${NORTHSTAR_DB_USER:northstar}

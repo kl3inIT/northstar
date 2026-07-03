@@ -4,6 +4,11 @@ spring:
   main:
     # No web server; run as a background process.
     web-application-type: none
+  threads:
+    virtual:
+      # @Scheduled + event listeners run on virtual threads — cheap to block on
+      # LLM-latency jobs.
+      enabled: true
   datasource:
     url: ${NORTHSTAR_DB_URL:jdbc:postgresql://localhost:5432/northstar}
     username: ${NORTHSTAR_DB_USER:northstar}

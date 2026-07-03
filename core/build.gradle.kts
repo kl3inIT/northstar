@@ -7,6 +7,9 @@ dependencies {
     api("org.springframework.boot:spring-boot-starter-data-jpa")
     api("org.springframework.boot:spring-boot-starter-validation")
     api("org.springframework.modulith:spring-modulith-starter-core")
+    // ChatClient API only — the model starter (and the ChatClient bean) lives in
+    // whichever app delivers the AI feature; core stays provider-agnostic.
+    api("org.springframework.ai:spring-ai-client-chat")
 
     // Internal to :core.
     implementation("org.springframework.modulith:spring-modulith-starter-jpa")

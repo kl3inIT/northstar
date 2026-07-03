@@ -1,6 +1,16 @@
 spring:
   application:
     name: northstar-api
+  config:
+    # Load repo-root .env (gitignored) as properties so OPENAI_API_KEY resolves
+    # without a shell env var. Both paths because the working dir differs between
+    # `./gradlew :apps:api:bootRun` (apps/api) and IDE run configs (repo root).
+    import: optional:file:.env[.properties],optional:file:../../.env[.properties]
+  threads:
+    virtual:
+      # Java 25 virtual threads for request handling — blocking LLM/DB calls park
+      # the virtual thread instead of pinning a platform thread.
+      enabled: true
   datasource:
     url: ${NORTHSTAR_DB_URL:jdbc:postgresql://localhost:5432/northstar}
     username: ${NORTHSTAR_DB_USER:northstar}
@@ -15,6 +25,13 @@ spring:
     enabled: true
     # Migrations ship on the classpath from :core (core/src/main/resources/db/migration).
     locations: classpath:db/migration
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      # Spring AI 2.0 dropped the `.options` layer (chat.options.model -> chat.model).
+      # No temperature: gpt-5.5 is a reasoning model and rejects any value but 1.
+      chat:
+        model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
 
 server:
   port: ${NORTHSTAR_API_PORT:8080}

@@ -13,6 +13,9 @@ dependencies {
     // Emits the OpenAPI contract at /v3/api-docs -> contracts/openapi.json -> web `pnpm gen:api`.
     implementation(libs.springdoc.webmvc)
 
+    // OpenAI ChatModel autoconfig for the capture extraction (core uses ChatClient).
+    implementation(libs.spring.ai.starter.openai)
+
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("org.springframework.modulith:spring-modulith-actuator")
     runtimeOnly("org.springframework.modulith:spring-modulith-runtime")

@@ -14,7 +14,9 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * {@code ddl-auto: validate}. If an entity column drifts from the migration, this
  * test fails at startup, not a user.
  */
-@SpringBootTest
+// Dummy key: the OpenAI autoconfig only validates presence at bean creation —
+// no request is made unless a capture runs.
+@SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
 @Testcontainers
 class NorthstarApiContextLoadTests {
 

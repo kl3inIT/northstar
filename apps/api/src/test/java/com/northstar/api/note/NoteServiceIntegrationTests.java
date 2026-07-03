@@ -22,7 +22,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * context-load test cannot cover — it proves the module actually works, not just
  * that it boots.
  */
-@SpringBootTest
+@SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
 @Testcontainers
 class NoteServiceIntegrationTests {
 
