@@ -25,4 +25,8 @@ interface TaskRepository extends JpaRepository<Task, UUID> {
 
     /** Dated tasks in a window, any status — calendar cells and board columns. */
     List<Task> findByDueDateBetweenOrderByDueDateAscDueTimeAscCreatedAtAsc(LocalDate from, LocalDate to);
+
+    /** Open tasks of one discipline — the agenda inside a study block's details. */
+    List<Task> findByStatusAndDisciplineIdOrderByDueDateAscDueTimeAscCreatedAtAsc(
+            TaskStatus status, UUID disciplineId);
 }

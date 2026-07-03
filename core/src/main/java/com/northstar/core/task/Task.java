@@ -43,16 +43,21 @@ public class Task extends BaseEntity {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    /** LDP spine: which discipline this action trains. Plain UUID — no JPA relation across modules. */
+    @Column(name = "discipline_id")
+    private UUID disciplineId;
+
     protected Task() {
         // for JPA
     }
 
-    public Task(UUID id, String title, String notes, LocalDate dueDate, LocalTime dueTime) {
+    public Task(UUID id, String title, String notes, LocalDate dueDate, LocalTime dueTime, UUID disciplineId) {
         super(id);
         this.title = title;
         this.notes = notes;
         this.dueDate = dueDate;
         this.dueTime = dueTime;
+        this.disciplineId = disciplineId;
     }
 
     public String getTitle() {
@@ -79,11 +84,16 @@ public class Task extends BaseEntity {
         return completedAt;
     }
 
-    public void edit(String title, String notes, LocalDate dueDate, LocalTime dueTime) {
+    public UUID getDisciplineId() {
+        return disciplineId;
+    }
+
+    public void edit(String title, String notes, LocalDate dueDate, LocalTime dueTime, UUID disciplineId) {
         this.title = title;
         this.notes = notes;
         this.dueDate = dueDate;
         this.dueTime = dueTime;
+        this.disciplineId = disciplineId;
     }
 
     public void complete(Instant now) {

@@ -36,10 +36,10 @@ class TaskServiceIntegrationTests {
     @Test
     void todayBundlesOverdueDueTodayAndCompletedToday() {
         LocalDate today = LocalDate.now(ZONE);
-        TaskSummary overdue = tasks.create("Nộp form học bổng", null, today.minusDays(2), null);
-        TaskSummary dueToday = tasks.create("Làm docs MLN121", null, today, null);
-        tasks.create("Mock test IELTS", null, today.plusDays(2), null);
-        TaskSummary done = tasks.create("Review essay", null, today, null);
+        TaskSummary overdue = tasks.create("Nộp form học bổng", null, today.minusDays(2), null, null);
+        TaskSummary dueToday = tasks.create("Làm docs MLN121", null, today, null, null);
+        tasks.create("Mock test IELTS", null, today.plusDays(2), null, null);
+        TaskSummary done = tasks.create("Review essay", null, today, null, null);
         tasks.setDone(done.id(), true);
 
         var todayList = tasks.today(ZONE);
@@ -54,8 +54,8 @@ class TaskServiceIntegrationTests {
     @Test
     void upcomingWindowsExcludeTodayAndReopenWorks() {
         LocalDate today = LocalDate.now(ZONE);
-        tasks.create("Đóng học phí", null, today.plusDays(5), null);
-        TaskSummary t = tasks.create("Học từ vựng", null, today, null);
+        tasks.create("Đóng học phí", null, today.plusDays(5), null, null);
+        TaskSummary t = tasks.create("Học từ vựng", null, today, null, null);
 
         assertThat(tasks.upcoming(ZONE, 7)).extracting(TaskSummary::title).contains("Đóng học phí");
         assertThat(tasks.upcoming(ZONE, 7)).extracting(TaskSummary::title).doesNotContain("Học từ vựng");

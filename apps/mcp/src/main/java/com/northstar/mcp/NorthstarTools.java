@@ -95,7 +95,7 @@ class NorthstarTools {
                     required = false) String dueTime,
             @McpToolParam(description = "Extra detail beyond the title",
                     required = false) String taskNotes) {
-        return tasks.create(title, taskNotes, parseDate(dueDate), parseTime(dueTime));
+        return tasks.create(title, taskNotes, parseDate(dueDate), parseTime(dueTime), null);
     }
 
     @McpTool(name = "complete_task", description = "Mark a task as done by its id (ids come from today_tasks/upcoming_tasks).")

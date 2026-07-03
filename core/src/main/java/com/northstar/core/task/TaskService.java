@@ -1,5 +1,6 @@
 package com.northstar.core.task;
 
+import com.northstar.core.discipline.DisciplineService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -19,25 +20,31 @@ import org.springframework.transaction.annotation.Transactional;
 public class TaskService {
 
     private final TaskRepository tasks;
+    private final DisciplineService disciplines;
 
-    TaskService(TaskRepository tasks) {
+    TaskService(TaskRepository tasks, DisciplineService disciplines) {
         this.tasks = tasks;
+        this.disciplines = disciplines;
     }
 
     @Transactional
-    public TaskSummary create(String title, String notes, LocalDate dueDate, LocalTime dueTime) {
+    public TaskSummary create(String title, String notes, LocalDate dueDate, LocalTime dueTime,
+            UUID disciplineId) {
+        requireDiscipline(disciplineId);
         Task task = new Task(UUID.randomUUID(), title.strip(),
                 notes == null || notes.isBlank() ? null : notes.strip(),
-                dueDate, dueTime);
+                dueDate, dueTime, disciplineId);
         tasks.save(task);
         return summary(task);
     }
 
     @Transactional
-    public TaskSummary update(UUID id, String title, String notes, LocalDate dueDate, LocalTime dueTime) {
+    public TaskSummary update(UUID id, String title, String notes, LocalDate dueDate, LocalTime dueTime,
+            UUID disciplineId) {
+        requireDiscipline(disciplineId);
         Task task = tasks.findById(id).orElseThrow(() -> new TaskNotFoundException(id));
         task.edit(title.strip(), notes == null || notes.isBlank() ? null : notes.strip(),
-                dueDate, dueTime);
+                dueDate, dueTime, disciplineId);
         return summary(task);
     }
 
@@ -101,12 +108,27 @@ public class TaskService {
                 .stream().map(this::summary).toList();
     }
 
+    /** Open tasks of one discipline — the agenda inside a study block's details. */
+    @Transactional(readOnly = true)
+    public List<TaskSummary> openByDiscipline(UUID disciplineId) {
+        return tasks.findByStatusAndDisciplineIdOrderByDueDateAscDueTimeAscCreatedAtAsc(
+                TaskStatus.OPEN, disciplineId)
+                .stream().map(this::summary).toList();
+    }
+
+    private void requireDiscipline(UUID disciplineId) {
+        if (disciplineId != null && !disciplines.exists(disciplineId)) {
+            throw new IllegalArgumentException("No discipline with id " + disciplineId);
+        }
+    }
+
     private static List<TaskSummary> concat(List<TaskSummary> a, List<TaskSummary> b) {
         return java.util.stream.Stream.concat(a.stream(), b.stream()).toList();
     }
 
     private TaskSummary summary(Task task) {
         return new TaskSummary(task.getId(), task.getTitle(), task.getNotes(), task.getStatus(),
-                task.getDueDate(), task.getDueTime(), task.getCompletedAt(), task.getCreatedAt());
+                task.getDueDate(), task.getDueTime(), task.getCompletedAt(), task.getCreatedAt(),
+                task.getDisciplineId());
     }
 }

@@ -18,7 +18,7 @@ export interface IEvent {
   kind: "event" | "task";
   taskDone?: boolean;
   /** Original task row (kind "task") — drag needs its fields to PUT the new due date. */
-  task?: { id: string; title: string; notes: string | null; dueTime: string | null };
+  task?: { id: string; title: string; notes: string | null; dueTime: string | null; disciplineId: string | null };
 }
 
 export interface ICalendarCell {

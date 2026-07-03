@@ -16,6 +16,7 @@ export type Task = {
   dueTime: string | null
   completedAt: string | null
   createdAt: string
+  disciplineId: string | null
 }
 
 export type TaskInput = Schemas['TaskRequest']
@@ -33,6 +34,7 @@ function toTask(t: Schemas['TaskSummary']): Task {
     dueTime: t.dueTime ?? null,
     completedAt: t.completedAt ?? null,
     createdAt: t.createdAt ?? '',
+    disciplineId: t.disciplineId ?? null,
   }
 }
 
@@ -61,6 +63,15 @@ export async function rangeTasks(from: string, to: string): Promise<Task[]> {
 
 export async function somedayTasks(): Promise<Task[]> {
   const { data, error } = await api.GET('/api/tasks/someday')
+  if (error) throw error
+  return (data ?? []).map(toTask)
+}
+
+/** Open tasks of one discipline — the agenda inside a study block's details. */
+export async function openTasksByDiscipline(disciplineId: string): Promise<Task[]> {
+  const { data, error } = await api.GET('/api/tasks/open', {
+    params: { query: { disciplineId } },
+  })
   if (error) throw error
   return (data ?? []).map(toTask)
 }
@@ -108,6 +119,14 @@ export function useRangeTasks(from: string, to: string) {
 
 export function useSomedayTasks() {
   return useQuery({ queryKey: ['tasks', 'someday'], queryFn: somedayTasks })
+}
+
+export function useOpenTasksByDiscipline(disciplineId: string | undefined) {
+  return useQuery({
+    queryKey: ['tasks', 'open', disciplineId],
+    queryFn: () => openTasksByDiscipline(disciplineId!),
+    enabled: !!disciplineId,
+  })
 }
 
 export function useCreateTask() {

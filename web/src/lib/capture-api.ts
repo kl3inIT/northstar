@@ -1,5 +1,6 @@
 import { api } from './api'
 import type { components } from './api.gen'
+import { listDisciplines } from './disciplines-api'
 import { createNote } from './notes-api'
 import { createTask, deleteTask } from './tasks-api'
 
@@ -31,11 +32,18 @@ export async function capture(text: string, kind?: CaptureKind): Promise<Capture
 
   if (draft.kind === 'TASK' && draft.task) {
     const t = draft.task
+    // The LLM names a discipline; resolve it to an id (exact name, else drop).
+    let disciplineId: string | undefined
+    if (t.disciplineName) {
+      const disciplines = await listDisciplines().catch(() => [])
+      disciplineId = disciplines.find((d) => d.name === t.disciplineName)?.id
+    }
     const created = await createTask({
       title: t.title ?? text,
       notes: t.notes,
       dueDate: t.dueDate,
       dueTime: t.dueTime,
+      disciplineId,
     })
     return {
       kind: 'TASK',

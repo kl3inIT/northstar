@@ -1,5 +1,7 @@
 package com.northstar.core.capture;
 
+import com.northstar.core.discipline.DisciplineService;
+import com.northstar.core.discipline.DisciplineSummary;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteSummary;
 import java.time.LocalDate;
@@ -41,8 +43,15 @@ public class CaptureService {
             - title: short imperative phrase (drop filler like "hôm nay tôi phải")
             - dueDate: ISO date. Resolve relative words against today ("hôm nay"=today,
               "mai"=tomorrow, "thứ 6"=the next Friday). Omit if no time reference.
-            - dueTime: ISO time only when the text names a clock time.
+            - dueTime: ISO time ONLY when the text names a clock time ("5pm", "17h").
+              NEVER invent one — "hôm nay"/"mai" are dates, not times; most tasks
+              have no dueTime.
             - notes: extra detail beyond the title, or omit.
+            - disciplineName: the ONE existing discipline (exact name from the list
+              below) this task clearly trains, else omit. Never invent a new one.
+
+            Existing disciplines:
+            %s
 
             CLASSIFY as NOTE when the text is knowledge worth keeping (an idea, a
             learning, reference material). Then fill `note` only:
@@ -66,11 +75,13 @@ public class CaptureService {
 
     private final ChatClient chat;
     private final NoteService notes;
+    private final DisciplineService disciplines;
     private final ZoneId zone;
 
-    public CaptureService(ChatClient chat, NoteService notes, ZoneId zone) {
+    public CaptureService(ChatClient chat, NoteService notes, DisciplineService disciplines, ZoneId zone) {
         this.chat = chat;
         this.notes = notes;
+        this.disciplines = disciplines;
         this.zone = zone;
     }
 
@@ -99,10 +110,14 @@ public class CaptureService {
                 titles.add(note.title());
             }
         }
+        Set<String> disciplineNames = new LinkedHashSet<>();
+        for (DisciplineSummary discipline : disciplines.list()) {
+            disciplineNames.add(discipline.name());
+        }
         LocalDate today = LocalDate.now(zone);
         String system = SYSTEM_PROMPT.formatted(
                 today, today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH),
-                bulleted(folders), bulleted(tags), bulleted(titles));
+                bulleted(disciplineNames), bulleted(folders), bulleted(tags), bulleted(titles));
         if (forcedKind != null) {
             system += """
 

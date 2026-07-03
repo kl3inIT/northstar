@@ -55,6 +55,12 @@ class TaskController {
         return tasks.someday();
     }
 
+    /** Open tasks of one discipline — the agenda inside a study block's details. */
+    @GetMapping("/open")
+    List<TaskSummary> openByDiscipline(@RequestParam("disciplineId") UUID disciplineId) {
+        return tasks.openByDiscipline(disciplineId);
+    }
+
     @GetMapping("/range")
     List<TaskSummary> range(
             @RequestParam("from") LocalDate from,
@@ -68,12 +74,14 @@ class TaskController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     TaskSummary create(@Valid @RequestBody TaskRequest request) {
-        return tasks.create(request.title(), request.notes(), request.dueDate(), request.dueTime());
+        return tasks.create(request.title(), request.notes(), request.dueDate(), request.dueTime(),
+                request.disciplineId());
     }
 
     @PutMapping("/{id}")
     TaskSummary update(@PathVariable UUID id, @Valid @RequestBody TaskRequest request) {
-        return tasks.update(id, request.title(), request.notes(), request.dueDate(), request.dueTime());
+        return tasks.update(id, request.title(), request.notes(), request.dueDate(), request.dueTime(),
+                request.disciplineId());
     }
 
     @PatchMapping("/{id}/status")
