@@ -7,8 +7,8 @@ java = "25"
 springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
 springModulith = "2.1.0"
+springdoc = "3.0.3"                 # OpenAPI 3 generation; 3.x is the Spring Boot 4 line (2.8.x = Boot 3.5)
 # Deferred until their features are implemented (kept here as the intended pins):
-# springdoc  -> OpenAPI generation for the `contracts/openapi.json` (add with api endpoints)
 # shedlock   -> distributed lock for @Scheduled jobs in :apps:worker
 # springAi   -> capture extraction + embeddings + MCP tools (add later)
 
@@ -16,6 +16,9 @@ springModulith = "2.1.0"
 # BOMs
 spring-boot-dependencies = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "springBoot" }
 spring-modulith-bom = { module = "org.springframework.modulith:spring-modulith-bom", version.ref = "springModulith" }
+
+# Non-Spring libraries (need explicit versions — not in the Boot BOM)
+springdoc-webmvc = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api", version.ref = "springdoc" }
 
 # Convention-plugin build dependencies (used by :build-logic)
 plugin-spring-boot = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "springBoot" }

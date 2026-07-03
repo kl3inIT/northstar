@@ -10,6 +10,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-database-postgresql")
 
+    // Emits the OpenAPI contract at /v3/api-docs -> contracts/openapi.json -> web `pnpm gen:api`.
+    implementation(libs.springdoc.webmvc)
+
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("org.springframework.modulith:spring-modulith-actuator")
     runtimeOnly("org.springframework.modulith:spring-modulith-runtime")
