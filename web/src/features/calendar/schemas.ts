@@ -20,6 +20,7 @@ export const eventSchema = z
     color: z.enum(["blue", "green", "red", "yellow", "purple", "orange", "gray"], {
       error: "Chọn màu",
     }),
+    disciplineId: z.string().optional(),
   })
   .refine(data => combine(data.startDate, data.startTime) < combine(data.endDate, data.endTime), {
     message: "Kết thúc phải sau bắt đầu",

@@ -5,8 +5,12 @@ import { SingleDayPicker } from "@/components/ui/single-day-picker";
 import { Form, FormField, FormLabel, FormItem, FormControl, FormMessage } from "@/components/ui/form";
 import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+import { useDisciplines } from "@/lib/disciplines-api";
+
 import type { UseFormReturn } from "react-hook-form";
 import type { TEventFormData } from "@/features/calendar/schemas";
+
+const NO_DISCIPLINE = "__none__";
 
 const COLORS = [
   { value: "blue", label: "Blue", dot: "bg-blue-600" },
@@ -26,6 +30,7 @@ interface IProps {
 /** The shared add/edit event form body — one source for both dialogs. */
 export function EventFormFields({ form, onSubmit }: IProps) {
   const allDay = form.watch("allDay");
+  const { data: disciplines = [] } = useDisciplines();
 
   return (
     <Form {...form}>
@@ -140,6 +145,43 @@ export function EventFormFields({ form, onSubmit }: IProps) {
             />
           )}
         </div>
+
+        <FormField
+          control={form.control}
+          name="disciplineId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Discipline</FormLabel>
+              <FormControl>
+                <Select
+                  value={field.value ?? NO_DISCIPLINE}
+                  onValueChange={value => {
+                    field.onChange(value === NO_DISCIPLINE ? undefined : value);
+                    // The discipline is the "calendar": picking one adopts its color.
+                    const discipline = disciplines.find(d => d.id === value);
+                    if (discipline) form.setValue("color", discipline.color.toLowerCase() as TEventFormData["color"]);
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Không thuộc discipline nào" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_DISCIPLINE}>Không</SelectItem>
+                    {disciplines.map(d => (
+                      <SelectItem key={d.id} value={d.id}>
+                        <div className="flex items-center gap-2">
+                          <div className={`size-3.5 rounded-full ${COLORS.find(c => c.value === d.color.toLowerCase())?.dot ?? "bg-neutral-600"}`} />
+                          {d.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

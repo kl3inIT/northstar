@@ -33,6 +33,7 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
       description: "",
       allDay: false,
       color: "blue",
+      disciplineId: undefined,
       startDate,
       startTime: startTime ? `${pad(startTime.hour)}:${pad(startTime.minute)}` : "",
       endDate: startDate,
@@ -49,6 +50,7 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
         endAt: combine(values.endDate, values.allDay ? "23:59" : values.endTime).toISOString(),
         allDay: values.allDay,
         color: values.color.toUpperCase() as EventColor,
+        disciplineId: values.disciplineId,
       },
       {
         onSuccess: () => toast.success("Đã tạo event"),

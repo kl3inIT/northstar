@@ -1,5 +1,7 @@
 package com.northstar.core.calendar;
 
+import com.northstar.core.discipline.DisciplineService;
+import com.northstar.core.shared.ColorName;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -15,9 +17,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class CalendarEventService {
 
     private final CalendarEventRepository events;
+    private final DisciplineService disciplines;
 
-    CalendarEventService(CalendarEventRepository events) {
+    CalendarEventService(CalendarEventRepository events, DisciplineService disciplines) {
         this.events = events;
+        this.disciplines = disciplines;
     }
 
     /** Events overlapping [from, to) — the visible month/week/day window. */
@@ -32,20 +36,22 @@ public class CalendarEventService {
 
     @Transactional
     public CalendarEventSummary create(String title, String notes, Instant startAt, Instant endAt,
-            boolean allDay, EventColor color) {
+            boolean allDay, ColorName color, UUID disciplineId) {
         requireValidSpan(startAt, endAt);
+        requireDiscipline(disciplineId);
         CalendarEvent event = new CalendarEvent(UUID.randomUUID(), title.strip(), clean(notes),
-                startAt, endAt, allDay, color);
+                startAt, endAt, allDay, color, disciplineId);
         events.save(event);
         return summary(event);
     }
 
     @Transactional
     public CalendarEventSummary update(UUID id, String title, String notes, Instant startAt,
-            Instant endAt, boolean allDay, EventColor color) {
+            Instant endAt, boolean allDay, ColorName color, UUID disciplineId) {
         requireValidSpan(startAt, endAt);
+        requireDiscipline(disciplineId);
         CalendarEvent event = events.findById(id).orElseThrow(() -> new CalendarEventNotFoundException(id));
-        event.edit(title.strip(), clean(notes), startAt, endAt, allDay, color);
+        event.edit(title.strip(), clean(notes), startAt, endAt, allDay, color, disciplineId);
         return summary(event);
     }
 
@@ -66,6 +72,12 @@ public class CalendarEventService {
         events.deleteById(id);
     }
 
+    private void requireDiscipline(UUID disciplineId) {
+        if (disciplineId != null && !disciplines.exists(disciplineId)) {
+            throw new IllegalArgumentException("No discipline with id " + disciplineId);
+        }
+    }
+
     private static void requireValidSpan(Instant startAt, Instant endAt) {
         if (!endAt.isAfter(startAt)) {
             throw new IllegalArgumentException("endAt must be after startAt");
@@ -78,6 +90,7 @@ public class CalendarEventService {
 
     private CalendarEventSummary summary(CalendarEvent event) {
         return new CalendarEventSummary(event.getId(), event.getTitle(), event.getNotes(),
-                event.getStartAt(), event.getEndAt(), event.isAllDay(), event.getColor());
+                event.getStartAt(), event.getEndAt(), event.isAllDay(), event.getColor(),
+                event.getDisciplineId());
     }
 }

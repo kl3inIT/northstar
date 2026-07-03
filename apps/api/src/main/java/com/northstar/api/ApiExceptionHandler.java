@@ -42,6 +42,12 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
 
+    /** Domain guard rejected the request (bad reference id, invalid span, ...). */
+    @ExceptionHandler(IllegalArgumentException.class)
+    ProblemDetail badRequest(IllegalArgumentException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
     /** Stale write (optimistic locking): the resource changed since the client read it. */
     @ExceptionHandler(OptimisticLockingFailureException.class)
     ProblemDetail conflict(OptimisticLockingFailureException e) {

@@ -19,7 +19,7 @@ export function YearViewMonth({ month, events }: IProps) {
 
   const daysInMonth = useMemo(() => {
     const totalDays = getDaysInMonth(month);
-    const firstDay = startOfMonth(month).getDay();
+    const firstDay = (startOfMonth(month).getDay() + 6) % 7; // Monday-first
 
     const days = Array.from({ length: totalDays }, (_, i) => i + 1);
     const blanks = Array(firstDay).fill(null);
@@ -27,7 +27,7 @@ export function YearViewMonth({ month, events }: IProps) {
     return [...blanks, ...days];
   }, [month]);
 
-  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   const handleClick = () => {
     setSelectedDate(new Date(month.getFullYear(), month.getMonth(), 1));

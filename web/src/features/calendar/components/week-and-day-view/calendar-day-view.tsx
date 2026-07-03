@@ -139,7 +139,7 @@ export function CalendarDayView({ singleDayEvents, multiDayEvents }: IProps) {
       </div>
 
       <div className="hidden w-64 divide-y border-l md:block">
-        <MiniCalendar className="mx-auto w-fit" mode="single" selected={selectedDate} onSelect={setSelectedDate} autoFocus />
+        <MiniCalendar className="mx-auto w-fit" mode="single" weekStartsOn={1} selected={selectedDate} onSelect={setSelectedDate} autoFocus />
 
         <div className="flex-1 space-y-3">
           {currentEvents.length > 0 ? (

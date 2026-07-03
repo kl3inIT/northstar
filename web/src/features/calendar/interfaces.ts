@@ -13,8 +13,12 @@ export interface IEvent {
   color: TEventColor;
   description: string;
   allDay?: boolean;
+  disciplineId?: string;
+  disciplineName?: string;
   kind: "event" | "task";
   taskDone?: boolean;
+  /** Original task row (kind "task") — drag needs its fields to PUT the new due date. */
+  task?: { id: string; title: string; notes: string | null; dueTime: string | null };
 }
 
 export interface ICalendarCell {

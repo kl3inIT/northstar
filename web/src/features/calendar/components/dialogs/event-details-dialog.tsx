@@ -1,5 +1,5 @@
 import { format, parseISO } from "date-fns";
-import { Calendar, CheckCircle2, Clock, Text, Trash2, Undo2 } from "lucide-react";
+import { Calendar, CheckCircle2, Clock, Tag, Text, Trash2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useDeleteEvent } from "@/lib/calendar-api";
@@ -61,6 +61,16 @@ export function EventDetailsDialog({ event, children }: IProps) {
               <div>
                 <p className="text-sm font-medium">Kết thúc</p>
                 <p className="text-sm text-muted-foreground">{format(endDate, timeFormat)}</p>
+              </div>
+            </div>
+          )}
+
+          {event.disciplineName && (
+            <div className="flex items-start gap-2">
+              <Tag className="mt-1 size-4 shrink-0" />
+              <div>
+                <p className="text-sm font-medium">Discipline</p>
+                <p className="text-sm text-muted-foreground">{event.disciplineName}</p>
               </div>
             </div>
           )}

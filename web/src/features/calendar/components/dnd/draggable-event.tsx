@@ -18,7 +18,6 @@ interface DraggableEventProps {
 
 export function DraggableEvent({ event, children }: DraggableEventProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const isTask = event.kind === "task";
 
   const [{ isDragging }, drag, preview] = useDrag(() => ({
     type: ItemTypes.EVENT,
@@ -35,7 +34,7 @@ export function DraggableEvent({ event, children }: DraggableEventProps) {
     preview(getEmptyImage(), { captureDraggingState: true });
   }, [preview]);
 
-  if (!isTask) drag(ref);
+  drag(ref);
 
   return (
     <div ref={ref} className={cn(isDragging && "opacity-40")}>

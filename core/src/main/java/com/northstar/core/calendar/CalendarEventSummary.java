@@ -1,12 +1,14 @@
 package com.northstar.core.calendar;
 
+import com.northstar.core.shared.ColorName;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Read model for calendar events. Only {@code notes} is nullable; the
- * {@code @NotNull} marks make the rest required in the generated OpenAPI client.
+ * Read model for calendar events. {@code notes} and {@code disciplineId} are
+ * genuinely nullable; the {@code @NotNull} marks make the rest required in the
+ * generated OpenAPI client.
  */
 public record CalendarEventSummary(
         @NotNull UUID id,
@@ -15,5 +17,6 @@ public record CalendarEventSummary(
         @NotNull Instant startAt,
         @NotNull Instant endAt,
         boolean allDay,
-        @NotNull EventColor color) {
+        @NotNull ColorName color,
+        UUID disciplineId) {
 }

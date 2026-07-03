@@ -36,6 +36,7 @@ export function EditEventDialog({ children, event }: IProps) {
       endDate: parseISO(event.endDate),
       endTime: format(parseISO(event.endDate), "HH:mm"),
       color: event.color,
+      disciplineId: event.disciplineId,
     },
   });
 
@@ -50,6 +51,7 @@ export function EditEventDialog({ children, event }: IProps) {
           endAt: combine(values.endDate, values.allDay ? "23:59" : values.endTime).toISOString(),
           allDay: values.allDay,
           color: values.color.toUpperCase() as EventColor,
+          disciplineId: values.disciplineId,
         },
       },
       {

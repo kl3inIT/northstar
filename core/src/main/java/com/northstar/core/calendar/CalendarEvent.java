@@ -1,6 +1,7 @@
 package com.northstar.core.calendar;
 
 import com.northstar.core.shared.BaseEntity;
+import com.northstar.core.shared.ColorName;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -42,14 +43,18 @@ public class CalendarEvent extends BaseEntity {
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private EventColor color = EventColor.BLUE;
+    private ColorName color = ColorName.BLUE;
+
+    /** LDP spine: which discipline this block serves. Plain UUID — no JPA relation across modules. */
+    @Column(name = "discipline_id")
+    private UUID disciplineId;
 
     protected CalendarEvent() {
         // for JPA
     }
 
     public CalendarEvent(UUID id, String title, String notes, Instant startAt, Instant endAt,
-            boolean allDay, EventColor color) {
+            boolean allDay, ColorName color, UUID disciplineId) {
         super(id);
         this.title = title;
         this.notes = notes;
@@ -57,6 +62,7 @@ public class CalendarEvent extends BaseEntity {
         this.endAt = endAt;
         this.allDay = allDay;
         this.color = color;
+        this.disciplineId = disciplineId;
     }
 
     public String getTitle() {
@@ -79,18 +85,23 @@ public class CalendarEvent extends BaseEntity {
         return allDay;
     }
 
-    public EventColor getColor() {
+    public ColorName getColor() {
         return color;
     }
 
+    public UUID getDisciplineId() {
+        return disciplineId;
+    }
+
     public void edit(String title, String notes, Instant startAt, Instant endAt,
-            boolean allDay, EventColor color) {
+            boolean allDay, ColorName color, UUID disciplineId) {
         this.title = title;
         this.notes = notes;
         this.startAt = startAt;
         this.endAt = endAt;
         this.allDay = allDay;
         this.color = color;
+        this.disciplineId = disciplineId;
     }
 
     /** Drag-drop / resize: move the block without touching the text fields. */

@@ -71,6 +71,15 @@ export async function createTask(body: TaskInput): Promise<Task> {
   return toTask(data as Schemas['TaskSummary'])
 }
 
+export async function updateTask(id: string, body: TaskInput): Promise<Task> {
+  const { data, error } = await api.PUT('/api/tasks/{id}', {
+    params: { path: { id } },
+    body,
+  })
+  if (error) throw error
+  return toTask(data as Schemas['TaskSummary'])
+}
+
 export async function setTaskDone(id: string, done: boolean): Promise<Task> {
   const { data, error } = await api.PATCH('/api/tasks/{id}/status', {
     params: { path: { id } },
@@ -105,6 +114,14 @@ export function useCreateTask() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createTask,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+  })
+}
+
+export function useUpdateTask() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: TaskInput }) => updateTask(id, body),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   })
 }

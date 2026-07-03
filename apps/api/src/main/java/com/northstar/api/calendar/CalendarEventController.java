@@ -54,14 +54,14 @@ class CalendarEventController {
     CalendarEventSummary create(@Valid @RequestBody CalendarEventRequest request) {
         requireValidSpan(request.startAt(), request.endAt());
         return events.create(request.title(), request.notes(), request.startAt(), request.endAt(),
-                request.allDay(), request.color());
+                request.allDay(), request.color(), request.disciplineId());
     }
 
     @PutMapping("/{id}")
     CalendarEventSummary update(@PathVariable UUID id, @Valid @RequestBody CalendarEventRequest request) {
         requireValidSpan(request.startAt(), request.endAt());
         return events.update(id, request.title(), request.notes(), request.startAt(), request.endAt(),
-                request.allDay(), request.color());
+                request.allDay(), request.color(), request.disciplineId());
     }
 
     /** Drag-drop / resize: move the block without resending the text fields. */

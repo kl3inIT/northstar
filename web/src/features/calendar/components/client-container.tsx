@@ -33,7 +33,7 @@ export function ClientContainer() {
       }
 
       if (view === "week") {
-        const dayOfWeek = selectedDate.getDay();
+        const dayOfWeek = (selectedDate.getDay() + 6) % 7; // Monday-first
 
         const weekStart = new Date(selectedDate);
         weekStart.setDate(selectedDate.getDate() - dayOfWeek);

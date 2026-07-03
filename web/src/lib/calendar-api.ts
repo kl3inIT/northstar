@@ -15,6 +15,7 @@ export interface CalendarEventInput {
   endAt: string
   allDay: boolean
   color: EventColor
+  disciplineId?: string
 }
 
 /** API record → the UI model the vendored calendar components render. */
@@ -27,6 +28,7 @@ function toEvent(e: Schemas['CalendarEventSummary']): IEvent {
     endDate: e.endAt,
     allDay: e.allDay ?? false,
     color: e.color.toLowerCase() as TEventColor,
+    disciplineId: e.disciplineId,
     kind: 'event',
   }
 }
