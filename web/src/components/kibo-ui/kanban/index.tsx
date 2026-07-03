@@ -162,7 +162,9 @@ export const KanbanCards = <T extends KanbanItemProps = KanbanItemProps>({
   const items = filteredData.map((item) => item.id);
 
   return (
-    <ScrollArea className="overflow-hidden">
+    // Radix viewport wraps children in a display:table div that refuses to
+    // shrink, so long card titles blow past the column edge — force block.
+    <ScrollArea className="overflow-hidden [&_[data-slot=scroll-area-viewport]>div]:!block">
       <SortableContext items={items}>
         <div
           className={cn("flex flex-grow flex-col gap-2 p-2", className)}

@@ -274,13 +274,50 @@ function TaskKanban({ groups, today, disciplines }: { groups: Group[]; today: st
             <KanbanCards id={column.id}>
               {(item: BoardItem) => (
                 <KanbanCard key={item.id} {...item}>
-                  <TaskLine task={item.task} overdue={originById.get(item.id) === 'overdue'} disciplines={disciplines} compact />
+                  <BoardCard task={item.task} overdue={originById.get(item.id) === 'overdue'} disciplines={disciplines} />
                 </KanbanCard>
               )}
             </KanbanCards>
           </KanbanBoard>
         )}
       </KanbanProvider>
+    </div>
+  )
+}
+
+/** Kanban card body: title wraps to two lines (VN titles die in one), meta row below. */
+function BoardCard({ task, overdue, disciplines }: { task: Task; overdue?: boolean; disciplines: Discipline[] }) {
+  const setDone = useSetTaskDone()
+  const done = task.status === 'DONE'
+  const discipline = task.disciplineId ? disciplines.find((d) => d.id === task.disciplineId) : undefined
+  return (
+    <div className="flex items-start gap-2.5">
+      <Checkbox
+        checked={done}
+        onCheckedChange={() => setDone.mutate({ id: task.id, done: !done })}
+        aria-label={task.title}
+        className={cn('mt-0.5 rounded-full', overdue && 'border-destructive')}
+      />
+      <div className="min-w-0 flex-1">
+        <p className={cn('line-clamp-2 text-sm leading-snug', done && 'text-muted-foreground line-through')}>{task.title}</p>
+        {(discipline || task.dueDate) && (
+          <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+            {discipline && (
+              <span className="flex min-w-0 items-center gap-1">
+                <span className={cn('size-2 shrink-0 rounded-full', DOT[discipline.color])} />
+                <span className="truncate">{discipline.name}</span>
+              </span>
+            )}
+            {task.dueDate && (
+              <span className="ml-auto flex shrink-0 items-center gap-1">
+                {task.dueTime && <Clock className="size-3" />}
+                {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' })}
+                {task.dueTime && ` · ${task.dueTime.slice(0, 5)}`}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -306,18 +343,16 @@ function TaskLine({
   task,
   overdue,
   disciplines,
-  compact,
 }: {
   task: Task
   overdue?: boolean
   disciplines: Discipline[]
-  compact?: boolean
 }) {
   const setDone = useSetTaskDone()
   const done = task.status === 'DONE'
   const discipline = task.disciplineId ? disciplines.find((d) => d.id === task.disciplineId) : undefined
   return (
-    <div className={cn('flex items-center gap-3', compact ? 'py-0' : 'py-2.5')}>
+    <div className="flex items-center gap-3 py-2.5">
       <Checkbox
         checked={done}
         onCheckedChange={() => setDone.mutate({ id: task.id, done: !done })}
@@ -333,19 +368,13 @@ function TaskLine({
           className="flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
         >
           <span className={cn('size-2 rounded-full', DOT[discipline.color])} />
-          {!compact && discipline.name}
+          {discipline.name}
         </span>
       )}
-      {task.dueDate && !compact && (
+      {task.dueDate && (
         <span className="flex shrink-0 items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
           {task.dueTime && <Clock className="size-3" />}
           {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          {task.dueTime && ` · ${task.dueTime.slice(0, 5)}`}
-        </span>
-      )}
-      {task.dueDate && compact && (
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' })}
           {task.dueTime && ` · ${task.dueTime.slice(0, 5)}`}
         </span>
       )}
