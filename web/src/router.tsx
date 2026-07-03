@@ -1,50 +1,47 @@
-import { createRootRoute, createRoute, createRouter, Link } from '@tanstack/react-router'
+import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Link } from '@tanstack/react-router'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
-import { NoteView } from '@/features/notes/note-view'
-import { NotesEmpty } from '@/features/notes/notes-empty'
-import { NotesLayout } from '@/features/notes/notes-layout'
-import { CapturePage } from '@/pages/capture'
-import { TasksPage } from '@/pages/tasks'
-import { TodayPage } from '@/pages/today'
 
+// Every page is a lazy chunk: the initial bundle is just the shell + router;
+// a page's code loads on navigation (and preloads on hover/touch via
+// defaultPreload: 'intent' below).
 const rootRoute = createRootRoute({ component: AppShell })
 
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: TodayPage,
+  component: lazyRouteComponent(() => import('@/pages/today'), 'TodayPage'),
 })
 
 const captureRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'capture',
-  component: CapturePage,
+  component: lazyRouteComponent(() => import('@/pages/capture'), 'CapturePage'),
 })
 
 const tasksRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'tasks',
-  component: TasksPage,
+  component: lazyRouteComponent(() => import('@/pages/tasks'), 'TasksPage'),
 })
 
 const notesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'notes',
-  component: NotesLayout,
+  component: lazyRouteComponent(() => import('@/features/notes/notes-layout'), 'NotesLayout'),
 })
 
 const notesIndexRoute = createRoute({
   getParentRoute: () => notesRoute,
   path: '/',
-  component: NotesEmpty,
+  component: lazyRouteComponent(() => import('@/features/notes/notes-empty'), 'NotesEmpty'),
 })
 
 const noteRoute = createRoute({
   getParentRoute: () => notesRoute,
   path: '$slug',
-  component: NoteView,
+  component: lazyRouteComponent(() => import('@/features/notes/note-view'), 'NoteView'),
 })
 
 const routeTree = rootRoute.addChildren([
