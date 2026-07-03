@@ -2,11 +2,17 @@
   "mcpServers": {
     "dart": {
       "command": "dart",
-      "args": ["mcp-server"]
+      "args": [
+        "mcp-server"
+      ]
     },
     "penpot": {
       "type": "http",
       "url": "http://localhost:4401/mcp"
+    },
+    "northstar": {
+      "type": "http",
+      "url": "http://localhost:8081/mcp"
     }
   }
 }

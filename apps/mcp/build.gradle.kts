@@ -8,8 +8,8 @@ dependencies {
 
     runtimeOnly("org.postgresql:postgresql")
 
-    // Added when Spring AI is introduced — exposes northstar_* tools to agents:
-    // implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc")
+    // MCP server (streamable-http) — exposes the northstar_* tools to coding agents.
+    implementation("org.springframework.ai:spring-ai-starter-mcp-server-webmvc")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")

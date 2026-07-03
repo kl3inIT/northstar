@@ -15,6 +15,22 @@ spring:
   # The api owns migrations; mcp only reads the already-migrated schema.
   flyway:
     enabled: false
+  ai:
+    mcp:
+      server:
+        name: northstar
+        version: 0.1.0
+        # Streamable-HTTP (SSE is deprecated in Spring AI 2.0): one long-running
+        # server on :8081 that every agent session connects to at /mcp.
+        protocol: STREAMABLE
+        instructions: >-
+          Northstar is the user's personal knowledge base (Obsidian-style Markdown
+          notes with [[wiki links]]) and task manager, covering IELTS/HSK study,
+          scholarship applications, projects and a daily journal. Search notes
+          before answering questions about the user's studies, plans or saved
+          knowledge; create a note when the user learns something worth keeping;
+          create tasks for reminders and todos; check today_tasks to see what the
+          user should work on.
 
 server:
   port: ${NORTHSTAR_MCP_PORT:8081}
