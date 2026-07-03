@@ -249,14 +249,16 @@ function TaskKanban({ groups, today, disciplines }: { groups: Group[]; today: st
   }
 
   return (
-    <div className="mt-6 overflow-x-auto pb-4">
+    <div className="mt-6 pb-4">
+      {/* Two rows of three: top = touch this week (Overdue/Today/This week),
+          bottom = the parking lot (Later/Someday/Done). Wider columns, no dead space. */}
       <KanbanProvider
         columns={BUCKETS.map((b) => ({ ...b }))}
         data={items}
         onDataChange={setItems}
         onDragEnd={handleDragEnd}
         sensors={sensors}
-        className="min-w-[1080px]"
+        className="grid-flow-row grid-cols-1 md:grid-cols-2 xl:grid-cols-3"
       >
         {(column) => (
           <KanbanBoard id={column.id} key={column.id}>
