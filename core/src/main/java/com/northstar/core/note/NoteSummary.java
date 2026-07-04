@@ -17,6 +17,7 @@ public record NoteSummary(
         @NotNull String folderPath,
         @NotNull String snippet,
         @NotNull List<String> tags,
+        @NotNull NoteStatus status,
         @NotNull Instant createdAt,
         @NotNull Instant updatedAt) {
 }

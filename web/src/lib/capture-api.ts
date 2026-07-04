@@ -55,11 +55,13 @@ export async function capture(text: string, kind?: CaptureKind): Promise<Capture
   }
 
   const n = draft.note ?? {}
+  // Machine-drafted → STAGING: it waits in the Notes review queue, not the trusted KB.
   const created = await createNote({
     title: n.title ?? text.slice(0, 80),
     folderPath: n.folderPath ?? '',
     contentMarkdown: n.contentMarkdown ?? text,
     tags: n.tags ?? [],
+    status: 'STAGING',
   })
   return {
     kind: 'NOTE',

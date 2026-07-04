@@ -3,6 +3,8 @@ package com.northstar.core.note;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +19,9 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
 
     /** Resolve a wiki-link target title to an existing note (first match wins). */
     Optional<Note> findFirstByTitleIgnoreCase(String title);
+
+    /** One working-state tab (Staging / Resources / Archive). */
+    Page<Note> findByStatus(NoteStatus status, Pageable pageable);
 
     /** A ranked full-text hit: note id plus a {@code <mark>}-highlighted body fragment. */
     interface SearchHit {
@@ -37,6 +42,7 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
                                'StartSel=<mark>, StopSel=</mark>, MaxWords=25, MinWords=10') AS headline
             FROM note n
             WHERE n.search_tsv @@ websearch_to_tsquery('english', :query)
+              AND n.status <> 'ARCHIVED'
             ORDER BY ts_rank(n.search_tsv, websearch_to_tsquery('english', :query)) DESC,
                      n.updated_at DESC
             LIMIT 50

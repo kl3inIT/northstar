@@ -1,13 +1,14 @@
 import { Link, useParams } from '@tanstack/react-router'
-import { Clock, FileText, Info, Link2, Pencil } from 'lucide-react'
+import { Archive, Check, Clock, FileText, Info, Link2, Pencil, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { MarkdownBody } from '@/components/markdown-body'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useNote } from '@/lib/notes-api'
+import { useNote, useSetNoteStatus } from '@/lib/notes-api'
 import type { NoteDetail, NoteRef } from '@/lib/notes-types'
 import { NoteEditor } from './note-editor'
 
@@ -49,6 +50,7 @@ export function NoteView() {
   return (
     <div className="flex min-w-0 flex-1">
       <article className="min-w-0 flex-1 overflow-auto px-10 py-8">
+        {note.status !== 'RESOURCE' && <StatusBanner note={note} />}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             {crumbs.length > 0 && (
@@ -74,6 +76,62 @@ export function NoteView() {
       <aside className="w-80 shrink-0 overflow-auto border-l p-5">
         <RightPanel note={note} />
       </aside>
+    </div>
+  )
+}
+
+/** MFI review bar: a staging note asks for its verdict; an archived one offers restore. */
+function StatusBanner({ note }: { note: NoteDetail }) {
+  const setStatus = useSetNoteStatus()
+  const staging = note.status === 'STAGING'
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/50 px-4 py-2.5">
+      <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+        {staging ? 'Note này do máy soạn, đang chờ duyệt (Staging).' : 'Note này đang nằm trong Archive.'}
+      </p>
+      {staging ? (
+        <>
+          <Button
+            size="sm"
+            disabled={setStatus.isPending}
+            onClick={() =>
+              setStatus.mutate(
+                { id: note.id, status: 'RESOURCE' },
+                { onSuccess: () => toast.success('Đã chuyển vào Resources') },
+              )
+            }
+          >
+            <Check className="size-4" /> Vào Resources
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={setStatus.isPending}
+            onClick={() =>
+              setStatus.mutate(
+                { id: note.id, status: 'ARCHIVED' },
+                { onSuccess: () => toast.success('Đã lưu trữ') },
+              )
+            }
+          >
+            <Archive className="size-4" /> Lưu trữ
+          </Button>
+        </>
+      ) : (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={setStatus.isPending}
+          onClick={() =>
+            setStatus.mutate(
+              { id: note.id, status: 'RESOURCE' },
+              { onSuccess: () => toast.success('Đã khôi phục vào Resources') },
+            )
+          }
+        >
+          <Undo2 className="size-4" /> Khôi phục
+        </Button>
+      )}
     </div>
   )
 }

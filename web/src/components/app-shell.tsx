@@ -25,12 +25,14 @@ import {
   SidebarHeader,
   SidebarInset,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
+import { useStagingCount } from '@/lib/notes-api'
 
 interface NavItem {
   label: string
@@ -58,6 +60,8 @@ const NAV: NavItem[] = [
 export function AppShell() {
   const pathname = useLocation({ select: (l) => l.pathname })
   const navigate = useNavigate()
+  // MFI review queue: machine-drafted notes waiting in Staging nag from the nav.
+  const { data: stagingCount = 0 } = useStagingCount()
 
   // Global capture hotkey — Ctrl/Cmd+Shift+K jumps to the Capture page and
   // focuses the composer (plain Ctrl+K is the quick switcher).
@@ -102,16 +106,23 @@ export function AppShell() {
             {NAV.map((item) => (
               <SidebarMenuItem key={item.label}>
                 {item.to ? (
-                  <SidebarMenuButton
-                    asChild
-                    tooltip={item.label}
-                    isActive={item.exact ? pathname === item.to : pathname.startsWith(item.to)}
-                  >
-                    <Link to={item.to}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
+                  <>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={item.label}
+                      isActive={item.exact ? pathname === item.to : pathname.startsWith(item.to)}
+                    >
+                      <Link to={item.to}>
+                        <item.icon />
+                        <span>{item.label}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                    {item.label === 'Notes' && stagingCount > 0 && (
+                      <SidebarMenuBadge className="rounded-full bg-primary text-primary-foreground">
+                        {stagingCount}
+                      </SidebarMenuBadge>
+                    )}
+                  </>
                 ) : (
                   <SidebarMenuButton tooltip={item.label} className="cursor-default opacity-60">
                     <item.icon />

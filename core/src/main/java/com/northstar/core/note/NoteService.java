@@ -40,13 +40,30 @@ public class NoteService {
         this.links = links;
     }
 
+    /** Hand-written note: born a trusted {@link NoteStatus#RESOURCE}. */
     @Transactional
     public NoteDetail create(String title, String folderPath, String markdown, Collection<String> tags) {
+        return create(title, folderPath, markdown, tags, NoteStatus.RESOURCE);
+    }
+
+    /** Machine-drafted callers (capture, MCP) pass {@link NoteStatus#STAGING} — the review queue. */
+    @Transactional
+    public NoteDetail create(String title, String folderPath, String markdown, Collection<String> tags,
+                             NoteStatus status) {
         Note note = new Note(UUID.randomUUID(), title.strip(), uniqueSlug(title),
-                NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags));
+                NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags), status);
         notes.save(note);
         syncOutgoingLinks(note);
         resolveInboundLinks(note);
+        return detail(note);
+    }
+
+    /** Staging verdict or restore: move the note to another working state. */
+    @Transactional
+    public NoteDetail setStatus(UUID id, NoteStatus status) {
+        Note note = notes.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
+        note.moveTo(status);
+        notes.saveAndFlush(note);
         return detail(note);
     }
 
@@ -91,6 +108,12 @@ public class NoteService {
     @Transactional(readOnly = true)
     public Page<NoteSummary> list(Pageable pageable) {
         return notes.findAll(pageable).map(this::summary);
+    }
+
+    /** One working-state tab (Staging / Resources / Archive), same paging contract. */
+    @Transactional(readOnly = true)
+    public Page<NoteSummary> listByStatus(NoteStatus status, Pageable pageable) {
+        return notes.findByStatus(status, pageable).map(this::summary);
     }
 
     @Transactional(readOnly = true)
@@ -145,8 +168,8 @@ public class NoteService {
                 .map(src -> new NoteRef(src.getTitle(), src.getSlug(), NoteText.snippet(src.getContentMarkdown(), SNIPPET_REF), true))
                 .toList();
         return new NoteDetail(note.getId(), note.getTitle(), note.getSlug(), note.getFolderPath(),
-                note.getContentMarkdown(), List.copyOf(note.getTags()), note.getCreatedAt(), note.getUpdatedAt(),
-                note.getVersion(), outgoing, backlinks);
+                note.getContentMarkdown(), List.copyOf(note.getTags()), note.getStatus(),
+                note.getCreatedAt(), note.getUpdatedAt(), note.getVersion(), outgoing, backlinks);
     }
 
     private NoteRef outgoingRef(NoteLink link) {
@@ -164,6 +187,6 @@ public class NoteService {
 
     private NoteSummary summary(Note note, String snippet) {
         return new NoteSummary(note.getId(), note.getTitle(), note.getSlug(), note.getFolderPath(),
-                snippet, List.copyOf(note.getTags()), note.getCreatedAt(), note.getUpdatedAt());
+                snippet, List.copyOf(note.getTags()), note.getStatus(), note.getCreatedAt(), note.getUpdatedAt());
     }
 }

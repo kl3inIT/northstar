@@ -1,10 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
-import type { NoteDetail, NoteInput, NoteSummary, NoteUpdate } from './notes-types'
+import type { NoteDetail, NoteInput, NoteStatus, NoteSummary, NoteUpdate } from './notes-types'
 
-/** First page of notes, newest-first. 500 covers a personal KB; page further when needed. */
-export async function listNotes(): Promise<NoteSummary[]> {
-  const { data, error } = await api.GET('/api/notes', { params: { query: { page: 0, size: 500 } } })
+/**
+ * First page of notes, newest-first; {@code status} narrows to one MFI
+ * working-state tab (Staging / Resources / Archive). 500 covers a personal KB.
+ */
+export async function listNotes(status?: NoteStatus): Promise<NoteSummary[]> {
+  const { data, error } = await api.GET('/api/notes', {
+    params: { query: { page: 0, size: 500, status } },
+  })
   if (error) throw error
   return (data?.content ?? []) as NoteSummary[]
 }
@@ -33,12 +38,49 @@ export async function updateNote(id: string, body: NoteUpdate): Promise<NoteDeta
   return data as NoteDetail
 }
 
-/** Lists notes, or runs keyword search when {@code search} is non-empty. */
+/** Staging verdict ("→ Resources" / "Archive") or a restore. */
+export async function setNoteStatus(id: string, status: NoteStatus): Promise<NoteDetail> {
+  const { data, error } = await api.PATCH('/api/notes/{id}/status', {
+    params: { path: { id } },
+    body: { status },
+  })
+  if (error) throw error
+  return data as NoteDetail
+}
+
+/** Lists RESOURCE notes (the trusted KB), or runs keyword search when {@code search} is non-empty. */
 export function useNotes(search: string) {
   const query = search.trim()
   return useQuery({
-    queryKey: ['notes', query],
-    queryFn: () => (query ? searchNotes(query) : listNotes()),
+    queryKey: ['notes', 'RESOURCE', query],
+    queryFn: () => (query ? searchNotes(query) : listNotes('RESOURCE')),
+  })
+}
+
+/** One working-state tab list (Staging review queue, Archive). */
+export function useNotesByStatus(status: NoteStatus) {
+  return useQuery({ queryKey: ['notes', status], queryFn: () => listNotes(status) })
+}
+
+/** Badge count for the staging review queue (sidebar + tab). */
+export function useStagingCount() {
+  return useQuery({
+    queryKey: ['notes', 'STAGING'],
+    queryFn: () => listNotes('STAGING'),
+    select: (notes) => notes.length,
+    staleTime: 30_000,
+  })
+}
+
+export function useSetNoteStatus() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: NoteStatus }) => setNoteStatus(id, status),
+    onSuccess: (note) => {
+      queryClient.setQueryData(['note', note.slug], note)
+      queryClient.invalidateQueries({ queryKey: ['notes'] })
+      queryClient.invalidateQueries({ queryKey: ['note', note.slug] })
+    },
   })
 }
 

@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteRef;
 import com.northstar.core.note.NoteService;
+import com.northstar.core.note.NoteStatus;
 import com.northstar.core.note.NoteSummary;
 import java.util.List;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -69,6 +71,29 @@ class NoteServiceIntegrationTests {
         assertThat(notes.search("coherence")).extracting(NoteSummary::title).contains("Coherence and cohesion");
         assertThat(notes.search("referencing")).isNotEmpty();
         assertThat(notes.search("nonexistentxyz")).isEmpty();
+    }
+
+    @Test
+    void mfiLifecycleStagingListsAndArchiveHidesFromSearch() {
+        // Hand-written → RESOURCE; machine-drafted → STAGING (the review queue).
+        NoteDetail handWritten = notes.create("HSK grammar particles", "Chinese", "了 vs 过 usage.", List.of());
+        NoteDetail drafted = notes.create("Captured draft xyzstaging", "", "AI-drafted body.", List.of(),
+                NoteStatus.STAGING);
+        assertThat(handWritten.status()).isEqualTo(NoteStatus.RESOURCE);
+        assertThat(drafted.status()).isEqualTo(NoteStatus.STAGING);
+
+        assertThat(notes.listByStatus(NoteStatus.STAGING, PageRequest.of(0, 50)).getContent())
+                .extracting(NoteSummary::id).contains(drafted.id());
+
+        // Review verdict: promote to Resources — it leaves the staging tab.
+        assertThat(notes.setStatus(drafted.id(), NoteStatus.RESOURCE).status()).isEqualTo(NoteStatus.RESOURCE);
+        assertThat(notes.listByStatus(NoteStatus.STAGING, PageRequest.of(0, 50)).getContent())
+                .extracting(NoteSummary::id).doesNotContain(drafted.id());
+
+        // Archived notes stay in the table but vanish from search results.
+        assertThat(notes.search("xyzstaging")).isNotEmpty();
+        notes.setStatus(drafted.id(), NoteStatus.ARCHIVED);
+        assertThat(notes.search("xyzstaging")).isEmpty();
     }
 
     @Test

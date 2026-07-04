@@ -18,6 +18,7 @@ public record NoteDetail(
         @NotNull String folderPath,
         @NotNull String contentMarkdown,
         @NotNull List<String> tags,
+        @NotNull NoteStatus status,
         @NotNull Instant createdAt,
         @NotNull Instant updatedAt,
         long version,

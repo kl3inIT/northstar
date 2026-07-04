@@ -19,6 +19,9 @@ export type NoteRef = Omit<Present<Schemas['NoteRef']>, 'slug'> & { slug: string
 
 export type NoteSummary = Present<Schemas['NoteSummary']>
 
+/** MFI working state: STAGING (chờ duyệt) → RESOURCE (kho) / ARCHIVED (lưu trữ). */
+export type NoteStatus = NoteSummary['status']
+
 export type NoteDetail = Omit<Present<Schemas['NoteDetail']>, 'outgoingLinks' | 'backlinks'> & {
   outgoingLinks: NoteRef[]
   backlinks: NoteRef[]

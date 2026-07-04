@@ -2,6 +2,7 @@ package com.northstar.mcp;
 
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
+import com.northstar.core.note.NoteStatus;
 import com.northstar.core.note.NoteSummary;
 import com.northstar.core.task.TaskService;
 import com.northstar.core.task.TaskSummary;
@@ -68,7 +69,8 @@ class NorthstarTools {
             @McpToolParam(description = "Note body in Markdown", required = true) String contentMarkdown,
             @McpToolParam(description = "1-4 lowercase tags, reusing the user's existing tags where possible",
                     required = false) List<String> tags) {
-        return notes.create(title, folderPath, contentMarkdown, tags);
+        // Machine-drafted → STAGING: the user reviews it in the Notes staging tab.
+        return notes.create(title, folderPath, contentMarkdown, tags, NoteStatus.STAGING);
     }
 
     @McpTool(name = "today_tasks", description = """

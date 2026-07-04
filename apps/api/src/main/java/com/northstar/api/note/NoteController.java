@@ -3,6 +3,7 @@ package com.northstar.api.note;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteNotFoundException;
 import com.northstar.core.note.NoteService;
+import com.northstar.core.note.NoteStatus;
 import com.northstar.core.note.NoteSummary;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -13,6 +14,7 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -42,13 +44,15 @@ class NoteController {
         this.notes = notes;
     }
 
+    /** Without {@code status}: every note (legacy view). With it: one working-state tab. */
     @GetMapping
     PagedModel<NoteSummary> list(
             @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", defaultValue = "100") int size) {
+            @RequestParam(name = "size", defaultValue = "100") int size,
+            @RequestParam(name = "status", required = false) NoteStatus status) {
         var pageable = PageRequest.of(Math.max(page, 0), Math.clamp(size, 1, MAX_PAGE_SIZE),
                 Sort.by(Sort.Direction.DESC, "updatedAt"));
-        return new PagedModel<>(notes.list(pageable));
+        return new PagedModel<>(status == null ? notes.list(pageable) : notes.listByStatus(status, pageable));
     }
 
     @GetMapping("/search")
@@ -64,7 +68,14 @@ class NoteController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     NoteDetail create(@Valid @RequestBody CreateNoteRequest request) {
-        return notes.create(request.title(), request.folderPath(), request.contentMarkdown(), request.tags());
+        return notes.create(request.title(), request.folderPath(), request.contentMarkdown(), request.tags(),
+                request.status() == null ? NoteStatus.RESOURCE : request.status());
+    }
+
+    /** Staging verdict ("→ Resources" / "Archive") or a restore. */
+    @PatchMapping("/{id}/status")
+    NoteDetail setStatus(@PathVariable UUID id, @Valid @RequestBody NoteStatusRequest request) {
+        return notes.setStatus(id, request.status());
     }
 
     @PutMapping("/{id}")
