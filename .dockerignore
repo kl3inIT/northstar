@@ -1,0 +1,17 @@
+# Keep the build context lean — both Dockerfiles use the repo root as context.
+.git
+.github
+.gradle
+.idea
+.playwright-mcp
+**/build
+build-logic/.gradle
+web/node_modules
+web/dist
+docs
+mobile
+*.png
+*.log
+.env
+.env.*
+!.env.example

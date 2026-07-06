@@ -1,0 +1,107 @@
+# Northstar — application services (api, web; mcp behind a profile).
+#
+#   docker compose \
+#     -f docker/docker-compose.infra.yml \
+#     -f docker/docker-compose.yml \
+#     --env-file .env up -d
+#
+# Image vars are overridden by the deploy workflow with versioned/rollback
+# refs; left empty they fall back to locally-built :latest tags.
+#
+# The worker app is deliberately ABSENT: it is still an empty shell (no
+# scheduled jobs, no event listeners). Add a `worker` service mirroring `api`
+# when the first async job lands.
+name: northstar
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+    compress: "true"
+
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    image: ${NORTHSTAR_API_IMAGE:-northstar-api:latest}
+    container_name: northstar-api
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NORTHSTAR_DB_URL: jdbc:postgresql://northstar-postgres:5432/${POSTGRES_DB:-northstar}
+      NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
+      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    mem_limit: 1200m
+    mem_reservation: 800m
+    # Keep Java out of swap; host swap stays a system-level safety net only.
+    memswap_limit: 1200m
+    networks:
+      - northstar-proxy
+      - northstar-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8888/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
+    logging: *default-logging
+
+  web:
+    build:
+      context: ..
+      dockerfile: web/Dockerfile
+    image: ${NORTHSTAR_WEB_IMAGE:-northstar-web:latest}
+    container_name: northstar-web
+    restart: unless-stopped
+    networks:
+      - northstar-proxy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    logging: *default-logging
+
+  # MCP server for EXTERNAL clients (Claude, etc.) — off by default; start
+  # with `--profile mcp` once it is actually exposed (and give it its own
+  # auth at the edge first).
+  mcp:
+    build:
+      context: ..
+      dockerfile: apps/mcp/Dockerfile
+    image: ${NORTHSTAR_MCP_IMAGE:-northstar-mcp:latest}
+    container_name: northstar-mcp
+    restart: unless-stopped
+    profiles: ["mcp"]
+    env_file: ../.env
+    environment:
+      NORTHSTAR_DB_URL: jdbc:postgresql://northstar-postgres:5432/${POSTGRES_DB:-northstar}
+      NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
+      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    mem_limit: 768m
+    memswap_limit: 768m
+    networks:
+      - northstar-proxy
+      - northstar-internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
+    logging: *default-logging
+
+networks:
+  northstar-proxy:
+    external: true
+  northstar-internal:
+    external: true
