@@ -1,4 +1,4 @@
-import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Link } from '@tanstack/react-router'
+import { createRootRoute, createRoute, createRouter, lazyRouteComponent, Link, redirect } from '@tanstack/react-router'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { AppShell } from '@/components/app-shell'
 import { Button } from '@/components/ui/button'
@@ -8,10 +8,14 @@ import { Button } from '@/components/ui/button'
 // defaultPreload: 'intent' below).
 const rootRoute = createRootRoute({ component: AppShell })
 
+// The assistant is the home screen — the old Today page was a worse copy of
+// Tasks, and daily/weekly reviews are drafted from chat (draft_review tool).
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: lazyRouteComponent(() => import('@/pages/today'), 'TodayPage'),
+  beforeLoad: () => {
+    throw redirect({ to: '/assistant' })
+  },
 })
 
 const captureRoute = createRoute({
@@ -106,7 +110,7 @@ function RouteNotFound() {
       <p className="text-3xl font-bold">404</p>
       <p className="text-sm text-muted-foreground">This page does not exist.</p>
       <Button asChild size="sm" variant="outline">
-        <Link to="/">Back to Today</Link>
+        <Link to="/assistant">Back home</Link>
       </Button>
     </div>
   )

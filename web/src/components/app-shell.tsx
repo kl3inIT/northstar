@@ -10,7 +10,6 @@ import {
   LogOut,
   Settings,
   Sparkles,
-  Sun,
   Target,
   Trophy,
   Wallet,
@@ -40,12 +39,11 @@ import { useStagingCount } from '@/lib/notes-api'
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/' | '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines' | '/projects'
+  to?: '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines' | '/projects'
   exact?: boolean
 }
 
 const NAV: NavItem[] = [
-  { label: 'Today', icon: Sun, to: '/', exact: true },
   { label: 'Assistant', icon: Bot, to: '/assistant' },
   { label: 'Tasks', icon: CheckSquare, to: '/tasks' },
   { label: 'Calendar', icon: Calendar, to: '/calendar' },
