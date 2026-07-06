@@ -5,8 +5,12 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 
 import com.northstar.core.calendar.CalendarEventService;
 import com.northstar.core.calendar.CalendarEventSummary;
+import com.northstar.core.calendar.FreeSlot;
 import com.northstar.core.shared.ColorName;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
@@ -68,6 +72,31 @@ class CalendarEventServiceIntegrationTests {
         events.delete(master.id());
         assertThat(events.range(ict(2026, 7, 6, 0, 0), ict(2026, 7, 20, 0, 0), ZONE))
                 .extracting(CalendarEventSummary::id).doesNotContain(master.id());
+    }
+
+    @Test
+    void freeSlotsMergesOverlapsIgnoresAllDayAndDropsTooSmallGaps() {
+        // 2026-09-01: 09:00–10:00 and 09:30–11:00 overlap into one busy span;
+        // an all-day banner must not block anything; 21:45–22:00 is < 60min.
+        events.create("Họp", null, ict(2026, 9, 1, 9, 0), ict(2026, 9, 1, 10, 0),
+                false, ColorName.BLUE, null, null);
+        events.create("Review", null, ict(2026, 9, 1, 9, 30), ict(2026, 9, 1, 11, 0),
+                false, ColorName.PURPLE, null, null);
+        events.create("Hạn nộp hồ sơ", null, ict(2026, 9, 1, 0, 0), ict(2026, 9, 2, 0, 0),
+                true, ColorName.RED, null, null);
+        events.create("Gym tối", null, ict(2026, 9, 1, 20, 30), ict(2026, 9, 1, 21, 45),
+                false, ColorName.GREEN, null, null);
+
+        List<FreeSlot> slots = events.freeSlots(LocalDate.of(2026, 9, 1),
+                LocalTime.of(7, 0), LocalTime.of(22, 0), Duration.ofMinutes(60), ZONE);
+
+        assertThat(slots).containsExactly(
+                new FreeSlot(ict(2026, 9, 1, 7, 0), ict(2026, 9, 1, 9, 0)),
+                new FreeSlot(ict(2026, 9, 1, 11, 0), ict(2026, 9, 1, 20, 30)));
+
+        assertThatIllegalArgumentException().isThrownBy(() -> events.freeSlots(
+                LocalDate.of(2026, 9, 1), LocalTime.of(22, 0), LocalTime.of(7, 0),
+                Duration.ofMinutes(60), ZONE));
     }
 
     @Test

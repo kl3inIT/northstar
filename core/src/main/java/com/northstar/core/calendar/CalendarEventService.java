@@ -4,6 +4,8 @@ import com.northstar.core.discipline.DisciplineService;
 import com.northstar.core.shared.ColorName;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -54,6 +56,43 @@ public class CalendarEventService {
         }
         result.sort(Comparator.comparing(CalendarEventSummary::startAt));
         return result;
+    }
+
+    /**
+     * Gaps of at least {@code minDuration} between the day's timed events,
+     * inside [windowStart, windowEnd) local. All-day events do not block a
+     * slot (a deadline banner is not a busy block); overlapping events merge
+     * into one busy span.
+     */
+    @Transactional(readOnly = true)
+    public List<FreeSlot> freeSlots(LocalDate date, LocalTime windowStart, LocalTime windowEnd,
+            Duration minDuration, ZoneId zone) {
+        if (!windowEnd.isAfter(windowStart)) {
+            throw new IllegalArgumentException("windowEnd must be after windowStart");
+        }
+        if (minDuration.isNegative() || minDuration.isZero()) {
+            throw new IllegalArgumentException("minDuration must be positive");
+        }
+        Instant from = date.atTime(windowStart).atZone(zone).toInstant();
+        Instant to = date.atTime(windowEnd).atZone(zone).toInstant();
+        List<FreeSlot> slots = new ArrayList<>();
+        Instant cursor = from;
+        for (CalendarEventSummary event : range(from, to, zone)) {
+            if (event.allDay()) {
+                continue;
+            }
+            Instant busyStart = event.startAt().isBefore(from) ? from : event.startAt();
+            if (busyStart.isAfter(cursor) && Duration.between(cursor, busyStart).compareTo(minDuration) >= 0) {
+                slots.add(new FreeSlot(cursor, busyStart));
+            }
+            if (event.endAt().isAfter(cursor)) {
+                cursor = event.endAt();
+            }
+        }
+        if (to.isAfter(cursor) && Duration.between(cursor, to).compareTo(minDuration) >= 0) {
+            slots.add(new FreeSlot(cursor, to));
+        }
+        return slots;
     }
 
     /** The raw master row — what an "edit series" form prefills from. */

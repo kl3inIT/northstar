@@ -25,12 +25,14 @@ spring:
         protocol: STREAMABLE
         instructions: >-
           Northstar is the user's personal knowledge base (Obsidian-style Markdown
-          notes with [[wiki links]]) and task manager, covering IELTS/HSK study,
-          scholarship applications, projects and a daily journal. Search notes
+          notes with [[wiki links]]), task manager and calendar, covering IELTS/HSK
+          study, scholarship applications, projects and a daily journal. Search notes
           before answering questions about the user's studies, plans or saved
           knowledge; create a note when the user learns something worth keeping;
           create tasks for reminders and todos; check today_tasks to see what the
-          user should work on.
+          user should work on. For scheduling: upcoming_events shows the calendar,
+          find_free_slots finds room on a day, create_event books a block — all in
+          the user's local wall-clock time.
 
 server:
   port: ${NORTHSTAR_MCP_PORT:8081}
