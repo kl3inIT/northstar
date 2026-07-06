@@ -19,6 +19,13 @@
 name: Deploy
 
 on:
+  # Auto-CD: after images are built+pushed on a push to main, deploy them.
+  # (northstar is not strict like zero-mail — no manual gate on every release.)
+  workflow_run:
+    workflows: ["Build and Push Images"]
+    types: [completed]
+    branches: [main]
+  # Manual dispatch is kept for rollback: deploy a specific sha-<short> tag.
   workflow_dispatch:
     inputs:
       tag:
@@ -39,11 +46,14 @@ jobs:
     name: Deploy (self-hosted VPS runner)
     runs-on: [self-hosted, northstar]
     timeout-minutes: 20
+    # On workflow_run, only proceed if the build actually succeeded; manual
+    # dispatch always proceeds.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Deploy stack
         env:
-          DEPLOY_TAG: ${{ inputs.tag }}
+          DEPLOY_TAG: ${{ inputs.tag || 'main' }}
           OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
