@@ -23,10 +23,10 @@ docker compose up -d                       # Postgres + pgvector :5432, Adminer 
 ./gradlew --no-daemon compileJava          # fast Java-only ground truth
 ./gradlew :core:test                       # ApplicationModules.verify() — module boundaries
 ./gradlew :core:test --tests "com.northstar.core.note.NoteRepositoryTests"   # a single test
-./gradlew :apps:api:bootRun                # run api on :8080 (auto-starts compose in dev)
+./gradlew :apps:api:bootRun                # run api on :8888 (auto-starts compose in dev)
 
 pnpm -C web install
-pnpm -C web dev                            # web on :5173, proxies /api -> :8080
+pnpm -C web dev                            # web on :5173, proxies /api -> :8888
 pnpm -C web typecheck                      # tsc --noEmit (esbuild strips types, does NOT check them)
 pnpm -C web build                          # tsc + vite build
 pnpm -C web gen:api                        # regenerate the typed API client from contracts/openapi.json
@@ -78,7 +78,7 @@ showing evidence. Use the MCP tool when connected (primary); else the fallback.
 |---|---|---|
 | **1 · API & static** | verify EVERY unfamiliar symbol via **Context7** before typing it, AND run the JetBrains inspection (`get_file_problems`) per file | `./gradlew compileJava` + `pnpm -C web typecheck` + `./gradlew :core:test` + the mechanical checks in `northstar-static-analysis` |
 | **2 · Context loads** | *(no MCP substitute)* | `./gradlew --no-daemon clean test` — boots the Spring context, runs Flyway + Testcontainers tests, then EXITS |
-| **3 · Runs / renders** | drive the running app with **Playwright** (SPA) | `/run` and `/verify` skills; or `bootRun` in the background, poll `http://localhost:8080/actuator/health` until UP, drive, then shut down |
+| **3 · Runs / renders** | drive the running app with **Playwright** (SPA) | `/run` and `/verify` skills; or `bootRun` in the background, poll `http://localhost:8888/actuator/health` until UP, drive, then shut down |
 
 **Never use `bootRun` (or any non-terminating server start) as the Gate-2 check** — it
 does not exit and hangs your turn. Gate 2 is `clean test`.

@@ -32,10 +32,10 @@ docker compose up -d
 
 # 2. backend
 ./gradlew build                 # compile + tests (incl. Modulith verification)
-./gradlew :apps:api:bootRun     # http://localhost:8080
+./gradlew :apps:api:bootRun     # http://localhost:8888
 
 # 3. web
-cd web && pnpm install && pnpm dev   # http://localhost:5173  (proxies /api -> :8080)
+cd web && pnpm install && pnpm dev   # http://localhost:5173  (proxies /api -> :8888)
 ```
 
 ## Repo map

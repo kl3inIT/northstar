@@ -40,7 +40,7 @@ spring:
       enabled: true
 
 server:
-  port: ${NORTHSTAR_API_PORT:8080}
+  port: ${NORTHSTAR_API_PORT:8888}
 
 management:
   endpoints:
