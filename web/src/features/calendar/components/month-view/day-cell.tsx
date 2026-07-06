@@ -6,6 +6,7 @@ import { useCalendar } from "@/features/calendar/contexts/calendar-context";
 import { EventBullet } from "@/features/calendar/components/month-view/event-bullet";
 import { DroppableDayCell } from "@/features/calendar/components/dnd/droppable-day-cell";
 import { MonthEventBadge } from "@/features/calendar/components/month-view/month-event-badge";
+import { AddEventDialog } from "@/features/calendar/components/dialogs/add-event-dialog";
 
 import { cn } from "@/lib/utils";
 import { getMonthCellEvents } from "@/features/calendar/helpers";
@@ -54,11 +55,16 @@ export function DayCell({ cell, events, eventPositions }: IProps) {
 
             return (
               <div key={eventKey} className="lg:flex-1">
-                {event && (
+                {event ? (
                   <>
                     <EventBullet className="lg:hidden" color={event.color} />
                     <MonthEventBadge className="hidden lg:flex" event={event} cellDate={startOfDay(date)} />
                   </>
+                ) : (
+                  // Empty slot = click-to-create, same affordance as the week/day grids.
+                  <AddEventDialog startDate={date}>
+                    <div className="hidden h-full w-full cursor-pointer rounded-md transition-colors hover:bg-accent lg:block" />
+                  </AddEventDialog>
                 )}
               </div>
             );
