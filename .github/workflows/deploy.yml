@@ -13,7 +13,7 @@
 #     IPs at config load, so a recreated api gets 502'd until a reload
 #
 # Prerequisites on the VPS (one-time, see docs/ops/DEPLOY.md):
-#   /apps/northstar          — clone of this repo (compose files + .env)
+#   /apps/north-star          — clone of this repo (compose files + .env)
 #   northstar-proxy/internal — external docker networks, NPM attached
 #   a self-hosted runner registered on this repo with labels [self-hosted, northstar]
 name: Deploy
@@ -49,15 +49,17 @@ jobs:
           set -euo pipefail
           # GHCR paths are lowercase; the repo owner is kl3inIT.
           OWNER="${OWNER,,}"
-          cd /apps/northstar
+          cd /apps/north-star
           git fetch --quiet origin main
           git checkout --quiet origin/main -- docker/docker-compose.yml docker/docker-compose.infra.yml
 
           echo "::group::Backup database before migrate"
-          docker exec northstar-postgres pg_dump -U northstar -d northstar -Fc \
-            > "/apps/northstar/backups/pre-deploy-$(date +%Y%m%d-%H%M%S).dump" \
+          # Northstar shares the zero-mail Postgres instance; dump the dedicated
+          # northstar database from that container.
+          docker exec zeromail-postgres pg_dump -U northstar -d northstar -Fc \
+            > "/apps/north-star/backups/pre-deploy-$(date +%Y%m%d-%H%M%S).dump" \
             || echo "::warning::pg_dump failed (first deploy with no postgres yet is fine)"
-          ls -t /apps/northstar/backups/pre-deploy-*.dump 2>/dev/null | tail -n +8 | xargs -r rm --
+          ls -t /apps/north-star/backups/pre-deploy-*.dump 2>/dev/null | tail -n +8 | xargs -r rm --
           echo "::endgroup::"
 
           echo "::group::Snapshot previous image digests for rollback"
@@ -75,7 +77,7 @@ jobs:
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
             --env-file .env pull api web
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-            --env-file .env up -d --no-build postgres api web
+            --env-file .env up -d --no-build api web
           echo "::endgroup::"
 
           echo "::group::Wait for api readiness"
@@ -122,7 +124,7 @@ jobs:
         if: failure()
         run: |
           set -uo pipefail
-          cd /apps/northstar
+          cd /apps/north-star
           if [[ ! -s .last-deploy.txt ]]; then
             echo "::error::No previous-image snapshot — cannot auto-roll back."
             exit 1

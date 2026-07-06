@@ -30,7 +30,7 @@ services:
     restart: unless-stopped
     env_file: ../.env
     environment:
-      NORTHSTAR_DB_URL: jdbc:postgresql://northstar-postgres:5432/${POSTGRES_DB:-northstar}
+      NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
       NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
       NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
     mem_limit: 1200m
@@ -40,9 +40,6 @@ services:
     networks:
       - northstar-proxy
       - northstar-internal
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8888/actuator/health || exit 1"]
       interval: 30s
@@ -81,7 +78,7 @@ services:
     profiles: ["mcp"]
     env_file: ../.env
     environment:
-      NORTHSTAR_DB_URL: jdbc:postgresql://northstar-postgres:5432/${POSTGRES_DB:-northstar}
+      NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
       NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
       NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
     mem_limit: 768m
@@ -89,9 +86,6 @@ services:
     networks:
       - northstar-proxy
       - northstar-internal
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
       interval: 30s

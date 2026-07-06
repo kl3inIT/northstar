@@ -1,6 +1,9 @@
-# Northstar — infrastructure (postgres). Runs on the same VPS as zero-mail,
-# sharing its nginx-proxy-manager edge but nothing else: own networks, own
-# volume, own loopback port.
+# Northstar — infrastructure (networks only).
+#
+# Northstar does NOT run its own Postgres: it shares the zero-mail Postgres
+# instance (pgvector build) on this VPS, using a dedicated `northstar` database
+# + role. That container joins `northstar-internal` (declared in zero-mail's
+# infra compose) so northstar api/mcp reach it as host `zeromail-postgres`.
 #
 #   docker compose \
 #     -f docker/docker-compose.infra.yml \
@@ -11,51 +14,15 @@
 #   docker network create northstar-proxy
 #   docker network create northstar-internal
 #   docker network connect northstar-proxy nginx-proxy-manager
+#   # shared DB: create role+db+extensions in zeromail-postgres, and ensure it
+#   # is attached to northstar-internal (persisted via zero-mail's compose).
 name: northstar
 
-x-logging: &default-logging
-  driver: json-file
-  options:
-    max-size: "10m"
-    max-file: "3"
-    compress: "true"
-
-services:
-  postgres:
-    # pgvector build of Postgres 18 — semantic search lands without a
-    # migration of the database image.
-    image: ${POSTGRES_IMAGE:-pgvector/pgvector:pg18}
-    container_name: northstar-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-northstar}
-      POSTGRES_USER: ${POSTGRES_USER:-northstar}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in the server .env}
-    # Loopback-only publish for ad-hoc SSH-tunnel access from a dev machine
-    # (zero-mail owns 5555 on this box; northstar takes 5556):
-    #   ssh -fN -L 5556:localhost:5556 <user>@<vps>
-    ports:
-      - "127.0.0.1:5556:5432"
-    volumes:
-      # PG18+ images want the mount at /var/lib/postgresql (data in a subdir)
-      # so future major upgrades can use pg_upgrade --link.
-      - postgres_data:/var/lib/postgresql
-    networks:
-      - northstar-internal
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    logging: *default-logging
-
+# This file intentionally declares no services — it exists so the external
+# networks resolve for the -f infra -f app compose invocation used everywhere
+# (deploy workflow, docs). The shared Postgres lives in zero-mail's compose.
 networks:
   northstar-proxy:
     external: true
   northstar-internal:
     external: true
-
-volumes:
-  postgres_data:
-    # Pinned so moving/renaming compose files never orphans the data.
-    name: ${POSTGRES_VOLUME_NAME:-northstar_postgres_data}
