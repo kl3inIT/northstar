@@ -80,5 +80,21 @@ class AssistantControllerIntegrationTests {
         assertThat(history.body())
                 .contains("what is due today?")
                 .contains("You have nothing due today.");
+
+        // The conversation list titles it by the first user message…
+        HttpResponse<String> conversations = http.send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/assistant/conversations"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(conversations.body()).contains("test-convo").contains("what is due today?");
+
+        // …and deleting it clears the stored transcript.
+        HttpResponse<String> deleted = http.send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/assistant/conversations/test-convo"))
+                .DELETE().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(deleted.statusCode()).isEqualTo(204);
+        HttpResponse<String> after = http.send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/assistant/conversations"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(after.body()).doesNotContain("test-convo");
     }
 }

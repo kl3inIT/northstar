@@ -16,15 +16,21 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import java.time.Instant;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
@@ -74,13 +80,15 @@ class AssistantController {
     private final ChatMemory memory;
     private final List<NorthstarTool> tools;
     private final ObjectMapper json;
+    private final JdbcClient jdbc;
 
     AssistantController(@Qualifier(AssistantConfig.ASSISTANT_CHAT_CLIENT) ChatClient chat,
-            ChatMemory memory, List<NorthstarTool> tools, ObjectMapper json) {
+            ChatMemory memory, List<NorthstarTool> tools, ObjectMapper json, JdbcClient jdbc) {
         this.chat = chat;
         this.memory = memory;
         this.tools = tools;
         this.json = json;
+        this.jdbc = jdbc;
     }
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -104,6 +112,46 @@ class AssistantController {
                     default -> java.util.stream.Stream.<HistoryMessage>empty();
                 })
                 .toList();
+    }
+
+    /**
+     * All stored conversations, newest activity first, titled by their first
+     * user message. Reads the memory table directly — ChatMemory's API has no
+     * listing, and this is a read model of Spring AI's own schema, not domain.
+     */
+    @GetMapping("/conversations")
+    List<ConversationSummary> conversations() {
+        return jdbc.sql("""
+                SELECT m.conversation_id,
+                       (SELECT u.content FROM spring_ai_chat_memory u
+                         WHERE u.conversation_id = m.conversation_id AND u.type = 'USER'
+                         ORDER BY u.sequence_id LIMIT 1) AS title,
+                       MAX(m."timestamp") AS last_at,
+                       COUNT(*) FILTER (WHERE m.type IN ('USER', 'ASSISTANT')) AS messages
+                  FROM spring_ai_chat_memory m
+                 GROUP BY m.conversation_id
+                 ORDER BY last_at DESC
+                """)
+                .query((rs, i) -> new ConversationSummary(
+                        rs.getString("conversation_id"),
+                        truncate(rs.getString("title")),
+                        rs.getTimestamp("last_at").toInstant(),
+                        rs.getLong("messages")))
+                .list();
+    }
+
+    @DeleteMapping("/conversations/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void deleteConversation(@PathVariable String id) {
+        memory.clear(id);
+    }
+
+    private static String truncate(String title) {
+        if (title == null || title.isBlank()) {
+            return "New conversation";
+        }
+        String stripped = title.strip();
+        return stripped.length() <= 80 ? stripped : stripped.substring(0, 77) + "…";
     }
 
     private Flux<Part> streamTurn(String userMessage, String conversationId) {
@@ -145,5 +193,8 @@ class AssistantController {
     }
 
     record HistoryMessage(String role, String text) {
+    }
+
+    record ConversationSummary(String id, String title, Instant lastAt, long messages) {
     }
 }
