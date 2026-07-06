@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type ToolUIPart, type UIMessage } from 'ai'
-import { Loader2, MessageSquarePlus, Trash2 } from 'lucide-react'
+import { Loader2, MessageSquarePlus, PanelRightClose, PanelRightOpen, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import {
@@ -113,6 +113,16 @@ export function AssistantPage() {
     queryFn: fetchConversations,
   })
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [historyOpen, setHistoryOpen] = useState(
+    () => localStorage.getItem('assistant-history-open') !== '0',
+  )
+
+  function toggleHistory() {
+    setHistoryOpen((open) => {
+      localStorage.setItem('assistant-history-open', open ? '0' : '1')
+      return !open
+    })
+  }
   // Once, on load: resume the most recent conversation, else start fresh.
   const bootstrapped = useRef(false)
   useEffect(() => {
@@ -139,22 +149,48 @@ export function AssistantPage() {
     )
   }
   return (
-    <div className="flex h-full w-full flex-1 overflow-hidden">
+    <div className="relative flex h-full w-full flex-1 overflow-hidden">
       <ChatColumn key={conversationId} conversationId={conversationId} />
 
+      {!historyOpen && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="absolute right-3 top-3 size-7"
+          aria-label="Show chat history"
+          title="Show chat history"
+          onClick={toggleHistory}
+        >
+          <PanelRightOpen className="size-4" />
+        </Button>
+      )}
+
+      {historyOpen && (
       <aside className="hidden w-72 shrink-0 flex-col border-l lg:flex">
         <div className="flex items-center justify-between px-4 pb-2 pt-4">
           <h2 className="text-sm font-semibold">Chat history</h2>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-7"
-            aria-label="New chat"
-            title="New chat"
-            onClick={() => setConversationId(crypto.randomUUID())}
-          >
-            <MessageSquarePlus className="size-4" />
-          </Button>
+          <div className="flex items-center">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              aria-label="New chat"
+              title="New chat"
+              onClick={() => setConversationId(crypto.randomUUID())}
+            >
+              <MessageSquarePlus className="size-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7"
+              aria-label="Hide chat history"
+              title="Hide chat history"
+              onClick={toggleHistory}
+            >
+              <PanelRightClose className="size-4" />
+            </Button>
+          </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
           {conversations.length === 0 && (
@@ -192,6 +228,7 @@ export function AssistantPage() {
           ))}
         </div>
       </aside>
+      )}
     </div>
   )
 }
