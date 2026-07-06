@@ -21,6 +21,7 @@ import {
 import { Suggestion } from '@/components/ai-elements/suggestion'
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '@/components/ai-elements/tool'
 import { Button } from '@/components/ui/button'
+import { MicButton } from '@/components/mic-button'
 import { useStagingCount } from '@/lib/notes-api'
 import { useTodayTasks } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
@@ -255,20 +256,32 @@ function AssistantChat({
     }),
   })
 
+  const [text, setText] = useState('')
+
   function onSubmit(message: PromptInputMessage) {
-    const text = message.text.trim()
-    if (!text) return
-    sendMessage({ text })
+    const trimmed = message.text.trim()
+    if (!trimmed) return
+    setText('')
+    sendMessage({ text: trimmed })
   }
 
   const input = (
     <PromptInput onSubmit={onSubmit} className={PILL_INPUT}>
       <PromptInputBody>
-        <PromptInputTextarea placeholder="Message Northstar…" autoFocus className="min-h-12" />
+        <PromptInputTextarea
+          placeholder="Message Northstar…"
+          autoFocus
+          className="min-h-12"
+          value={text}
+          onChange={(e) => setText(e.currentTarget.value)}
+        />
       </PromptInputBody>
       <PromptInputFooter>
         <span />
-        <PromptInputSubmit status={status} className="rounded-full" />
+        <div className="flex items-center gap-1">
+          <MicButton value={text} onChange={setText} compact />
+          <PromptInputSubmit status={status} className="rounded-full" />
+        </div>
       </PromptInputFooter>
     </PromptInput>
   )

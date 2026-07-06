@@ -6,9 +6,7 @@ import {
   ExternalLink,
   FileText,
   Loader2,
-  Mic,
   Sparkles,
-  Square,
   Tag,
   Trash2,
 } from 'lucide-react'
@@ -27,7 +25,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { capture, deleteNote, type CaptureKind } from '@/lib/capture-api'
-import { useRealtimeDictation } from '@/lib/use-realtime-dictation'
+import { MicButton } from '@/components/mic-button'
 import { useNotes } from '@/lib/notes-api'
 import { deleteTask, useTodayTasks, useUpcomingTasks, type Task } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
@@ -137,39 +135,6 @@ export function CapturePage() {
 
       <RecentSection pending={pending} />
     </div>
-  )
-}
-
-/**
- * Live dictation: text streams into the composer AS YOU SPEAK (OpenAI Realtime,
- * gpt-realtime-whisper). Still dictation-first — the user reviews and presses
- * Capture; nothing is stored server-side and audio goes browser→OpenAI direct.
- */
-function MicButton({ value, onChange }: { value: string; onChange: (text: string) => void }) {
-  const { state, seconds, start, stop } = useRealtimeDictation(onChange, (msg) => toast.error(msg))
-
-  if (state === 'connecting' || state === 'finishing') {
-    return (
-      <PromptInputButton variant="ghost" disabled>
-        <Loader2 className="size-4 animate-spin" /> {state === 'connecting' ? 'Connecting…' : 'Finalizing…'}
-      </PromptInputButton>
-    )
-  }
-  if (state === 'live') {
-    return (
-      <PromptInputButton variant="destructive" onClick={stop}>
-        <Square className="size-4" /> Stop · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
-      </PromptInputButton>
-    )
-  }
-  return (
-    <PromptInputButton
-      variant="ghost"
-      onClick={() => void start(value)}
-      title="Words appear as you speak (audio goes straight to OpenAI, never stored)"
-    >
-      <Mic className="size-4" /> Dictate
-    </PromptInputButton>
   )
 }
 
