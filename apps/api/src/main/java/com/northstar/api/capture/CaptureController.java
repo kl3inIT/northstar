@@ -38,9 +38,16 @@ class CaptureController {
 
     /** Voice capture: audio in, text out — the recording is never stored. */
     @PostMapping(value = "/transcribe", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    TranscriptionResponse transcribe(@RequestPart("audio") MultipartFile audio) throws IOException {
+    TranscriptionResponse transcribe(@RequestPart("audio") MultipartFile audio) {
+        byte[] bytes;
+        try {
+            bytes = audio.getBytes();
+        } catch (IOException e) {
+            // A truncated/unreadable upload is the client's problem — 400, not 500.
+            throw new IllegalArgumentException("Could not read the uploaded audio", e);
+        }
         String filename = audio.getOriginalFilename();
-        return new TranscriptionResponse(transcriber.transcribe(audio.getBytes(),
+        return new TranscriptionResponse(transcriber.transcribe(bytes,
                 filename == null || filename.isBlank() ? "capture.webm" : filename));
     }
 }

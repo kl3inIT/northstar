@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -171,7 +172,7 @@ public class TaskService {
     }
 
     private static List<TaskSummary> concat(List<TaskSummary> a, List<TaskSummary> b) {
-        return java.util.stream.Stream.concat(a.stream(), b.stream()).toList();
+        return Stream.concat(a.stream(), b.stream()).toList();
     }
 
     private TaskSummary summary(Task task) {

@@ -25,8 +25,8 @@ final class UiMessageStream {
         Encoder encoder = new Encoder(emitter, json);
         Disposable subscription = source.subscribe(
                 encoder::write,
-                e -> {
-                    encoder.error("The assistant stream failed.");
+                _ -> {
+                    encoder.error();
                     encoder.done();
                     emitter.complete();
                 },
@@ -40,7 +40,7 @@ final class UiMessageStream {
             subscription.dispose();
             emitter.complete();
         });
-        emitter.onError(e -> subscription.dispose());
+        emitter.onError(_ -> subscription.dispose());
     }
 
     private static final class Encoder {
@@ -65,9 +65,10 @@ final class UiMessageStream {
             frame(json.writeValueAsString(Map.of("type", "finish")));
         }
 
-        void error(String message) {
+        void error() {
             startIfNeeded();
-            frame(json.writeValueAsString(fields("type", "error", "errorText", message)));
+            frame(json.writeValueAsString(
+                    fields("type", "error", "errorText", "The assistant stream failed.")));
         }
 
         void done() {

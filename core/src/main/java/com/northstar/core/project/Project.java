@@ -115,11 +115,9 @@ public class Project extends BaseEntity {
         this.status = ProjectStatus.ACTIVE;
     }
 
-    public Milestone addMilestone(UUID id, String name, LocalDate dueDate) {
+    public void addMilestone(UUID id, String name, LocalDate dueDate) {
         int nextOrder = milestones.stream().mapToInt(Milestone::getSortOrder).max().orElse(-1) + 1;
-        Milestone milestone = new Milestone(id, this, name, dueDate, nextOrder);
-        milestones.add(milestone);
-        return milestone;
+        milestones.add(new Milestone(id, this, name, dueDate, nextOrder));
     }
 
     public Milestone milestone(UUID milestoneId) {

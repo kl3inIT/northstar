@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.ai.tool.annotation.Tool;
@@ -218,7 +219,7 @@ class ProjectTools implements NorthstarTool {
             return hits.getFirst();
         }
         String valid = project.milestones().stream().map(MilestoneSummary::name)
-                .collect(java.util.stream.Collectors.joining(", "));
+                .collect(Collectors.joining(", "));
         throw new IllegalArgumentException((hits.isEmpty()
                 ? "No milestone matches '" + name + "'"
                 : "Milestone '" + name + "' is ambiguous")

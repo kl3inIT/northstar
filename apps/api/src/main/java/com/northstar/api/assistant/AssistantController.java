@@ -11,6 +11,7 @@ import java.time.format.TextStyle;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Stream;
 import java.util.function.Consumer;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
@@ -113,7 +114,7 @@ class AssistantController {
                 .flatMap(message -> switch (message) {
                     case UserMessage user -> textOf(user.getText(), "user");
                     case AssistantMessage assistant -> textOf(assistant.getText(), "assistant");
-                    default -> java.util.stream.Stream.<HistoryMessage>empty();
+                    default -> Stream.empty();
                 })
                 .toList();
     }
@@ -136,7 +137,7 @@ class AssistantController {
                  GROUP BY m.conversation_id
                  ORDER BY last_at DESC
                 """)
-                .query((rs, i) -> new ConversationSummary(
+                .query((rs, _) -> new ConversationSummary(
                         rs.getString("conversation_id"),
                         truncate(rs.getString("title")),
                         rs.getTimestamp("last_at").toInstant(),
@@ -174,7 +175,7 @@ class AssistantController {
                 .stream()
                 .content()
                 .<Part>map(token -> new Part.TextDelta(TEXT_PART_ID, token))
-                .doFinally(signal -> toolEvents.tryEmitComplete());
+                .doFinally(_ -> toolEvents.tryEmitComplete());
 
         Flux<Part> text = Flux.concat(
                 Flux.just(new Part.TextStart(TEXT_PART_ID)),
@@ -187,10 +188,10 @@ class AssistantController {
         return StringUtils.hasText(requested) ? requested : DEFAULT_CONVERSATION_ID;
     }
 
-    private static java.util.stream.Stream<HistoryMessage> textOf(String text, String role) {
+    private static Stream<HistoryMessage> textOf(String text, String role) {
         return text == null || text.isBlank()
-                ? java.util.stream.Stream.empty()
-                : java.util.stream.Stream.of(new HistoryMessage(role, text));
+                ? Stream.empty()
+                : Stream.of(new HistoryMessage(role, text));
     }
 
     record ChatRequest(@NotBlank @Size(max = 20_000) String message, String conversationId) {

@@ -7,6 +7,9 @@ import com.northstar.core.project.ProjectNotFoundException;
 import com.northstar.core.task.TaskNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -32,6 +35,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
  * enrich Bean Validation failures with a per-field {@code errors} property.
  * Ordered before Boot's problemdetails advice so these handlers win.
  */
+@NullMarked
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -75,12 +79,13 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     /** Body validation (@Valid on a request record): expose field → message so the UI can inline errors. */
     @Override
-    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+    protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
             HttpHeaders headers, HttpStatusCode status, WebRequest request) {
         ProblemDetail body = ex.getBody();
         Map<String, String> errors = new LinkedHashMap<>();
         ex.getBindingResult().getFieldErrors()
-                .forEach(f -> errors.putIfAbsent(f.getField(), f.getDefaultMessage()));
+                .forEach(f -> errors.putIfAbsent(f.getField(),
+                        Objects.requireNonNullElse(f.getDefaultMessage(), "invalid value")));
         body.setProperty("errors", errors);
         return handleExceptionInternal(ex, body, headers, status, request);
     }

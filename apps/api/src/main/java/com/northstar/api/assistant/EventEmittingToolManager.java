@@ -12,6 +12,7 @@ import org.springframework.ai.model.tool.ToolCallingChatOptions;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.tool.definition.ToolDefinition;
+import org.jspecify.annotations.NullMarked;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -21,6 +22,7 @@ import tools.jackson.databind.ObjectMapper;
  * around the delegate's execution. Calls without that context key (capture,
  * alignment) pass straight through.
  */
+@NullMarked
 class EventEmittingToolManager implements ToolCallingManager {
 
     static final String EVENTS_KEY = "toolEvents";

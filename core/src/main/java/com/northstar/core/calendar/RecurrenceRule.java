@@ -123,9 +123,6 @@ final class RecurrenceRule {
 
         for (int i = 0; i < MAX_ITERATIONS; i++) {
             LocalDate date = candidateDate(seed, i);
-            if (date == null) {
-                break;
-            }
             Instant start = ZonedDateTime.of(date, time, zone).toInstant();
             if (start.isBefore(seedStart)) {
                 continue;
@@ -145,12 +142,6 @@ final class RecurrenceRule {
             }
         }
         return result;
-    }
-
-    /** True when the given start instant is one this rule generates for the seed. */
-    boolean generates(Instant seedStart, ZoneId zone, Instant occurrenceStart) {
-        return occurrencesBetween(seedStart, Duration.ofNanos(1), zone,
-                occurrenceStart, occurrenceStart.plusNanos(1)).contains(occurrenceStart);
     }
 
     /**

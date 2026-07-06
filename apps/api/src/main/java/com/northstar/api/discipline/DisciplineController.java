@@ -14,6 +14,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.stream.Stream;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -116,8 +118,8 @@ class DisciplineController {
      * the discipline name's words as a tag ("English · IELTS" → english, ielts).
      */
     private static List<String> nameTokens(String disciplineName) {
-        return List.of(disciplineName.toLowerCase(java.util.Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
-                .stream().filter(t -> t.length() >= 2).toList();
+        return Stream.of(disciplineName.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
+                .filter(t -> t.length() >= 2).toList();
     }
 
     private static ZoneId zone(String tz) {

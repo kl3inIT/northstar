@@ -4,6 +4,7 @@ import com.northstar.core.calendar.CalendarEventService;
 import com.northstar.core.calendar.CalendarEventSummary;
 import jakarta.validation.Valid;
 import java.time.Instant;
+import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +48,7 @@ class CalendarEventController {
             @RequestParam("from") Instant from,
             @RequestParam("to") Instant to,
             @RequestHeader(name = "X-Timezone", required = false) String tz) {
-        if (!to.isAfter(from) || from.plus(java.time.Duration.ofDays(MAX_RANGE_DAYS)).isBefore(to)) {
+        if (!to.isAfter(from) || from.plus(Duration.ofDays(MAX_RANGE_DAYS)).isBefore(to)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid range");
         }
         return events.range(from, to, zone(tz));

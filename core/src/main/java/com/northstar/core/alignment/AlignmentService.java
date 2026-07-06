@@ -18,6 +18,7 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -216,7 +217,7 @@ public class AlignmentService {
         section(sb, "Done today (%d)".formatted(done.size()),
                 done.stream().map(t -> "- " + t.title()).toList());
         section(sb, "Still open (%d, %d overdue)".formatted(overdue.size() + dueToday.size(), overdue.size()),
-                java.util.stream.Stream.concat(
+                Stream.concat(
                         overdue.stream().map(t -> "- %s — overdue %s"
                                 .formatted(t.title(), count(ChronoUnit.DAYS.between(t.dueDate(), today), "day"))),
                         dueToday.stream().map(t -> "- %s — due today%s"
@@ -226,7 +227,7 @@ public class AlignmentService {
                 staging.stream().map(n -> "- " + n.title()).toList());
         section(sb, "Tomorrow (%s, %s)".formatted(
                 count(tomorrow.size(), "task"), count(tomorrowEvents.size(), "event")),
-                java.util.stream.Stream.concat(
+                Stream.concat(
                         tomorrow.stream().map(t -> "- Task: %s%s"
                                 .formatted(t.title(), t.dueTime() == null ? "" : " (" + TIME.format(t.dueTime()) + ")")),
                         tomorrowEvents.stream().map(e -> "- " + eventLine(e, zone)))
