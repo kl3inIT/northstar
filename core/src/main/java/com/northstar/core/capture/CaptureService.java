@@ -146,11 +146,16 @@ public class CaptureService {
                     to %s and shape the matching draft following the rules above.
                     """.formatted(forcedKind, forcedKind);
         }
+        // Hardened structured output: the schema rides as an API-level constraint
+        // (OpenAI structured output guarantees conformant JSON), instead of being
+        // prompt text the model may drift from. Client-side validateSchema() is
+        // deliberately NOT added: it is the fallback for providers without native
+        // structured output, and its retry loop would just burn tokens here.
         return chat.prompt()
                 .system(system)
                 .user(rawText)
                 .call()
-                .entity(CaptureDraft.class);
+                .entity(CaptureDraft.class, ChatClient.EntityParamSpec::useProviderStructuredOutput);
     }
 
     private static String bulleted(Set<String> values) {

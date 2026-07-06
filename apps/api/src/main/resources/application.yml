@@ -28,10 +28,19 @@ spring:
   ai:
     openai:
       api-key: ${OPENAI_API_KEY}
+      # Interactive calls (capture, alignment, transcribe) run on the request
+      # thread — bound the wait and retry transient failures instead of hanging.
+      timeout: 60s
+      max-retries: 2
       # Spring AI 2.0 dropped the `.options` layer (chat.options.model -> chat.model).
       # No temperature: gpt-5.5 is a reasoning model and rejects any value but 1.
       chat:
         model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
+  servlet:
+    multipart:
+      # Voice capture uploads; Whisper's own cap is 25MB.
+      max-file-size: 25MB
+      max-request-size: 26MB
 
   mvc:
     problemdetails:
@@ -47,3 +56,9 @@ management:
     web:
       exposure:
         include: health,info,modulith
+
+logging:
+  level:
+    # Full LLM request/response bodies from the SimpleLoggerAdvisor in AiConfig.
+    # DEBUG in dev; drop to INFO to silence.
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: DEBUG

@@ -18,6 +18,20 @@ export async function deleteNote(id: string): Promise<void> {
 }
 
 /**
+ * Voice capture: audio blob in, spoken text out (server-side Whisper; the
+ * recording is never stored). Plain fetch because openapi-fetch needs a custom
+ * serializer for multipart — not worth it for one endpoint.
+ */
+export async function transcribeAudio(blob: Blob): Promise<string> {
+  const form = new FormData()
+  form.append('audio', blob, 'capture.webm')
+  const res = await fetch('/api/capture/transcribe', { method: 'POST', body: form })
+  if (!res.ok) throw new Error(`transcribe failed: ${res.status}`)
+  const data = (await res.json()) as { text: string }
+  return data.text
+}
+
+/**
  * Fire-and-forget capture: classify with one LLM call, then create the task or
  * note immediately. The caller shows a toast with the returned {@code undo}
  * (deletes what was just created) instead of a review dialog. Passing
@@ -38,11 +52,13 @@ export async function capture(text: string, kind?: CaptureKind): Promise<Capture
       const disciplines = await listDisciplines().catch(() => [])
       disciplineId = disciplines.find((d) => d.name === t.disciplineName)?.id
     }
+    // Strict structured output can hand back "" instead of null — drop empties
+    // so TaskRequest's LocalDate/LocalTime parsing never sees them.
     const created = await createTask({
-      title: t.title ?? text,
-      notes: t.notes,
-      dueDate: t.dueDate,
-      dueTime: t.dueTime,
+      title: t.title || text,
+      notes: t.notes || undefined,
+      dueDate: t.dueDate || undefined,
+      dueTime: t.dueTime || undefined,
       disciplineId,
     })
     return {

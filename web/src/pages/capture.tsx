@@ -6,7 +6,9 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  Mic,
   Sparkles,
+  Square,
   Tag,
   Trash2,
 } from 'lucide-react'
@@ -24,7 +26,7 @@ import {
 } from '@/components/ai-elements/prompt-input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { capture, deleteNote, type CaptureKind } from '@/lib/capture-api'
+import { capture, deleteNote, transcribeAudio, type CaptureKind } from '@/lib/capture-api'
 import { useNotes } from '@/lib/notes-api'
 import { deleteTask, useTodayTasks, useUpcomingTasks, type Task } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
@@ -119,6 +121,7 @@ export function CapturePage() {
             >
               <FileText className="size-4" /> Thêm note
             </PromptInputButton>
+            <MicButton onText={(t) => setText((prev) => (prev.trim() ? `${prev.trimEnd()} ${t}` : t))} />
           </PromptInputTools>
           <div className="flex items-center gap-3">
             <span className="hidden text-xs text-muted-foreground sm:block">
@@ -133,6 +136,79 @@ export function CapturePage() {
 
       <RecentSection pending={pending} />
     </div>
+  )
+}
+
+/**
+ * Voice capture, memos-style dictation-first: record → server-side Whisper →
+ * the text lands in the composer for REVIEW (the user still presses Capture),
+ * and the recording is never stored.
+ */
+function MicButton({ onText }: { onText: (text: string) => void }) {
+  const [state, setState] = useState<'idle' | 'recording' | 'transcribing'>('idle')
+  const [seconds, setSeconds] = useState(0)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const timerRef = useRef<number | null>(null)
+
+  async function start() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = MediaRecorder.isTypeSupported('audio/webm')
+        ? new MediaRecorder(stream, { mimeType: 'audio/webm' })
+        : new MediaRecorder(stream)
+      chunksRef.current = []
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        setState('transcribing')
+        transcribeAudio(blob)
+          .then((text) => {
+            if (text.trim()) onText(text.trim())
+            else toast.info('Không nghe được gì — thử nói gần mic hơn.')
+          })
+          .catch(() => toast.error('Transcribe thất bại — thử lại.'))
+          .finally(() => setState('idle'))
+      }
+      recorderRef.current = recorder
+      recorder.start()
+      setSeconds(0)
+      timerRef.current = window.setInterval(() => setSeconds((s) => s + 1), 1000)
+      setState('recording')
+    } catch {
+      toast.error('Không truy cập được micro — kiểm tra quyền trình duyệt.')
+    }
+  }
+
+  function stop() {
+    if (timerRef.current !== null) {
+      window.clearInterval(timerRef.current)
+      timerRef.current = null
+    }
+    recorderRef.current?.stop()
+  }
+
+  if (state === 'transcribing') {
+    return (
+      <PromptInputButton variant="ghost" disabled>
+        <Loader2 className="size-4 animate-spin" /> Đang chuyển chữ…
+      </PromptInputButton>
+    )
+  }
+  if (state === 'recording') {
+    return (
+      <PromptInputButton variant="destructive" onClick={stop}>
+        <Square className="size-4" /> Dừng · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+      </PromptInputButton>
+    )
+  }
+  return (
+    <PromptInputButton variant="ghost" onClick={start} title="Nói để capture (không lưu file ghi âm)">
+      <Mic className="size-4" /> Nói
+    </PromptInputButton>
   )
 }
 

@@ -7,9 +7,11 @@ import static org.mockito.Mockito.when;
 
 import com.northstar.core.capture.CaptureDraft;
 import com.northstar.core.capture.CaptureService;
+import com.northstar.core.capture.VoiceTranscriber;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.ai.audio.transcription.TranscriptionModel;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -19,6 +21,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.core.io.Resource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -41,13 +44,33 @@ class CaptureServiceIntegrationTests {
     @MockitoBean
     ChatModel chatModel;
 
+    @MockitoBean
+    TranscriptionModel transcriptionModel;
+
     @Autowired
     CaptureService capture;
+
+    @Autowired
+    VoiceTranscriber transcriber;
 
     private void modelReturns(String json) {
         when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
         when(chatModel.call(any(Prompt.class)))
                 .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(json)))));
+    }
+
+    @Test
+    void voiceTranscriberDelegatesAndKeepsTheContainerFilename() {
+        when(transcriptionModel.transcribe(org.mockito.ArgumentMatchers.any(Resource.class)))
+                .thenReturn("nghiên cứu về memory os");
+
+        String text = transcriber.transcribe(new byte[] {1, 2, 3}, "capture.webm");
+
+        assertThat(text).isEqualTo("nghiên cứu về memory os");
+        // The filename's extension is how the provider learns the container format.
+        ArgumentCaptor<Resource> resource = ArgumentCaptor.forClass(Resource.class);
+        verify(transcriptionModel).transcribe(resource.capture());
+        assertThat(resource.getValue().getFilename()).isEqualTo("capture.webm");
     }
 
     @Test
