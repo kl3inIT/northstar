@@ -40,4 +40,6 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      # api.gen.d.ts is gitignored — regenerate from the committed contract.
+      - run: pnpm gen:api
       - run: pnpm build
