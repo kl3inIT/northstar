@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate } from '@tanstack/react-router'
 import {
   BookOpen,
+  Bot,
   Calendar,
   CheckSquare,
   FileText,
@@ -37,7 +38,7 @@ import { useStagingCount } from '@/lib/notes-api'
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/' | '/notes' | '/tasks' | '/calendar'
+  to?: '/' | '/notes' | '/tasks' | '/calendar' | '/assistant'
   exact?: boolean
 }
 
@@ -46,6 +47,7 @@ const NAV: NavItem[] = [
   { label: 'Tasks', icon: CheckSquare, to: '/tasks' },
   { label: 'Calendar', icon: Calendar, to: '/calendar' },
   { label: 'Notes', icon: FileText, to: '/notes' },
+  { label: 'Assistant', icon: Bot, to: '/assistant' },
   { label: 'Study', icon: BookOpen },
   { label: 'Scholarships', icon: Trophy },
   { label: 'Finance', icon: Wallet },

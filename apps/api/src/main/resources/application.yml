@@ -36,6 +36,12 @@ spring:
       # No temperature: gpt-5.5 is a reasoning model and rejects any value but 1.
       chat:
         model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
+    chat:
+      memory:
+        repository:
+          jdbc:
+            # Flyway owns the schema (V12) — never let the repository DDL race it.
+            initialize-schema: never
   servlet:
     multipart:
       # Voice capture uploads; Whisper's own cap is 25MB.

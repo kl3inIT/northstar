@@ -5,6 +5,7 @@ import org.springframework.ai.chat.client.ChatClientBuilderCustomizer;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 /**
  * Shared LLM plumbing for this app. The OpenAI starter autoconfigures the
@@ -16,7 +17,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 class AiConfig {
 
+    // @Primary: capture/alignment inject ChatClient by type; the assistant's
+    // memory-carrying client is a separate, qualified bean (see AssistantConfig).
     @Bean
+    @Primary
     ChatClient chatClient(ChatClient.Builder builder) {
         return builder.build();
     }

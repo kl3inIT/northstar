@@ -34,6 +34,13 @@ repositories {
     mavenCentral()
 }
 
+// Keep reflective parameter names (Spring Boot's plugin does this for the app
+// modules automatically, libraries must opt in): the assistant tools' JSON
+// schemas are generated from parameter names — without this they become arg0…
+tasks.withType<JavaCompile> {
+    options.compilerArgs.add("-parameters")
+}
+
 tasks.withType<Test> {
     useJUnitPlatform()
     usesService(testcontainersLock)

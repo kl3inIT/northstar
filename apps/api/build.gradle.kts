@@ -15,6 +15,8 @@ dependencies {
 
     // OpenAI ChatModel autoconfig for the capture extraction (core uses ChatClient).
     implementation(libs.spring.ai.starter.openai)
+    // Durable assistant conversation memory (spring_ai_chat_memory, Flyway V12).
+    implementation("org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc")
 
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("org.springframework.modulith:spring-modulith-actuator")
