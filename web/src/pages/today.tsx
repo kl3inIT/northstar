@@ -54,7 +54,7 @@ export function TodayPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl overflow-auto px-8 py-8">
+    <div className="w-full min-w-0 flex-1 overflow-auto px-10 py-8">
       <div className="flex items-baseline gap-3">
         <h1 className="text-3xl font-bold tracking-tight">Today</h1>
         <span className="text-sm text-muted-foreground">{headerDate()}</span>
