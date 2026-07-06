@@ -104,6 +104,12 @@ public class NoteService {
         return notes.findBySlug(slug).map(this::detail);
     }
 
+    /** Exact-title lookup (case-insensitive) — deterministic-title upserts (alignment journal). */
+    @Transactional(readOnly = true)
+    public Optional<NoteDetail> findByTitle(String title) {
+        return notes.findFirstByTitleIgnoreCase(title.strip()).map(this::detail);
+    }
+
     /** Notes newest-first, bounded: callers page instead of pulling the whole table. */
     @Transactional(readOnly = true)
     public Page<NoteSummary> list(Pageable pageable) {

@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ReviewCard } from '@/features/alignment/review-card'
 import { cn } from '@/lib/utils'
 import {
   useCreateTask,
@@ -110,6 +111,7 @@ export function TodayPage() {
               ))}
             </Section>
           )}
+          <ReviewCard />
         </div>
       )}
     </div>

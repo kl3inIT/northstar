@@ -1,0 +1,95 @@
+package com.northstar.api.alignment;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+import com.northstar.core.alignment.AlignmentService;
+import com.northstar.core.note.NoteDetail;
+import com.northstar.core.task.TaskService;
+import com.northstar.core.task.TaskSummary;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+
+/**
+ * Proves the alignment wiring end-to-end minus the network: real task/note data
+ * in Postgres, a mocked ChatModel for the commentary. Covers the deterministic
+ * facts (an overdue task must be named with its days late), the upsert contract
+ * (regenerating refreshes the same Journal note), and the facts-only fallback
+ * when the LLM call fails.
+ */
+@SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
+@Testcontainers
+class AlignmentServiceIntegrationTests {
+
+    @Container
+    @ServiceConnection
+    static PostgreSQLContainer postgres = new PostgreSQLContainer("pgvector/pgvector:pg18");
+
+    @MockitoBean
+    ChatModel chatModel;
+
+    @Autowired
+    AlignmentService alignment;
+
+    @Autowired
+    TaskService tasks;
+
+    private final ZoneId zone = ZoneId.systemDefault();
+
+    private void modelReturns(String text) {
+        when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
+        when(chatModel.call(any(Prompt.class)))
+                .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(text)))));
+    }
+
+    @Test
+    void dailyReviewCarriesRealFactsAndUpsertsOneJournalNote() {
+        LocalDate today = LocalDate.now(zone);
+        tasks.create("Nộp essay Chevening", null, today.minusDays(2), null, null);
+        TaskSummary doneTask = tasks.create("Ôn từ vựng HSK", null, today, null, null);
+        tasks.setDone(doneTask.id(), true);
+        modelReturns("Hôm nay gọn gàng. **Mai ưu tiên:** Nộp essay Chevening.");
+
+        NoteDetail first = alignment.generateDaily(zone);
+
+        assertThat(first.folderPath()).isEqualTo("Journal");
+        assertThat(first.tags()).contains("alignment", "daily");
+        assertThat(first.contentMarkdown())
+                .contains("**Mai ưu tiên:** Nộp essay Chevening.")
+                .contains("Nộp essay Chevening — quá hạn 2 ngày")
+                .contains("Ôn từ vựng HSK");
+
+        NoteDetail second = alignment.generateDaily(zone);
+        assertThat(second.id()).isEqualTo(first.id());
+        assertThat(alignment.findDaily(zone)).map(NoteDetail::id).hasValue(first.id());
+    }
+
+    @Test
+    void llmFailureStillShipsTheFactsOnlyNote() {
+        when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
+        when(chatModel.call(any(Prompt.class))).thenThrow(new RuntimeException("LLM down"));
+
+        NoteDetail note = alignment.generateWeekly(zone);
+
+        assertThat(note.contentMarkdown())
+                .contains("số liệu thuần")
+                .contains("## Số liệu tuần");
+        assertThat(alignment.findWeekly(zone)).map(NoteDetail::id).hasValue(note.id());
+    }
+}
