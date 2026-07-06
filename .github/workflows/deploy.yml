@@ -47,6 +47,8 @@ jobs:
           OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
+          # GHCR paths are lowercase; the repo owner is kl3inIT.
+          OWNER="${OWNER,,}"
           cd /apps/northstar
           git fetch --quiet origin main
           git checkout --quiet origin/main -- docker/docker-compose.yml docker/docker-compose.infra.yml

@@ -46,9 +46,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute short SHA
+      - name: Compute image meta
         id: meta
-        run: echo "sha=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "sha=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          # GHCR requires a lowercase repository path; the owner is kl3inIT.
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -59,8 +62,8 @@ jobs:
           # pull:true picks up rolling CVE rebuilds of the base images.
           pull: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/northstar-${{ matrix.component }}:main
-            ghcr.io/${{ github.repository_owner }}/northstar-${{ matrix.component }}:${{ steps.meta.outputs.sha }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/northstar-${{ matrix.component }}:main
+            ghcr.io/${{ steps.meta.outputs.owner }}/northstar-${{ matrix.component }}:${{ steps.meta.outputs.sha }}
           # Per-component buildx cache (zero-mail pattern) — a web-only change
           # never invalidates the api's gradle layers.
           cache-from: type=gha,scope=northstar-${{ matrix.component }}
