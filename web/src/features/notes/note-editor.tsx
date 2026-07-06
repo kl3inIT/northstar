@@ -110,8 +110,8 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
         {update.isError && (
           <p className="text-sm text-destructive">
             {(update.error as { status?: number } | null)?.status === 409
-              ? 'Note đã bị sửa ở nơi khác — đóng editor và mở lại để lấy bản mới nhất.'
-              : 'Lưu thất bại. Kiểm tra tiêu đề rồi thử lại.'}
+              ? 'This note was edited elsewhere — close the editor and reopen it to get the latest version.'
+              : 'Save failed. Check the title and try again.'}
           </p>
         )}
       </header>

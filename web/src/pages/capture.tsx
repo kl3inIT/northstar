@@ -68,14 +68,14 @@ export function CapturePage() {
             action: {
               label: 'Undo',
               onClick: () =>
-                result.undo().then(invalidate).catch(() => toast.error('Undo thất bại.')),
+                result.undo().then(invalidate).catch(() => toast.error('Undo failed.')),
             },
           },
         )
       })
       .catch(() => {
         setPending((p) => p.filter((x) => x.key !== key))
-        toast.error('Capture thất bại — thử lại.', {
+        toast.error('Capture failed — try again.', {
           action: { label: 'Retry', onClick: () => fire(raw, forced) },
         })
       })
@@ -95,7 +95,7 @@ export function CapturePage() {
         <Sparkles className="size-5 text-primary" />
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Nắm bắt ý tưởng ngay lập tức — AI tự xếp thành task hoặc note.
+        Capture ideas instantly — AI files them as tasks or notes.
       </p>
 
       <PromptInput onSubmit={onSubmit} className="mt-5">
@@ -104,7 +104,7 @@ export function CapturePage() {
             data-capture-input
             value={text}
             onChange={(e) => setText(e.currentTarget.value)}
-            placeholder="Gõ hoặc paste… task hay note, Enter để capture"
+            placeholder="Type or paste… a task or a note, Enter to capture"
             autoFocus
           />
         </PromptInputBody>
@@ -114,19 +114,19 @@ export function CapturePage() {
               variant={kind === 'TASK' ? 'default' : 'ghost'}
               onClick={() => setKind((k) => (k === 'TASK' ? null : 'TASK'))}
             >
-              <CheckSquare className="size-4" /> Thêm task
+              <CheckSquare className="size-4" /> Add task
             </PromptInputButton>
             <PromptInputButton
               variant={kind === 'NOTE' ? 'default' : 'ghost'}
               onClick={() => setKind((k) => (k === 'NOTE' ? null : 'NOTE'))}
             >
-              <FileText className="size-4" /> Thêm note
+              <FileText className="size-4" /> Add note
             </PromptInputButton>
             <MicButton value={text} onChange={setText} />
           </PromptInputTools>
           <div className="flex items-center gap-3">
             <span className="hidden text-xs text-muted-foreground sm:block">
-              Enter để capture · Shift+Enter xuống dòng
+              Enter to capture · Shift+Enter for a new line
             </span>
             <PromptInputSubmit size="sm" disabled={!text.trim()}>
               Capture <Sparkles className="size-3.5" />
@@ -151,14 +151,14 @@ function MicButton({ value, onChange }: { value: string; onChange: (text: string
   if (state === 'connecting' || state === 'finishing') {
     return (
       <PromptInputButton variant="ghost" disabled>
-        <Loader2 className="size-4 animate-spin" /> {state === 'connecting' ? 'Đang kết nối…' : 'Đang chốt câu…'}
+        <Loader2 className="size-4 animate-spin" /> {state === 'connecting' ? 'Connecting…' : 'Finalizing…'}
       </PromptInputButton>
     )
   }
   if (state === 'live') {
     return (
       <PromptInputButton variant="destructive" onClick={stop}>
-        <Square className="size-4" /> Dừng · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
+        <Square className="size-4" /> Stop · {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}
       </PromptInputButton>
     )
   }
@@ -166,9 +166,9 @@ function MicButton({ value, onChange }: { value: string; onChange: (text: string
     <PromptInputButton
       variant="ghost"
       onClick={() => void start(value)}
-      title="Nói đến đâu chữ lên đến đó (audio đi thẳng OpenAI, không lưu)"
+      title="Words appear as you speak (audio goes straight to OpenAI, never stored)"
     >
-      <Mic className="size-4" /> Nói
+      <Mic className="size-4" /> Dictate
     </PromptInputButton>
   )
 }
@@ -187,7 +187,7 @@ type Row = {
 
 function formatDue(dueDate: string, dueTime: string | null | undefined): string {
   const [y, m, d] = dueDate.split('-')
-  return `Hạn ${d}/${m}/${y}${dueTime ? ` · ${dueTime.slice(0, 5)}` : ''}`
+  return `Due ${d}/${m}/${y}${dueTime ? ` · ${dueTime.slice(0, 5)}` : ''}`
 }
 
 /** One unified recent list — a finished capture surfaces at the top of it. */
@@ -234,19 +234,19 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
         queryClient.invalidateQueries({ queryKey: ['notes'] })
-        toast.success(`Đã xoá “${row.title}”`)
+        toast.success(`Deleted “${row.title}”`)
       })
-      .catch(() => toast.error('Xoá thất bại — thử lại.'))
+      .catch(() => toast.error('Delete failed — try again.'))
   }
 
   if (all.length === 0 && pending.length === 0) return null
   return (
     <section className="mt-8">
       <div className="mb-1 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-muted-foreground">Gần đây</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground">Recent</h2>
         {all.length > 8 && (
           <Button size="sm" variant="ghost" onClick={() => setShowAll((s) => !s)}>
-            {showAll ? 'Thu gọn' : 'Xem tất cả'}
+            {showAll ? 'Show less' : 'Show all'}
           </Button>
         )}
       </div>
@@ -255,7 +255,7 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
           <div key={p.key} className="flex items-center gap-3 py-3">
             <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
             <span className="truncate text-sm italic text-muted-foreground">
-              Đang phân loại… “{p.text}”
+              Classifying… “{p.text}”
             </span>
           </div>
         ))}
@@ -294,15 +294,15 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
               )}
             </span>
             <span className="flex shrink-0 items-center gap-0.5">
-              <Button size="icon" variant="ghost" className="size-7" aria-label="Xem" title="Xem" onClick={() => view(r)}>
+              <Button size="icon" variant="ghost" className="size-7" aria-label="View" title="View" onClick={() => view(r)}>
                 <ExternalLink className="size-3.5" />
               </Button>
               <Button
                 size="icon"
                 variant="ghost"
                 className="size-7 text-muted-foreground hover:text-destructive"
-                aria-label="Xoá"
-                title="Xoá"
+                aria-label="Delete"
+                title="Delete"
                 onClick={() => remove(r)}
               >
                 <Trash2 className="size-3.5" />

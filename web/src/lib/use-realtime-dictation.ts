@@ -143,7 +143,7 @@ export function useRealtimeDictation(
       }
     } catch {
       cleanup()
-      onError('Không mở được phiên dictation — kiểm tra mic/mạng rồi thử lại.')
+      onError("Couldn't start dictation — check your mic/network and try again.")
     }
   }
 

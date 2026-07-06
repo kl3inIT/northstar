@@ -10,13 +10,13 @@ import { format } from "date-fns";
 export type TRepeat = "none" | "daily" | "weekly";
 
 export const WEEKDAYS = [
-  { code: "MO", label: "T2" },
-  { code: "TU", label: "T3" },
-  { code: "WE", label: "T4" },
-  { code: "TH", label: "T5" },
-  { code: "FR", label: "T6" },
-  { code: "SA", label: "T7" },
-  { code: "SU", label: "CN" },
+  { code: "MO", label: "Mon" },
+  { code: "TU", label: "Tue" },
+  { code: "WE", label: "Wed" },
+  { code: "TH", label: "Thu" },
+  { code: "FR", label: "Fri" },
+  { code: "SA", label: "Sat" },
+  { code: "SU", label: "Sun" },
 ] as const;
 
 export type TWeekdayCode = (typeof WEEKDAYS)[number]["code"];
@@ -68,14 +68,14 @@ export function parseRrule(rrule: string | undefined): IRecurrenceFields {
   return { repeat, byDay, until };
 }
 
-/** "Hàng tuần: T2, T4 · đến 20/12/2026" — the details-dialog line. */
+/** "Weekly: Mon, Wed · until 20/12/2026" — the details-dialog line. */
 export function humanizeRrule(rrule: string): string {
   const { repeat, byDay, until } = parseRrule(rrule);
   if (repeat === "none") return rrule; // out-of-subset rule: show it raw rather than lie
-  let text = repeat === "daily" ? "Hàng ngày" : "Hàng tuần";
+  let text = repeat === "daily" ? "Daily" : "Weekly";
   if (repeat === "weekly" && byDay.length > 0) {
     text += `: ${byDay.map(code => WEEKDAYS.find(d => d.code === code)?.label ?? code).join(", ")}`;
   }
-  if (until) text += ` · đến ${format(until, "d/M/yyyy")}`;
+  if (until) text += ` · until ${format(until, "d/M/yyyy")}`;
   return text;
 }

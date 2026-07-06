@@ -19,7 +19,7 @@ export function SearchPanel({ query, activeSlug }: { query: string; activeSlug?:
   if (!debounced) {
     return (
       <p className="px-3 py-2 text-sm text-muted-foreground">
-        Tìm trong nội dung mọi note — gõ từ khóa, cụm trong nháy kép, hoặc -loại-trừ.
+        Search across all note contents — type keywords, "quoted phrases", or -exclusions.
       </p>
     )
   }
@@ -32,7 +32,7 @@ export function SearchPanel({ query, activeSlug }: { query: string; activeSlug?:
     )
   }
   if (results.length === 0) {
-    return <p className="px-3 py-2 text-sm text-muted-foreground">Không có kết quả cho “{debounced}”.</p>
+    return <p className="px-3 py-2 text-sm text-muted-foreground">No results for “{debounced}”.</p>
   }
 
   return (

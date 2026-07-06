@@ -63,10 +63,10 @@ function RouteError({ error }: { error: Error }) {
   return (
     <div className="flex w-full flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
       <AlertTriangle className="size-8 text-destructive" />
-      <p className="text-sm font-medium">Có lỗi khi hiển thị trang này.</p>
+      <p className="text-sm font-medium">Something went wrong while rendering this page.</p>
       <p className="max-w-md truncate text-xs text-muted-foreground">{error.message}</p>
       <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
-        Tải lại
+        Reload
       </Button>
     </div>
   )
@@ -76,9 +76,9 @@ function RouteNotFound() {
   return (
     <div className="flex w-full flex-1 flex-col items-center justify-center gap-3 p-10 text-center">
       <p className="text-3xl font-bold">404</p>
-      <p className="text-sm text-muted-foreground">Trang này không tồn tại.</p>
+      <p className="text-sm text-muted-foreground">This page does not exist.</p>
       <Button asChild size="sm" variant="outline">
-        <Link to="/">Về Today</Link>
+        <Link to="/">Back to Today</Link>
       </Button>
     </div>
   )

@@ -95,7 +95,7 @@ export function TasksPage() {
               disciplineFilter === null ? 'border-primary bg-primary/10 font-medium' : 'text-muted-foreground hover:bg-muted',
             )}
           >
-            Tất cả
+            All
           </button>
           {disciplines.map((d) => (
             <button
@@ -162,7 +162,7 @@ function GroupedViews({
   const visible = groups.filter((g) => g.tasks.length > 0)
 
   if (visible.length === 0) {
-    return <p className="mt-8 text-sm text-muted-foreground">Chưa có task nào — Capture hoặc quick-add ở Today.</p>
+    return <p className="mt-8 text-sm text-muted-foreground">No tasks yet — Capture or quick-add on Today.</p>
   }
 
   if (board) {
@@ -217,7 +217,7 @@ function TaskKanban({ groups, today, disciplines }: { groups: Group[]; today: st
     try {
       if (target === 'done') {
         await setDone.mutateAsync({ id: task.id, done: true })
-        toast.success('Đã xong')
+        toast.success('Done')
         return
       }
       if (task.status === 'DONE') {
@@ -236,9 +236,9 @@ function TaskKanban({ groups, today, disciplines }: { groups: Group[]; today: st
           disciplineId: task.disciplineId ?? undefined,
         },
       })
-      toast.success(dueDate ? `Dời hạn: ${new Date(dueDate + 'T00:00:00').toLocaleDateString('vi-VN')}` : 'Bỏ hạn — Someday')
+      toast.success(dueDate ? `Due moved to ${new Date(dueDate + 'T00:00:00').toLocaleDateString('vi-VN')}` : 'Due date removed — Someday')
     } catch {
-      toast.error('Không lưu được — thử lại')
+      toast.error("Couldn't save — try again")
       setItems(serverItems.map((i) => ({ ...i })))
     }
   }
@@ -249,7 +249,7 @@ function TaskKanban({ groups, today, disciplines }: { groups: Group[]; today: st
     const target = item.column as BucketId
     if (target === originById.get(item.id)) return
     if (target === 'overdue') {
-      toast.warning('Overdue do hạn quá khứ — kéo vào Today để làm hôm nay')
+      toast.warning('Overdue is computed from past due dates — drop on Today to do it today')
       setItems(serverItems.map((i) => ({ ...i })))
       return
     }
@@ -348,14 +348,14 @@ function StarButton({ task, className }: { task: Task; className?: string }) {
   return (
     <button
       type="button"
-      aria-label={starred ? 'Bỏ khỏi hôm nay' : 'Làm hôm nay'}
-      title={starred ? 'Bỏ khỏi hôm nay' : 'Làm hôm nay (không đổi deadline)'}
+      aria-label={starred ? 'Remove from today' : 'Do today'}
+      title={starred ? 'Remove from today' : 'Do today (deadline unchanged)'}
       disabled={setPlanned.isPending}
       onClick={(e) => {
         e.stopPropagation()
         setPlanned.mutate(
           { id: task.id, plannedDate: starred ? null : today },
-          { onSuccess: () => toast.success(starred ? 'Đã bỏ khỏi hôm nay' : 'Sẽ làm hôm nay — deadline giữ nguyên') },
+          { onSuccess: () => toast.success(starred ? 'Removed from today' : 'Doing it today — deadline unchanged') },
         )
       }}
       className={cn('shrink-0', className)}

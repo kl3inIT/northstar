@@ -43,9 +43,9 @@ export function EventFormFields({ form, onSubmit }: IProps) {
           name="title"
           render={({ field, fieldState }) => (
             <FormItem>
-              <FormLabel htmlFor="title">Tiêu đề</FormLabel>
+              <FormLabel htmlFor="title">Title</FormLabel>
               <FormControl>
-                <Input id="title" placeholder="Nhập tiêu đề" data-invalid={fieldState.invalid} {...field} />
+                <Input id="title" placeholder="Enter a title" data-invalid={fieldState.invalid} {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -69,7 +69,7 @@ export function EventFormFields({ form, onSubmit }: IProps) {
                   }}
                 />
               </FormControl>
-              <FormLabel className="!mt-0">Cả ngày</FormLabel>
+              <FormLabel className="!mt-0">All day</FormLabel>
             </FormItem>
           )}
         />
@@ -80,13 +80,13 @@ export function EventFormFields({ form, onSubmit }: IProps) {
             name="startDate"
             render={({ field, fieldState }) => (
               <FormItem className="flex-1">
-                <FormLabel htmlFor="startDate">Bắt đầu</FormLabel>
+                <FormLabel htmlFor="startDate">Start</FormLabel>
                 <FormControl>
                   <SingleDayPicker
                     id="startDate"
                     value={field.value}
                     onSelect={date => field.onChange(date as Date)}
-                    placeholder="Chọn ngày"
+                    placeholder="Pick a date"
                     data-invalid={fieldState.invalid}
                   />
                 </FormControl>
@@ -101,7 +101,7 @@ export function EventFormFields({ form, onSubmit }: IProps) {
               name="startTime"
               render={({ field, fieldState }) => (
                 <FormItem className="w-28">
-                  <FormLabel>Giờ</FormLabel>
+                  <FormLabel>Time</FormLabel>
                   <FormControl>
                     <Input type="time" data-invalid={fieldState.invalid} {...field} />
                   </FormControl>
@@ -118,12 +118,12 @@ export function EventFormFields({ form, onSubmit }: IProps) {
             name="endDate"
             render={({ field, fieldState }) => (
               <FormItem className="flex-1">
-                <FormLabel>Kết thúc</FormLabel>
+                <FormLabel>End</FormLabel>
                 <FormControl>
                   <SingleDayPicker
                     value={field.value}
                     onSelect={date => field.onChange(date as Date)}
-                    placeholder="Chọn ngày"
+                    placeholder="Pick a date"
                     data-invalid={fieldState.invalid}
                   />
                 </FormControl>
@@ -138,7 +138,7 @@ export function EventFormFields({ form, onSubmit }: IProps) {
               name="endTime"
               render={({ field, fieldState }) => (
                 <FormItem className="w-28">
-                  <FormLabel>Giờ</FormLabel>
+                  <FormLabel>Time</FormLabel>
                   <FormControl>
                     <Input type="time" data-invalid={fieldState.invalid} {...field} />
                   </FormControl>
@@ -155,7 +155,7 @@ export function EventFormFields({ form, onSubmit }: IProps) {
             name="repeat"
             render={({ field }) => (
               <FormItem className="flex-1">
-                <FormLabel>Lặp lại</FormLabel>
+                <FormLabel>Repeats</FormLabel>
                 <FormControl>
                   <Select
                     value={field.value}
@@ -169,12 +169,12 @@ export function EventFormFields({ form, onSubmit }: IProps) {
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Không lặp" />
+                      <SelectValue placeholder="Does not repeat" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">Không lặp</SelectItem>
-                      <SelectItem value="daily">Hàng ngày</SelectItem>
-                      <SelectItem value="weekly">Hàng tuần</SelectItem>
+                      <SelectItem value="none">Does not repeat</SelectItem>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
                     </SelectContent>
                   </Select>
                 </FormControl>
@@ -189,9 +189,9 @@ export function EventFormFields({ form, onSubmit }: IProps) {
               name="until"
               render={({ field }) => (
                 <FormItem className="flex-1">
-                  <FormLabel>Đến ngày (tùy chọn)</FormLabel>
+                  <FormLabel>Until (optional)</FormLabel>
                   <FormControl>
-                    <SingleDayPicker value={field.value} onSelect={date => field.onChange(date)} placeholder="Mãi mãi" />
+                    <SingleDayPicker value={field.value} onSelect={date => field.onChange(date)} placeholder="Forever" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -206,7 +206,7 @@ export function EventFormFields({ form, onSubmit }: IProps) {
             name="byDay"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Vào các thứ</FormLabel>
+                <FormLabel>On these days</FormLabel>
                 <FormControl>
                   <div className="flex gap-1.5">
                     {WEEKDAYS.map(day => {
@@ -255,10 +255,10 @@ export function EventFormFields({ form, onSubmit }: IProps) {
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Không thuộc discipline nào" />
+                    <SelectValue placeholder="No discipline" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={NO_DISCIPLINE}>Không</SelectItem>
+                    <SelectItem value={NO_DISCIPLINE}>None</SelectItem>
                     {disciplines.map(d => (
                       <SelectItem key={d.id} value={d.id}>
                         <div className="flex items-center gap-2">
@@ -280,11 +280,11 @@ export function EventFormFields({ form, onSubmit }: IProps) {
           name="color"
           render={({ field, fieldState }) => (
             <FormItem>
-              <FormLabel>Màu</FormLabel>
+              <FormLabel>Color</FormLabel>
               <FormControl>
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger data-invalid={fieldState.invalid}>
-                    <SelectValue placeholder="Chọn màu" />
+                    <SelectValue placeholder="Pick a color" />
                   </SelectTrigger>
                   <SelectContent>
                     {COLORS.map(color => (
@@ -308,7 +308,7 @@ export function EventFormFields({ form, onSubmit }: IProps) {
           name="description"
           render={({ field, fieldState }) => (
             <FormItem>
-              <FormLabel>Ghi chú</FormLabel>
+              <FormLabel>Notes</FormLabel>
               <FormControl>
                 <Textarea {...field} value={field.value ?? ""} data-invalid={fieldState.invalid} />
               </FormControl>

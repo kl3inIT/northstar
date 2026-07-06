@@ -83,7 +83,7 @@ export function EditEventDialog({ children, event }: IProps) {
         },
       },
       {
-        onSuccess: () => toast.success(isRecurring ? "Đã lưu cả chuỗi" : "Đã lưu event"),
+        onSuccess: () => toast.success(isRecurring ? "Saved the whole series" : "Event saved"),
       },
     );
     onClose();
@@ -95,9 +95,9 @@ export function EditEventDialog({ children, event }: IProps) {
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{isRecurring ? "Sửa chuỗi lặp" : "Sửa event"}</DialogTitle>
+          <DialogTitle>{isRecurring ? "Edit recurring series" : "Edit event"}</DialogTitle>
           {isRecurring && (
-            <DialogDescription>Thay đổi áp dụng cho CẢ CHUỖI; ngày bắt đầu là mốc neo của chuỗi.</DialogDescription>
+            <DialogDescription>Changes apply to the WHOLE SERIES; the start date anchors the series.</DialogDescription>
           )}
         </DialogHeader>
 
@@ -106,12 +106,12 @@ export function EditEventDialog({ children, event }: IProps) {
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline">
-              Hủy
+              Cancel
             </Button>
           </DialogClose>
 
           <Button form="event-form" type="submit">
-            Lưu
+            Save
           </Button>
         </DialogFooter>
       </DialogContent>

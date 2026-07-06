@@ -41,7 +41,7 @@ export function CommandMenu({ onCapture }: { onCapture?: () => void }) {
 
   function onNew() {
     setOpen(false)
-    const title = window.prompt('Tên note mới')?.trim()
+    const title = window.prompt('New note title')?.trim()
     if (!title) return
     createNote.mutate(
       { title, folderPath: '', contentMarkdown: '', tags: [] },

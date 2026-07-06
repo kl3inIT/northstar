@@ -23,7 +23,7 @@ const queryClient = new QueryClient({
   queryCache: new QueryCache({
     onError: (_error, query) => {
       if (query.meta?.silent) return
-      toast.error('Tải dữ liệu thất bại — thử lại sau.', { id: `query-${query.queryHash}` })
+      toast.error('Failed to load data — try again later.', { id: `query-${query.queryHash}` })
     },
   }),
 })

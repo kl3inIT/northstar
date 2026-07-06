@@ -36,7 +36,7 @@ export function NoteView() {
   if (isError || !note) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        Không tìm thấy note “{slug}”.
+        Note “{slug}” not found.
       </div>
     )
   }
@@ -87,7 +87,7 @@ function StatusBanner({ note }: { note: NoteDetail }) {
   return (
     <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/50 px-4 py-2.5">
       <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-        {staging ? 'Note này do máy soạn, đang chờ duyệt (Staging).' : 'Note này đang nằm trong Archive.'}
+        {staging ? 'This note was machine-drafted and is awaiting review (Staging).' : 'This note is in the Archive.'}
       </p>
       {staging ? (
         <>
@@ -97,11 +97,11 @@ function StatusBanner({ note }: { note: NoteDetail }) {
             onClick={() =>
               setStatus.mutate(
                 { id: note.id, status: 'RESOURCE' },
-                { onSuccess: () => toast.success('Đã chuyển vào Resources') },
+                { onSuccess: () => toast.success('Moved to Resources') },
               )
             }
           >
-            <Check className="size-4" /> Vào Resources
+            <Check className="size-4" /> Move to Resources
           </Button>
           <Button
             size="sm"
@@ -110,11 +110,11 @@ function StatusBanner({ note }: { note: NoteDetail }) {
             onClick={() =>
               setStatus.mutate(
                 { id: note.id, status: 'ARCHIVED' },
-                { onSuccess: () => toast.success('Đã lưu trữ') },
+                { onSuccess: () => toast.success('Archived') },
               )
             }
           >
-            <Archive className="size-4" /> Lưu trữ
+            <Archive className="size-4" /> Archive
           </Button>
         </>
       ) : (
@@ -125,11 +125,11 @@ function StatusBanner({ note }: { note: NoteDetail }) {
           onClick={() =>
             setStatus.mutate(
               { id: note.id, status: 'RESOURCE' },
-              { onSuccess: () => toast.success('Đã khôi phục vào Resources') },
+              { onSuccess: () => toast.success('Restored to Resources') },
             )
           }
         >
-          <Undo2 className="size-4" /> Khôi phục
+          <Undo2 className="size-4" /> Restore
         </Button>
       )}
     </div>
@@ -144,7 +144,7 @@ function RightPanel({ note }: { note: NoteDetail }) {
           <Link2 className="size-4 text-muted-foreground" /> Backlinks
         </h2>
         {note.backlinks.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Chưa có backlink.</p>
+          <p className="text-sm text-muted-foreground">No backlinks yet.</p>
         ) : (
           <div className="space-y-2">
             {note.backlinks.map((link) => (

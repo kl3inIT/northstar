@@ -28,7 +28,7 @@ function taskToEvent(task: Task, today: string): IEvent {
   const overdue = task.status === 'OPEN' && task.dueDate! < today
   const day = overdue ? today : task.dueDate!
   const time = task.dueTime ? `${task.dueTime.slice(0, 5)} ` : ''
-  const late = overdue ? `(trễ ${format(new Date(task.dueDate! + 'T00:00:00'), 'd/M')}) ` : ''
+  const late = overdue ? `(late ${format(new Date(task.dueDate! + 'T00:00:00'), 'd/M')}) ` : ''
   return {
     id: task.id,
     title: `${late}${time}${task.title}`,

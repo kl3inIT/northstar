@@ -58,7 +58,7 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
         rrule: buildRrule(values, values.startDate),
       },
       {
-        onSuccess: () => toast.success("Đã tạo event"),
+        onSuccess: () => toast.success("Event created"),
       },
     );
     onClose();
@@ -71,8 +71,8 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Thêm event</DialogTitle>
-          <DialogDescription>Chặn thời gian cho việc diễn ra — học, lớp, hẹn.</DialogDescription>
+          <DialogTitle>Add event</DialogTitle>
+          <DialogDescription>Block time for things that happen — study, classes, appointments.</DialogDescription>
         </DialogHeader>
 
         <EventFormFields form={form} onSubmit={onSubmit} />
@@ -80,12 +80,12 @@ export function AddEventDialog({ children, startDate, startTime }: IProps) {
         <DialogFooter>
           <DialogClose asChild>
             <Button type="button" variant="outline">
-              Hủy
+              Cancel
             </Button>
           </DialogClose>
 
           <Button form="event-form" type="submit">
-            Tạo event
+            Create event
           </Button>
         </DialogFooter>
       </DialogContent>

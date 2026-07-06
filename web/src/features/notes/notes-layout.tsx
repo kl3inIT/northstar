@@ -48,7 +48,7 @@ export function NotesLayout() {
   const tree = useMemo(() => buildFolderTree(visible), [visible])
 
   function onNew() {
-    const title = window.prompt('Tên note mới')?.trim()
+    const title = window.prompt('New note title')?.trim()
     if (!title) return
     createNote.mutate(
       { title, folderPath: '', contentMarkdown: '', tags: [] },
@@ -132,7 +132,7 @@ export function NotesLayout() {
             <StatusList status="ARCHIVED" activeSlug={params.slug} />
           ) : isFiles ? (
             isLoading ? (
-              <p className="px-3 py-2 text-sm text-muted-foreground">Đang tải…</p>
+              <p className="px-3 py-2 text-sm text-muted-foreground">Loading…</p>
             ) : (
               <FolderTree tree={tree} activeSlug={params.slug} />
             )

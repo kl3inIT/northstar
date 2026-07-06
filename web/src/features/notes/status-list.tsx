@@ -15,14 +15,14 @@ export function StatusList({ status, activeSlug }: { status: 'STAGING' | 'ARCHIV
   const { data: notes = [], isLoading } = useNotesByStatus(status)
 
   if (isLoading) {
-    return <p className="px-3 py-2 text-sm text-muted-foreground">Đang tải…</p>
+    return <p className="px-3 py-2 text-sm text-muted-foreground">Loading…</p>
   }
   if (notes.length === 0) {
     return (
       <p className="px-3 py-2 text-sm text-muted-foreground">
         {status === 'STAGING'
-          ? 'Staging trống — note capture mới sẽ chờ duyệt ở đây.'
-          : 'Chưa lưu trữ note nào.'}
+          ? 'Staging is empty — newly captured notes await review here.'
+          : 'No archived notes yet.'}
       </p>
     )
   }
@@ -60,7 +60,7 @@ function StatusRow({ note, active }: { note: NoteSummary; active: boolean }) {
               onClick={() =>
                 setStatus.mutate(
                   { id: note.id, status: 'RESOURCE' },
-                  { onSuccess: () => toast.success('Đã chuyển vào Resources') },
+                  { onSuccess: () => toast.success('Moved to Resources') },
                 )
               }
             >
@@ -74,7 +74,7 @@ function StatusRow({ note, active }: { note: NoteSummary; active: boolean }) {
               onClick={() =>
                 setStatus.mutate(
                   { id: note.id, status: 'ARCHIVED' },
-                  { onSuccess: () => toast.success('Đã lưu trữ') },
+                  { onSuccess: () => toast.success('Archived') },
                 )
               }
             >
@@ -90,11 +90,11 @@ function StatusRow({ note, active }: { note: NoteSummary; active: boolean }) {
             onClick={() =>
               setStatus.mutate(
                 { id: note.id, status: 'RESOURCE' },
-                { onSuccess: () => toast.success('Đã khôi phục vào Resources') },
+                { onSuccess: () => toast.success('Restored to Resources') },
               )
             }
           >
-            <Undo2 className="size-3" /> Khôi phục
+            <Undo2 className="size-3" /> Restore
           </Button>
         )}
       </div>

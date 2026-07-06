@@ -20,23 +20,23 @@ export function ReviewCard() {
 
   const onGenerate = () =>
     generate.mutate(undefined, {
-      onSuccess: () => toast.success(period === 'daily' ? 'Đã tổng kết hôm nay' : 'Đã tổng kết tuần này'),
-      onError: () => toast.error('Không tạo được tổng kết — thử lại sau'),
+      onSuccess: () => toast.success(period === 'daily' ? 'Daily review ready' : 'Weekly review ready'),
+      onError: () => toast.error('Could not generate the review — try again later'),
     })
 
   return (
     <section className="rounded-xl border">
       <div className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold">
-          <Sparkles className="size-4 text-primary" /> Tổng kết
+          <Sparkles className="size-4 text-primary" /> Review
         </h2>
         <Tabs value={period} onValueChange={(v) => setPeriod(v as ReviewPeriod)} className="ml-auto">
           <TabsList className="h-8">
             <TabsTrigger value="daily" className="px-3 text-xs">
-              Hôm nay
+              Today
             </TabsTrigger>
             <TabsTrigger value="weekly" className="px-3 text-xs">
-              Tuần này
+              This week
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -53,11 +53,11 @@ export function ReviewCard() {
             <MarkdownBody content={note.contentMarkdown} links={note.outgoingLinks} />
             <div className="mt-4 flex items-center gap-2 border-t pt-3">
               <Button size="sm" variant="ghost" onClick={onGenerate} disabled={generate.isPending}>
-                <RefreshCw className="size-4" /> {generate.isPending ? 'Đang viết…' : 'Làm mới'}
+                <RefreshCw className="size-4" /> {generate.isPending ? 'Generating…' : 'Refresh'}
               </Button>
               <Button asChild size="sm" variant="ghost" className="ml-auto">
                 <Link to="/notes/$slug" params={{ slug: note.slug }}>
-                  Mở trong Notes <ArrowUpRight className="size-4" />
+                  Open in Notes <ArrowUpRight className="size-4" />
                 </Link>
               </Button>
             </div>
@@ -66,12 +66,12 @@ export function ReviewCard() {
           <div className="flex flex-col items-start gap-3">
             <p className="text-sm text-muted-foreground">
               {period === 'daily'
-                ? 'AI đọc task, lịch và capture của hôm nay rồi viết tổng kết — anh chỉ việc đọc.'
-                : 'AI nhìn lại cả tuần: xong gì, trượt gì, tuần tới nên dồn sức vào đâu.'}
+                ? "AI reads today's tasks, calendar, and captures, then drafts the review — you just read it."
+                : 'AI looks back at the week: what got done, what slipped, and where to focus next week.'}
             </p>
             <Button size="sm" onClick={onGenerate} disabled={generate.isPending}>
               <Sparkles className="size-4" />
-              {generate.isPending ? 'Đang viết…' : period === 'daily' ? 'Tạo tổng kết hôm nay' : 'Tạo tổng kết tuần'}
+              {generate.isPending ? 'Generating…' : period === 'daily' ? 'Generate daily review' : 'Generate weekly review'}
             </Button>
           </div>
         )}

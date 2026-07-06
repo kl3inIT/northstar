@@ -113,7 +113,7 @@ export function TodayPage() {
           <Section label="Today" count={dueToday.length + doneToday.length}>
             {dueToday.length === 0 && doneToday.length === 0 && (
               <p className="py-2 text-sm text-muted-foreground">
-                Chưa có task cho hôm nay — thêm ở ô trên, bấm ⭐ một task, hoặc Capture (⌃⇧K).
+                No tasks for today — add one above, star ⭐ a task, or Capture (⌃⇧K).
               </p>
             )}
             {dueToday.map((t) => (
@@ -228,8 +228,8 @@ function TaskRow({
       {onStar && (
         <button
           type="button"
-          aria-label={starred ? 'Bỏ khỏi hôm nay' : 'Làm hôm nay'}
-          title={starred ? 'Bỏ khỏi hôm nay' : 'Làm hôm nay (không đổi deadline)'}
+          aria-label={starred ? 'Remove from today' : 'Do today'}
+          title={starred ? 'Remove from today' : 'Do today (deadline unchanged)'}
           onClick={onStar}
           className={cn(
             'shrink-0 transition-opacity',

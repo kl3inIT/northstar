@@ -9,7 +9,7 @@ const INDENT = 12
 
 export function FolderTree({ tree, activeSlug }: { tree: TreeFolder; activeSlug?: string }) {
   if (tree.folders.length === 0 && tree.notes.length === 0) {
-    return <p className="px-3 py-2 text-sm text-muted-foreground">Chưa có note nào.</p>
+    return <p className="px-3 py-2 text-sm text-muted-foreground">No notes yet.</p>
   }
   return (
     <div className="py-1 text-sm">

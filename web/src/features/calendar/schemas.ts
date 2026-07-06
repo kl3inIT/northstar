@@ -12,15 +12,15 @@ export function combine(date: Date, time: string): Date {
 
 export const eventSchema = z
   .object({
-    title: z.string().min(1, "Bắt buộc nhập tiêu đề"),
+    title: z.string().min(1, "Title is required"),
     description: z.string().optional(),
     allDay: z.boolean(),
-    startDate: z.date({ error: "Chọn ngày bắt đầu" }),
-    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Chọn giờ bắt đầu"),
-    endDate: z.date({ error: "Chọn ngày kết thúc" }),
-    endTime: z.string().regex(/^\d{2}:\d{2}$/, "Chọn giờ kết thúc"),
+    startDate: z.date({ error: "Pick a start date" }),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/, "Pick a start time"),
+    endDate: z.date({ error: "Pick an end date" }),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/, "Pick an end time"),
     color: z.enum(["blue", "green", "red", "yellow", "purple", "orange", "gray"], {
-      error: "Chọn màu",
+      error: "Pick a color",
     }),
     disciplineId: z.string().optional(),
     // Recurrence (lịch lặp): weekly defaults byDay to the start date's weekday on submit.
@@ -29,7 +29,7 @@ export const eventSchema = z
     until: z.date().optional(),
   })
   .refine(data => combine(data.startDate, data.startTime) < combine(data.endDate, data.endTime), {
-    message: "Kết thúc phải sau bắt đầu",
+    message: "End must be after start",
     path: ["endTime"],
   });
 

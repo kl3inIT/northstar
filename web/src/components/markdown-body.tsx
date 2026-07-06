@@ -39,7 +39,7 @@ export function MarkdownBody({ content, links }: { content: string; links: NoteR
               return (
                 <span
                   className="rounded bg-muted px-1 py-0.5 text-muted-foreground underline decoration-dashed underline-offset-2"
-                  title="Note chưa tồn tại"
+                  title="Note does not exist yet"
                 >
                   {children}
                 </span>

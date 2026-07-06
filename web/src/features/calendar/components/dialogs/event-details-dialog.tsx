@@ -38,7 +38,7 @@ export function EventDetailsDialog({ event, children }: IProps) {
   const handleDelete = () => {
     deleteEvent.mutate(
       { id: event.masterId ?? event.id },
-      { onSuccess: () => toast.success(isRecurring ? "Đã xóa cả chuỗi" : "Đã xóa event") },
+      { onSuccess: () => toast.success(isRecurring ? "Deleted the whole series" : "Event deleted") },
     );
     onClose();
   };
@@ -48,7 +48,7 @@ export function EventDetailsDialog({ event, children }: IProps) {
     if (!event.masterId || !event.occurrenceStart) return;
     deleteEvent.mutate(
       { id: event.masterId, occurrenceStart: event.occurrenceStart },
-      { onSuccess: () => toast.success("Đã xóa buổi này") },
+      { onSuccess: () => toast.success("Occurrence deleted") },
     );
     onClose();
   };
@@ -71,7 +71,7 @@ export function EventDetailsDialog({ event, children }: IProps) {
           <div className="flex items-start gap-2">
             <Calendar className="mt-1 size-4 shrink-0" />
             <div>
-              <p className="text-sm font-medium">{isTask ? "Đến hạn" : "Bắt đầu"}</p>
+              <p className="text-sm font-medium">{isTask ? "Due" : "Start"}</p>
               <p className="text-sm text-muted-foreground">{format(startDate, timeFormat)}</p>
             </div>
           </div>
@@ -80,7 +80,7 @@ export function EventDetailsDialog({ event, children }: IProps) {
             <div className="flex items-start gap-2">
               <Clock className="mt-1 size-4 shrink-0" />
               <div>
-                <p className="text-sm font-medium">Kết thúc</p>
+                <p className="text-sm font-medium">End</p>
                 <p className="text-sm text-muted-foreground">{format(endDate, timeFormat)}</p>
               </div>
             </div>
@@ -90,7 +90,7 @@ export function EventDetailsDialog({ event, children }: IProps) {
             <div className="flex items-start gap-2">
               <Repeat className="mt-1 size-4 shrink-0" />
               <div>
-                <p className="text-sm font-medium">Lặp lại</p>
+                <p className="text-sm font-medium">Repeats</p>
                 <p className="text-sm text-muted-foreground">{humanizeRrule(event.rrule!)}</p>
               </div>
             </div>
@@ -110,7 +110,7 @@ export function EventDetailsDialog({ event, children }: IProps) {
             <div className="flex items-start gap-2">
               <Text className="mt-1 size-4 shrink-0" />
               <div>
-                <p className="text-sm font-medium">Ghi chú</p>
+                <p className="text-sm font-medium">Notes</p>
                 <p className="text-sm text-muted-foreground">{event.description}</p>
               </div>
             </div>
@@ -120,7 +120,7 @@ export function EventDetailsDialog({ event, children }: IProps) {
             <div className="flex items-start gap-2">
               <ListTodo className="mt-1 size-4 shrink-0" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">Task đang mở của {event.disciplineName ?? "discipline này"}</p>
+                <p className="text-sm font-medium">Open tasks for {event.disciplineName ?? "this discipline"}</p>
                 <div className="mt-1.5 space-y-1.5">
                   {agenda.map(task => (
                     <label key={task.id} className="flex cursor-pointer items-center gap-2">
@@ -149,11 +149,11 @@ export function EventDetailsDialog({ event, children }: IProps) {
             <Button type="button" onClick={handleToggleTask}>
               {event.taskDone ? (
                 <>
-                  <Undo2 /> Mở lại
+                  <Undo2 /> Reopen
                 </>
               ) : (
                 <>
-                  <CheckCircle2 /> Đánh dấu xong
+                  <CheckCircle2 /> Mark done
                 </>
               )}
             </Button>
@@ -161,15 +161,15 @@ export function EventDetailsDialog({ event, children }: IProps) {
             <>
               {isRecurring && (
                 <Button type="button" variant="outline" onClick={handleDeleteOccurrence}>
-                  <Trash2 /> Xóa buổi này
+                  <Trash2 /> Delete this occurrence
                 </Button>
               )}
               <Button type="button" variant="outline" onClick={handleDelete}>
-                <Trash2 /> {isRecurring ? "Xóa cả chuỗi" : "Xóa"}
+                <Trash2 /> {isRecurring ? "Delete whole series" : "Delete"}
               </Button>
               <EditEventDialog event={event}>
                 <Button type="button" variant="outline">
-                  Sửa
+                  Edit
                 </Button>
               </EditEventDialog>
             </>
