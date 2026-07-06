@@ -2,7 +2,6 @@ package com.northstar.core.assistant;
 
 import com.northstar.core.alignment.AlignmentService;
 import com.northstar.core.note.NoteDetail;
-import java.util.Locale;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.ai.tool.annotation.Tool;
@@ -39,22 +38,24 @@ class ReviewTools implements NorthstarTool {
             annotations = @McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false,
                     openWorldHint = false))
     ReviewView draftReview(
-            @ToolParam(description = "'daily' for today, 'weekly' for the current ISO week")
-            @McpToolParam(description = "'daily' for today, 'weekly' for the current ISO week",
-                    required = true) String period) {
+            @ToolParam(description = "DAILY covers today, WEEKLY the current ISO week")
+            @McpToolParam(description = "DAILY covers today, WEEKLY the current ISO week",
+                    required = true) ReviewPeriod period) {
         AlignmentService service = alignment.getIfAvailable();
         if (service == null) {
             throw new IllegalStateException(
                     "Review drafting needs an LLM and is not configured in this app");
         }
-        String normalized = ToolSupport.required("period", period).strip().toLowerCase(Locale.ROOT);
-        NoteDetail note = switch (normalized) {
-            case "daily" -> service.generateDaily(ToolSupport.zone());
-            case "weekly" -> service.generateWeekly(ToolSupport.zone());
-            default -> throw new IllegalArgumentException(
-                    "period must be 'daily' or 'weekly', got '" + period + "'");
+        NoteDetail note = switch (ToolSupport.required("period", period)) {
+            case DAILY -> service.generateDaily(ToolSupport.zone());
+            case WEEKLY -> service.generateWeekly(ToolSupport.zone());
         };
         return new ReviewView(note.title(), note.slug(), note.contentMarkdown());
+    }
+
+    /** Schema-level constraint: the model cannot send a period outside this set. */
+    enum ReviewPeriod {
+        DAILY, WEEKLY
     }
 
     record ReviewView(String noteTitle, String noteSlug, String markdown) {

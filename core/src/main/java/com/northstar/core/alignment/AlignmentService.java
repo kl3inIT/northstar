@@ -42,39 +42,63 @@ public class AlignmentService {
     private static final int MAX_STAGING_LINES = 10;
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
+    // Step-back call (prompt-engineering pattern): analysis is separated from
+    // writing, so the writer starts from observations instead of a raw table.
+    private static final String OBSERVATIONS_SYSTEM = """
+            You are the analysis step before a personal review is written.
+            From the numbers in the user message, extract the 2-4 observations that
+            MATTER — patterns, risks, wins. Examples of what qualifies: the same task
+            slipping repeatedly, all overdue work clustering in one area, a day/week
+            with real output, tomorrow being overloaded.
+            One short line each, grounded ONLY in the numbers (quote titles verbatim).
+            No advice, no filler, no restating totals that carry no signal.
+            If the numbers are nearly empty, output exactly one line saying so.
+            """;
+
+    // Shared contrastive example: the writer must read patterns, not recite rows.
+    private static final String COMMENTARY_EXAMPLE = """
+
+            <example>
+            Bad commentary (recites the table): "You completed 0 tasks today and have
+            8 open tasks that are overdue."
+            Good commentary (reads the pattern): "A blank day — and 'Ôn 50 từ vựng
+            IELTS' has now slipped 6 days straight, so it is either too big or no
+            longer worth doing; shrink it or drop it."
+            </example>
+            """;
+
     private static final String DAILY_SYSTEM = """
             You are the end-of-day review companion inside Northstar, a personal-growth OS.
             The user does NOT want to write the journal themselves — you draft it, they
-            only read. The user message is the day's real numbers. Write 3-5 sentences
-            IN ENGLISH (quote task/note titles verbatim in whatever language they are
-            in), direct and honest, no flattery, no filler:
-            - An honest read of the day (what meaningful got done, what slipped).
-            - If a task is overdue by several days, name it outright.
-            - If notes are waiting for review (Staging), one sentence about it.
-            - End with exactly one line: **Tomorrow's priority:** <one single item,
-              picked from the numbers>.
-            If the numbers are nearly empty (no tasks, no events), write exactly 2
-            short sentences — do not pad.
-            No headings, do not restate the numbers table, never invent work that
-            is not in the numbers.
-            """;
+            only read. The user message is the day's real numbers plus pre-extracted
+            observations; build the commentary AROUND those observations. Fill the two
+            fields:
+            - commentary: 3-5 sentences IN ENGLISH (quote task/note titles verbatim in
+              whatever language they are in), direct and honest, no flattery, no filler.
+              An honest read of the day (what meaningful got done, what slipped); if a
+              task is overdue by several days, name it outright; if notes are waiting
+              for review (Staging), one sentence about it. If the numbers are nearly
+              empty, exactly 2 short sentences — do not pad. No headings, do not
+              restate the numbers table, never invent work that is not in the numbers.
+            - priority: the ONE item for tomorrow, picked from the numbers.
+            """ + COMMENTARY_EXAMPLE;
 
     private static final String WEEKLY_SYSTEM = """
             You are the end-of-week review companion inside Northstar, a personal-growth OS.
             The user does NOT want to write the journal themselves — you draft it, they
-            only read. The user message is the week's real numbers. Write 5-7 sentences
-            IN ENGLISH (quote task/note titles verbatim in whatever language they are
-            in), direct and honest, no flattery, no filler:
-            - What the week delivered and what slipped; call out a pattern if you see
-              one (the same task sliding repeatedly, work piling up at the weekend).
-            - If notes are waiting for review (Staging), one sentence about it.
-            - End with exactly one line: **Next week's priority:** <one single item,
-              picked from the numbers>.
-            If the numbers are nearly empty (no tasks, no events), write exactly 2
-            short sentences — do not pad.
-            No headings, do not restate the numbers table, never invent work that
-            is not in the numbers.
-            """;
+            only read. The user message is the week's real numbers plus pre-extracted
+            observations; build the commentary AROUND those observations. Fill the two
+            fields:
+            - commentary: 5-7 sentences IN ENGLISH (quote task/note titles verbatim in
+              whatever language they are in), direct and honest, no flattery, no filler.
+              What the week delivered and what slipped; call out a pattern if you see
+              one (the same task sliding repeatedly, work piling up at the weekend); if
+              notes are waiting for review (Staging), one sentence about it. If the
+              numbers are nearly empty, exactly 2 short sentences — do not pad. No
+              headings, do not restate the numbers table, never invent work that is
+              not in the numbers.
+            - priority: the ONE item for next week, picked from the numbers.
+            """ + COMMENTARY_EXAMPLE;
 
     private final ChatClient chat;
     private final TaskService tasks;
@@ -99,19 +123,19 @@ public class AlignmentService {
         return notes.findByTitle(weeklyTitle(LocalDate.now(zone)));
     }
 
-    /** (Re)drafts today's review — one LLM call — and upserts the Journal note. */
+    /** (Re)drafts today's review — a two-step chain — and upserts the Journal note. */
     public NoteDetail generateDaily(ZoneId zone) {
         LocalDate today = LocalDate.now(zone);
         String facts = dailyFacts(today, zone);
-        String body = commentary(DAILY_SYSTEM, facts) + "\n\n---\n\n" + facts;
+        String body = commentary(DAILY_SYSTEM, facts, "Tomorrow's priority") + "\n\n---\n\n" + facts;
         return upsert(dailyTitle(today), List.of("alignment", "daily"), body);
     }
 
-    /** (Re)drafts this week's review — one LLM call — and upserts the Journal note. */
+    /** (Re)drafts this week's review — a two-step chain — and upserts the Journal note. */
     public NoteDetail generateWeekly(ZoneId zone) {
         LocalDate today = LocalDate.now(zone);
-        String facts = weeklyFacts(today, zone);
-        String body = commentary(WEEKLY_SYSTEM, facts) + "\n\n---\n\n" + facts;
+        String facts = weeklyFacts(today);
+        String body = commentary(WEEKLY_SYSTEM, facts, "Next week's priority") + "\n\n---\n\n" + facts;
         return upsert(weeklyTitle(today), List.of("alignment", "weekly"), body);
     }
 
@@ -127,17 +151,42 @@ public class AlignmentService {
                 day.get(iso.weekBasedYear()), day.get(iso.weekOfWeekBasedYear()));
     }
 
-    /** The AI paragraph; on any LLM failure the note still ships with facts only. */
-    private String commentary(String system, String facts) {
+    /**
+     * The AI paragraph: step-back call extracts observations, the writer call turns
+     * them into commentary + a priority (structured, so the priority line can never
+     * drift from its format). Each step degrades independently — observations
+     * failing just means the writer sees raw numbers; the writer failing ships the
+     * facts-only note, exactly as before.
+     */
+    private String commentary(String system, String facts, String priorityLabel) {
+        String user = facts;
+        String observations = observations(facts);
+        if (!observations.isBlank()) {
+            user = facts + "\n\n## Observations (pre-extracted)\n" + observations;
+        }
         try {
-            String text = chat.prompt().system(system).user(facts).call().content();
-            if (text != null && !text.isBlank()) {
-                return text.strip();
+            ReviewCommentary draft = chat.prompt().system(system).user(user).call()
+                    .entity(ReviewCommentary.class, ChatClient.EntityParamSpec::useProviderStructuredOutput);
+            if (draft != null && draft.commentary() != null && !draft.commentary().isBlank()) {
+                String priority = draft.priority() == null || draft.priority().isBlank()
+                        ? "" : "\n\n**" + priorityLabel + ":** " + draft.priority().strip();
+                return draft.commentary().strip() + priority;
             }
         } catch (RuntimeException e) {
             log.warn("Alignment commentary failed; falling back to facts-only note", e);
         }
         return "*Couldn't generate the AI commentary this time — the raw numbers are below.*";
+    }
+
+    /** Step-back observations; "" on any failure so the chain degrades to single-call. */
+    private String observations(String facts) {
+        try {
+            String text = chat.prompt().system(OBSERVATIONS_SYSTEM).user(facts).call().content();
+            return text == null ? "" : text.strip();
+        } catch (RuntimeException e) {
+            log.warn("Alignment observations step failed; writing commentary from raw numbers", e);
+            return "";
+        }
     }
 
     private NoteDetail upsert(String title, List<String> tags, String markdown) {
@@ -185,7 +234,7 @@ public class AlignmentService {
         return sb.toString().stripTrailing();
     }
 
-    private String weeklyFacts(LocalDate today, ZoneId zone) {
+    private String weeklyFacts(LocalDate today) {
         LocalDate monday = today.with(DayOfWeek.MONDAY);
         List<TaskSummary> week = tasks.range(monday, monday.plusDays(6));
         List<TaskSummary> done = week.stream().filter(t -> t.status() == TaskStatus.DONE).toList();

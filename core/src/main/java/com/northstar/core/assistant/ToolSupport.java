@@ -2,7 +2,6 @@ package com.northstar.core.assistant;
 
 import com.northstar.core.discipline.DisciplineService;
 import com.northstar.core.discipline.DisciplineSummary;
-import com.northstar.core.shared.ColorName;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -72,17 +71,6 @@ final class ToolSupport {
                 : "Discipline '" + name + "' is ambiguous") + " — the disciplines are: " + valid);
     }
 
-    static ColorName parseColor(String value, ColorName fallback) {
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-        try {
-            return ColorName.valueOf(value.strip().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(
-                    "color must be one of BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE, GRAY — got '" + value + "'");
-        }
-    }
 
     /** Both api and mcp run on the user's own machine, so the system zone IS the user's zone. */
     static ZoneId zone() {

@@ -53,10 +53,10 @@ class ProjectTools implements NorthstarTool {
             finished project set status DONE via update_project instead.""";
 
     private static final String MANAGE_MILESTONE = """
-            Manage a project's stages: action 'add' creates a milestone, 'toggle' flips \
-            one between done and open ('đánh dấu Essays xong'), 'remove' deletes one. \
-            Toggle/remove match the milestone by name within the project. Returns the \
-            refreshed project with recomputed progress.""";
+            Manage a project's stages: ADD creates a milestone, TOGGLE flips one between \
+            done and open ('đánh dấu Essays xong'), REMOVE deletes one. Toggle/remove \
+            match the milestone by name within the project. Returns the refreshed \
+            project with recomputed progress.""";
 
     private final ProjectService projects;
     private final DisciplineService disciplines;
@@ -182,23 +182,27 @@ class ProjectTools implements NorthstarTool {
     ProjectView manageMilestone(
             @ToolParam(description = "The project's UUID")
             @McpToolParam(description = "The project's UUID", required = true) String projectId,
-            @ToolParam(description = "One of: add, toggle, remove")
-            @McpToolParam(description = "One of: add, toggle, remove", required = true) String action,
+            @ToolParam(description = "What to do with the milestone")
+            @McpToolParam(description = "What to do with the milestone",
+                    required = true) MilestoneAction action,
             @ToolParam(description = "Milestone name, e.g. 'Essays' (for toggle/remove a unique part matches)")
             @McpToolParam(description = "Milestone name, e.g. 'Essays' (for toggle/remove a unique part matches)",
                     required = true) String name,
-            @ToolParam(description = "Due date yyyy-MM-dd, only for action 'add'; omit if none", required = false)
-            @McpToolParam(description = "Due date yyyy-MM-dd, only for action 'add'; omit if none",
+            @ToolParam(description = "Due date yyyy-MM-dd, only for ADD; omit if none", required = false)
+            @McpToolParam(description = "Due date yyyy-MM-dd, only for ADD; omit if none",
                     required = false) String dueDate) {
         UUID id = UUID.fromString(projectId);
-        ProjectSummary result = switch (action.strip().toLowerCase(Locale.ROOT)) {
-            case "add" -> projects.addMilestone(id, name, ToolSupport.parseDate("dueDate", dueDate));
-            case "toggle" -> projects.toggleMilestone(id, milestoneByName(projects.find(id), name).id());
-            case "remove" -> projects.removeMilestone(id, milestoneByName(projects.find(id), name).id());
-            default -> throw new IllegalArgumentException(
-                    "action must be add, toggle or remove — got '" + action + "'");
+        ProjectSummary result = switch (action) {
+            case ADD -> projects.addMilestone(id, name, ToolSupport.parseDate("dueDate", dueDate));
+            case TOGGLE -> projects.toggleMilestone(id, milestoneByName(projects.find(id), name).id());
+            case REMOVE -> projects.removeMilestone(id, milestoneByName(projects.find(id), name).id());
         };
         return view(result, disciplineNames());
+    }
+
+    /** Schema-level constraint: the model cannot send an action outside this set. */
+    enum MilestoneAction {
+        ADD, TOGGLE, REMOVE
     }
 
     /** Milestone by (partial) name — fails loudly with the valid list on 0 or 2+ hits. */

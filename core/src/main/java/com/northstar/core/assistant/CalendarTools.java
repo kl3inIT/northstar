@@ -2,7 +2,6 @@ package com.northstar.core.assistant;
 
 import static com.northstar.core.assistant.ToolSupport.disciplineIdByName;
 import static com.northstar.core.assistant.ToolSupport.local;
-import static com.northstar.core.assistant.ToolSupport.parseColor;
 import static com.northstar.core.assistant.ToolSupport.parseDate;
 import static com.northstar.core.assistant.ToolSupport.parseTime;
 import static com.northstar.core.assistant.ToolSupport.required;
@@ -110,9 +109,9 @@ class CalendarTools implements NorthstarTool {
             @ToolParam(description = "Recurrence rule in the supported subset, e.g. 'FREQ=WEEKLY;BYDAY=MO,WE'; omit for a one-off", required = false)
             @McpToolParam(description = "Recurrence rule in the supported subset, e.g. 'FREQ=WEEKLY;BYDAY=MO,WE'; omit for a one-off",
                     required = false) String rrule,
-            @ToolParam(description = "Display color: BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE or GRAY; defaults to BLUE", required = false)
-            @McpToolParam(description = "Display color: BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE or GRAY; defaults to BLUE",
-                    required = false) String color,
+            @ToolParam(description = "Display color; defaults to BLUE", required = false)
+            @McpToolParam(description = "Display color; defaults to BLUE",
+                    required = false) ColorName color,
             @ToolParam(description = "Discipline name the event belongs to (see list_disciplines); omit for none", required = false)
             @McpToolParam(description = "Discipline name the event belongs to (see list_disciplines); omit for none",
                     required = false) String disciplineName) {
@@ -123,8 +122,8 @@ class CalendarTools implements NorthstarTool {
         Instant endAt = day.atTime(required("endTime", parseTime("endTime", endTime)))
                 .atZone(zone).toInstant();
         return EventView.of(events.create(title, eventNotes, startAt, endAt, false,
-                parseColor(color, ColorName.BLUE), disciplineIdByName(disciplines, disciplineName),
-                rrule), zone);
+                color == null ? ColorName.BLUE : color,
+                disciplineIdByName(disciplines, disciplineName), rrule), zone);
     }
 
     @Tool(name = "update_event", description = UPDATE_EVENT)
@@ -149,7 +148,7 @@ class CalendarTools implements NorthstarTool {
             @McpToolParam(description = "New recurrence rule; omit to keep, 'none' to make it a one-off",
                     required = false) String rrule,
             @ToolParam(description = "New display color; omit to keep", required = false)
-            @McpToolParam(description = "New display color; omit to keep", required = false) String color) {
+            @McpToolParam(description = "New display color; omit to keep", required = false) ColorName color) {
         ZoneId zone = zone();
         CalendarEventSummary current = events.find(UUID.fromString(eventId));
         LocalDateTime curStart = LocalDateTime.ofInstant(current.startAt(), zone);
@@ -167,7 +166,7 @@ class CalendarTools implements NorthstarTool {
                 day.atTime(start).atZone(zone).toInstant(),
                 day.atTime(end).atZone(zone).toInstant(),
                 allDay,
-                parseColor(color, current.color()),
+                color == null ? current.color() : color,
                 current.disciplineId(),
                 ToolSupport.resolve(rrule, current.rrule(), String::strip)), zone);
     }

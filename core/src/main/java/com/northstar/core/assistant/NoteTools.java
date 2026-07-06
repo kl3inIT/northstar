@@ -5,7 +5,6 @@ import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteStatus;
 import com.northstar.core.note.NoteSummary;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.ai.tool.annotation.Tool;
@@ -93,9 +92,9 @@ class NoteTools implements NorthstarTool {
             @ToolParam(description = "Replacement tag list (1-4 lowercase tags); pass [] or omit to keep", required = false)
             @McpToolParam(description = "Replacement tag list (1-4 lowercase tags); pass [] or omit to keep",
                     required = false) List<String> tags,
-            @ToolParam(description = "New working state: RESOURCE, STAGING or ARCHIVED; pass '' or omit to keep", required = false)
-            @McpToolParam(description = "New working state: RESOURCE, STAGING or ARCHIVED; pass '' or omit to keep",
-                    required = false) String status) {
+            @ToolParam(description = "New working state (RESOURCE = approved, STAGING = back to review, ARCHIVED = soft-delete); omit to keep", required = false)
+            @McpToolParam(description = "New working state (RESOURCE = approved, STAGING = back to review, ARCHIVED = soft-delete); omit to keep",
+                    required = false) NoteStatus status) {
         NoteDetail current = bySlug(slug);
         NoteDetail updated = notes.update(current.id(),
                 title == null || title.isBlank() ? current.title() : title,
@@ -104,8 +103,8 @@ class NoteTools implements NorthstarTool {
                         ? current.contentMarkdown() : contentMarkdown,
                 tags == null || tags.isEmpty() ? current.tags() : tags,
                 null);
-        if (status != null && !status.isBlank()) {
-            updated = notes.setStatus(current.id(), parseStatus(status));
+        if (status != null) {
+            updated = notes.setStatus(current.id(), status);
         }
         return updated;
     }
@@ -126,15 +125,6 @@ class NoteTools implements NorthstarTool {
                 : current.contentMarkdown().stripTrailing() + "\n\n" + markdown.strip();
         return notes.update(current.id(), current.title(), current.folderPath(), body,
                 current.tags(), null);
-    }
-
-    private static NoteStatus parseStatus(String status) {
-        try {
-            return NoteStatus.valueOf(status.strip().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(
-                    "status must be RESOURCE, STAGING or ARCHIVED — got '" + status + "'");
-        }
     }
 
     private NoteDetail bySlug(String slug) {

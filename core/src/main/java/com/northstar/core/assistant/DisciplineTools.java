@@ -48,9 +48,9 @@ class DisciplineTools implements NorthstarTool {
             @ToolParam(description = "Discipline name, e.g. 'Japanese · JLPT'")
             @McpToolParam(description = "Discipline name, e.g. 'Japanese · JLPT'",
                     required = true) String name,
-            @ToolParam(description = "Display color: BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE or GRAY; defaults to GRAY", required = false)
-            @McpToolParam(description = "Display color: BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE or GRAY; defaults to GRAY",
-                    required = false) String color) {
-        return disciplines.create(name, ToolSupport.parseColor(color, ColorName.GRAY));
+            @ToolParam(description = "Display color; defaults to GRAY", required = false)
+            @McpToolParam(description = "Display color; defaults to GRAY",
+                    required = false) ColorName color) {
+        return disciplines.create(name, color == null ? ColorName.GRAY : color);
     }
 }

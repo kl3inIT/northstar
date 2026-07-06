@@ -52,10 +52,15 @@ class AlignmentServiceIntegrationTests {
 
     private final ZoneId zone = ZoneId.systemDefault();
 
-    private void modelReturns(String text) {
+    private static ChatResponse response(String text) {
+        return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));
+    }
+
+    /** The chain is two calls: step-back observations (prose), then the writer (structured). */
+    private void modelReturns(String observations, String commentaryJson) {
         when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
         when(chatModel.call(any(Prompt.class)))
-                .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(text)))));
+                .thenReturn(response(observations), response(commentaryJson));
     }
 
     @Test
@@ -64,7 +69,9 @@ class AlignmentServiceIntegrationTests {
         tasks.create("Nộp essay Chevening", null, today.minusDays(2), null, null);
         TaskSummary doneTask = tasks.create("Ôn từ vựng HSK", null, today, null, null);
         tasks.setDone(doneTask.id(), true);
-        modelReturns("A tidy day. **Tomorrow's priority:** Nộp essay Chevening.");
+        modelReturns("- 'Nộp essay Chevening' is 2 days overdue",
+                """
+                {"commentary": "A tidy day.", "priority": "Nộp essay Chevening."}""");
 
         NoteDetail first = alignment.generateDaily(zone);
 
