@@ -120,9 +120,9 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder="Write in Markdown. Link notes with [[Title]]."
-          className="min-h-0 resize-none rounded-none border-0 px-10 py-8 font-mono text-sm leading-relaxed shadow-none focus-visible:ring-0"
+          className="min-h-0 resize-none rounded-none border-0 px-4 py-6 md:px-10 md:py-8 font-mono text-sm leading-relaxed shadow-none focus-visible:ring-0"
         />
-        <div className="min-h-0 overflow-auto px-10 py-8">
+        <div className="min-h-0 overflow-auto px-4 py-6 md:px-10 md:py-8">
           <MarkdownBody content={content} links={note.outgoingLinks} />
         </div>
       </div>

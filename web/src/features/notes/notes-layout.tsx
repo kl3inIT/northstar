@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { buildFolderTree } from '@/lib/folder-tree'
+import { cn } from '@/lib/utils'
 import { useCreateNote, useNotes, useStagingCount } from '@/lib/notes-api'
 import { FolderTree } from './folder-tree'
 import { SearchPanel } from './search-panel'
@@ -60,9 +61,18 @@ export function NotesLayout() {
   const value = isFiles ? filter : query
   const setValue = isFiles ? setFilter : setQuery
 
+  // Mobile is single-pane: the list until a note is picked, then the note
+  // full-width (NoteView renders a back-to-list button under md).
+  const hasNote = Boolean(params.slug)
+
   return (
     <div className="flex min-w-0 flex-1">
-      <aside className="flex w-72 shrink-0 flex-col border-r">
+      <aside
+        className={cn(
+          'w-full shrink-0 flex-col border-r md:flex md:w-72',
+          hasNote ? 'hidden' : 'flex',
+        )}
+      >
         <div className="space-y-2 p-3">
           <Tabs value={tab} onValueChange={(v) => setTab(v as StatusTab)}>
             <TabsList className="w-full">
@@ -146,7 +156,7 @@ export function NotesLayout() {
           </p>
         )}
       </aside>
-      <div className="flex min-w-0 flex-1">
+      <div className={cn('min-w-0 flex-1 md:flex', hasNote ? 'flex' : 'hidden')}>
         <Outlet />
       </div>
     </div>

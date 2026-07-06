@@ -65,7 +65,7 @@ export function DisciplinesPage() {
   const navigate = useNavigate()
 
   return (
-    <div className="w-full flex-1 overflow-auto px-10 py-8">
+    <div className="w-full flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Disciplines</h1>
@@ -78,7 +78,7 @@ export function DisciplinesPage() {
         </Button>
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
           <button
             key={card.discipline.id}
@@ -124,13 +124,13 @@ export function DisciplinePage() {
   const [editing, setEditing] = useState(false)
 
   if (isLoading || !overview) {
-    return <div className="w-full flex-1 px-10 py-8" />
+    return <div className="w-full flex-1 px-4 py-6 md:px-10 md:py-8" />
   }
   const d = overview.discipline
   const noteCount = overview.noteCount ?? 0
 
   return (
-    <div className="w-full flex-1 overflow-auto px-10 py-8">
+    <div className="w-full flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
       <Button asChild size="sm" variant="ghost" className="-ml-2 mb-3 text-muted-foreground">
         <Link to="/disciplines">
           <ArrowLeft className="size-4" /> Disciplines
@@ -154,7 +154,7 @@ export function DisciplinePage() {
         · {noteCount} notes
       </p>
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-2 xl:grid-cols-4">
         <SliceColumn title="Projects" emptyText="No projects yet — start one from the Projects page.">
           {(overview.projects ?? []).map((p) => (
             <Link key={p.id} to="/projects" className="group block py-2">

@@ -71,7 +71,7 @@ export function TodayPage() {
   const isStarred = (t: Task) => t.plannedDate !== null && t.plannedDate <= today
 
   return (
-    <div className="w-full min-w-0 flex-1 overflow-auto px-10 py-8">
+    <div className="w-full min-w-0 flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
       <div className="flex items-baseline gap-3">
         <h1 className="text-3xl font-bold tracking-tight">Today</h1>
         <span className="text-sm text-muted-foreground">{headerDate()}</span>

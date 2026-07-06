@@ -90,7 +90,7 @@ export function CapturePage() {
   }
 
   return (
-    <div className="w-full flex-1 overflow-auto px-10 py-8">
+    <div className="w-full flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
       <div className="flex items-center gap-2">
         <h1 className="text-3xl font-bold tracking-tight">Capture</h1>
         <Sparkles className="size-5 text-primary" />
@@ -109,8 +109,8 @@ export function CapturePage() {
             autoFocus
           />
         </PromptInputBody>
-        <PromptInputFooter>
-          <PromptInputTools>
+        <PromptInputFooter className="flex-wrap">
+          <PromptInputTools className="flex-wrap">
             <PromptInputButton
               variant={kind === 'TASK' ? 'default' : 'ghost'}
               onClick={() => setKind((k) => (k === 'TASK' ? null : 'TASK'))}

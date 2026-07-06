@@ -161,9 +161,15 @@ export function AppShell() {
         <SidebarRail />
       </Sidebar>
       <SidebarInset className="h-screen overflow-hidden">
-        {/* Mobile-only opener; desktop toggles via the edge rail or Cmd+B. */}
-        <SidebarTrigger className="absolute left-2 top-2 z-10 md:hidden" />
-        <div className="flex h-full min-w-0">
+        {/* Mobile-only top bar; desktop toggles via the edge rail or Cmd+B.
+            A real bar (not an absolute overlay) so it never sits on top of
+            page content that starts flush at the top, e.g. the notes tabs. */}
+        <header className="flex h-12 shrink-0 items-center gap-1.5 border-b px-2 md:hidden">
+          <SidebarTrigger />
+          <img src="/logo.png" alt="" className="size-5" />
+          <span className="text-sm font-semibold">Northstar</span>
+        </header>
+        <div className="flex min-h-0 min-w-0 flex-1">
           <Outlet />
         </div>
       </SidebarInset>

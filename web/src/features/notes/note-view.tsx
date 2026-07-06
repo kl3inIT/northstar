@@ -1,5 +1,5 @@
 import { Link, useParams } from '@tanstack/react-router'
-import { Archive, Check, Clock, FileText, Info, Link2, Pencil, Undo2 } from 'lucide-react'
+import { Archive, Check, ChevronLeft, Clock, FileText, Info, Link2, Pencil, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { MarkdownBody } from '@/components/markdown-body'
@@ -26,7 +26,7 @@ export function NoteView() {
 
   if (isLoading) {
     return (
-      <div className="min-w-0 flex-1 space-y-4 px-10 py-8">
+      <div className="min-w-0 flex-1 space-y-4 px-4 py-6 md:px-10 md:py-8">
         <Skeleton className="h-9 w-2/3" />
         <Skeleton className="h-4 w-40" />
         <Skeleton className="h-64 w-full" />
@@ -49,7 +49,13 @@ export function NoteView() {
 
   return (
     <div className="flex min-w-0 flex-1">
-      <article className="min-w-0 flex-1 overflow-auto px-10 py-8">
+      <article className="min-w-0 flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
+        {/* Mobile is single-pane (the list pane is hidden) — offer a way back. */}
+        <Button asChild size="sm" variant="ghost" className="-ml-2 mb-3 md:hidden">
+          <Link to="/notes">
+            <ChevronLeft className="size-4" /> All notes
+          </Link>
+        </Button>
         {note.status !== 'RESOURCE' && <StatusBanner note={note} />}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -73,7 +79,7 @@ export function NoteView() {
         <Separator className="my-6" />
         <MarkdownBody content={note.contentMarkdown} links={note.outgoingLinks} />
       </article>
-      <aside className="w-80 shrink-0 overflow-auto border-l p-5">
+      <aside className="hidden w-80 shrink-0 overflow-auto border-l p-5 lg:block">
         <RightPanel note={note} />
       </aside>
     </div>

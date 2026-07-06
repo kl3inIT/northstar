@@ -16,6 +16,7 @@ import {
 } from '@/components/kibo-ui/gantt'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
+import { useIsMobile } from '@/hooks/use-mobile'
 import {
   Dialog,
   DialogContent,
@@ -103,6 +104,7 @@ function featureOf(p: Project, disciplines: Discipline[]): GanttFeature {
 export function ProjectsPage() {
   const { data: projects = [], isLoading } = useProjects()
   const { data: disciplines = [] } = useDisciplines()
+  const isMobile = useIsMobile()
   const update = useUpdateProject()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
@@ -137,7 +139,7 @@ export function ProjectsPage() {
   }
 
   return (
-    <div className="flex w-full flex-1 flex-col overflow-hidden px-10 py-8">
+    <div className="flex w-full flex-1 flex-col overflow-hidden px-4 py-6 md:px-10 md:py-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
@@ -162,15 +164,20 @@ export function ProjectsPage() {
       ) : (
         <div className="mt-6 min-h-0 flex-1 overflow-hidden rounded-xl border">
           <GanttProvider range="monthly" zoom={100} className="h-full">
-            <GanttSidebar>
-              {groups.map((g) => (
-                <GanttSidebarGroup key={g.name} name={g.name}>
-                  {g.features.map((f) => (
-                    <GanttSidebarItem key={f.id} feature={f} onSelectItem={setSelectedId} />
-                  ))}
-                </GanttSidebarGroup>
-              ))}
-            </GanttSidebar>
+            {/* The 300px sidebar would leave a 390px phone a sliver of timeline —
+                the provider measures the sidebar's presence in the DOM, so it must
+                be unmounted (not display:none) on mobile. Names stay on the bars. */}
+            {!isMobile && (
+              <GanttSidebar>
+                {groups.map((g) => (
+                  <GanttSidebarGroup key={g.name} name={g.name}>
+                    {g.features.map((f) => (
+                      <GanttSidebarItem key={f.id} feature={f} onSelectItem={setSelectedId} />
+                    ))}
+                  </GanttSidebarGroup>
+                ))}
+              </GanttSidebar>
+            )}
             <GanttTimeline>
               <GanttHeader />
               <GanttFeatureList>
