@@ -64,15 +64,15 @@ class AlignmentServiceIntegrationTests {
         tasks.create("Nộp essay Chevening", null, today.minusDays(2), null, null);
         TaskSummary doneTask = tasks.create("Ôn từ vựng HSK", null, today, null, null);
         tasks.setDone(doneTask.id(), true);
-        modelReturns("Hôm nay gọn gàng. **Mai ưu tiên:** Nộp essay Chevening.");
+        modelReturns("A tidy day. **Tomorrow's priority:** Nộp essay Chevening.");
 
         NoteDetail first = alignment.generateDaily(zone);
 
         assertThat(first.folderPath()).isEqualTo("Journal");
         assertThat(first.tags()).contains("alignment", "daily");
         assertThat(first.contentMarkdown())
-                .contains("**Mai ưu tiên:** Nộp essay Chevening.")
-                .contains("Nộp essay Chevening — quá hạn 2 ngày")
+                .contains("**Tomorrow's priority:** Nộp essay Chevening.")
+                .contains("Nộp essay Chevening — overdue 2 days")
                 .contains("Ôn từ vựng HSK");
 
         NoteDetail second = alignment.generateDaily(zone);
@@ -88,8 +88,8 @@ class AlignmentServiceIntegrationTests {
         NoteDetail note = alignment.generateWeekly(zone);
 
         assertThat(note.contentMarkdown())
-                .contains("số liệu thuần")
-                .contains("## Số liệu tuần");
+                .contains("the raw numbers are below")
+                .contains("## The numbers, week");
         assertThat(alignment.findWeekly(zone)).map(NoteDetail::id).hasValue(note.id());
     }
 }

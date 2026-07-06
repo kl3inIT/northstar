@@ -31,12 +31,17 @@ public class CaptureService {
     private static final int MAX_CONTEXT_TITLES = 100;
     private static final int MAX_CONTEXT_NOTES = 300;
 
+    // Prompt shape follows the GPT-5.x prompting guide: XML-tag sections for
+    // adherence, contrastive few-shots with rationale, reason-then-label, a
+    // final self-check re-scan, and NO instruction the strict schema makes
+    // impossible ("omit" a required field) — absence is spelled "" explicitly.
     private static final String SYSTEM_PROMPT = """
             You are the capture inbox of a personal knowledge base + task manager.
             Classify the captured text and shape it, keeping the language of the source.
 
             Today is %s (%s).
 
+            <classification>
             Classify by INTENT, never by surface keywords. The single test (GTD
             "is it actionable?"): after this item is saved, is it WAITING FOR THE
             USER TO ACT (task) or WAITING TO BE LOOKED UP (note)?
@@ -48,41 +53,56 @@ public class CaptureService {
             - Tie-breaker: intention without content -> TASK; content, even when
               it opens with a verb, -> NOTE.
 
+            In `reasoning`, argue the user's intent in one short sentence BEFORE
+            choosing `kind`. Fill only the draft matching `kind`; the other one
+            stays null.
+            </classification>
+
+            <examples>
             Contrastive examples (input -> kind — why):
             - "research về memoryOS" -> TASK — only an intention, no knowledge
-              content yet; no time reference, so omit dueDate.
+              content yet; no time reference, so dueDate stays "".
             - "MemoryOS: memory 3 tầng cho LLM agent, mô phỏng cách OS quản lý
               RAM/disk" -> NOTE — the knowledge is already in the text.
             - "hôm nay học được cách dùng 把 trong câu chữ Hán" -> NOTE — opens
               with a verb, but it records something learned.
             - "nộp form học bổng trước thứ 6" -> TASK — a commitment with a
               deadline; resolve "thứ 6" to a date.
+            </examples>
 
-            In `reasoning`, argue the user's intent in one short sentence BEFORE
-            choosing `kind`.
-
-            For a TASK fill `task` only:
+            <task_shape>
+            Every field must be present; when a value is absent write "" — NEVER
+            guess one.
             - title: short imperative phrase (drop filler like "hôm nay tôi phải")
             - dueDate: ISO date. Resolve relative words against today ("hôm nay"=today,
-              "mai"=tomorrow, "thứ 6"=the next Friday). Omit if no time reference.
+              "mai"=tomorrow, "thứ 6"=the next Friday). "" when there is no time
+              reference.
             - dueTime: ISO time ONLY when the text names a clock time ("5pm", "17h").
-              NEVER invent one — "hôm nay"/"mai" are dates, not times; most tasks
-              have no dueTime.
-            - notes: extra detail beyond the title, or omit.
-            - disciplineName: the ONE existing discipline (exact name from the list
-              below) this task clearly trains, else omit. Never invent a new one.
+              "hôm nay"/"mai" are dates, not clock times — most tasks have dueTime "".
+            - notes: extra detail beyond the title, else "".
+            - disciplineName: the ONE existing discipline (exact name from
+              <user_context>) this task clearly trains, else "". Never invent one.
+            </task_shape>
 
-            Existing disciplines:
-            %s
-
-            For a NOTE fill `note` only:
+            <note_shape>
             - Clean the text into Markdown WITHOUT inventing facts or padding:
               a short capture stays short — never restate the title as a heading,
               never turn a single sentence into bullet points.
-            - title: short and specific. folderPath: best-fitting existing folder below,
-              else a sensible new path. tags: 1-4 lowercase, reusing existing ones.
+            - title: short and specific. folderPath: best-fitting existing folder
+              from <user_context>, else a sensible new path. tags: 1-4 lowercase,
+              reusing existing ones.
             - Reference existing notes inline as [[Exact Title]] ONLY when the text
               clearly relates to them — never link just because a title exists.
+            </note_shape>
+
+            <self_check>
+            Before answering, re-scan the source once for: a missed time reference,
+            a clock time mistaken for a date, a discipline that clearly fits.
+            </self_check>
+
+            <user_context>
+            Existing disciplines:
+            %s
 
             Existing folders:
             %s
@@ -92,6 +112,7 @@ public class CaptureService {
 
             Existing note titles:
             %s
+            </user_context>
             """;
 
     private final ChatClient chat;

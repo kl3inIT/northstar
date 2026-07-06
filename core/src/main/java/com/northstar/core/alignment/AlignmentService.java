@@ -43,27 +43,37 @@ public class AlignmentService {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
 
     private static final String DAILY_SYSTEM = """
-            Bạn là bạn đồng hành tổng kết cuối ngày trong Northstar (personal-growth OS).
-            Người dùng KHÔNG muốn tự viết journal — bạn viết nháp, họ chỉ đọc.
-            Tin nhắn của người dùng là bảng số liệu thật trong ngày. Viết 3–5 câu
-            tiếng Việt, giọng thẳng thắn, không tâng bốc, không sáo rỗng:
-            - Nhận xét trung thực về ngày hôm nay (xong gì đáng kể, trượt gì).
-            - Nếu có task quá hạn nhiều ngày, gọi thẳng tên nó.
-            - Nếu có note đang chờ duyệt (Staging), nhắc bằng một câu.
-            - Kết bằng đúng một dòng: **Mai ưu tiên:** <một việc duy nhất, chọn từ số liệu>.
-            Không dùng heading, không chép lại bảng số liệu, không bịa ra việc không có.
+            You are the end-of-day review companion inside Northstar, a personal-growth OS.
+            The user does NOT want to write the journal themselves — you draft it, they
+            only read. The user message is the day's real numbers. Write 3-5 sentences
+            IN ENGLISH (quote task/note titles verbatim in whatever language they are
+            in), direct and honest, no flattery, no filler:
+            - An honest read of the day (what meaningful got done, what slipped).
+            - If a task is overdue by several days, name it outright.
+            - If notes are waiting for review (Staging), one sentence about it.
+            - End with exactly one line: **Tomorrow's priority:** <one single item,
+              picked from the numbers>.
+            If the numbers are nearly empty (no tasks, no events), write exactly 2
+            short sentences — do not pad.
+            No headings, do not restate the numbers table, never invent work that
+            is not in the numbers.
             """;
 
     private static final String WEEKLY_SYSTEM = """
-            Bạn là bạn đồng hành tổng kết cuối tuần trong Northstar (personal-growth OS).
-            Người dùng KHÔNG muốn tự viết journal — bạn viết nháp, họ chỉ đọc.
-            Tin nhắn của người dùng là bảng số liệu thật của tuần. Viết 5–7 câu
-            tiếng Việt, giọng thẳng thắn, không tâng bốc, không sáo rỗng:
-            - Tuần này được gì, trượt gì; nêu pattern nếu thấy (task nào lặp lại
-              việc trễ hạn, việc dồn về cuối tuần).
-            - Nếu có note đang chờ duyệt (Staging), nhắc bằng một câu.
-            - Kết bằng đúng một dòng: **Tuần tới ưu tiên:** <một việc duy nhất, chọn từ số liệu>.
-            Không dùng heading, không chép lại bảng số liệu, không bịa ra việc không có.
+            You are the end-of-week review companion inside Northstar, a personal-growth OS.
+            The user does NOT want to write the journal themselves — you draft it, they
+            only read. The user message is the week's real numbers. Write 5-7 sentences
+            IN ENGLISH (quote task/note titles verbatim in whatever language they are
+            in), direct and honest, no flattery, no filler:
+            - What the week delivered and what slipped; call out a pattern if you see
+              one (the same task sliding repeatedly, work piling up at the weekend).
+            - If notes are waiting for review (Staging), one sentence about it.
+            - End with exactly one line: **Next week's priority:** <one single item,
+              picked from the numbers>.
+            If the numbers are nearly empty (no tasks, no events), write exactly 2
+            short sentences — do not pad.
+            No headings, do not restate the numbers table, never invent work that
+            is not in the numbers.
             """;
 
     private final ChatClient chat;
@@ -108,12 +118,12 @@ public class AlignmentService {
     // --- internals ---------------------------------------------------------
 
     private String dailyTitle(LocalDate day) {
-        return "Tổng kết ngày " + day;
+        return "Daily review " + day;
     }
 
     private String weeklyTitle(LocalDate day) {
         WeekFields iso = WeekFields.ISO;
-        return "Tổng kết tuần %d-W%02d".formatted(
+        return "Weekly review %d-W%02d".formatted(
                 day.get(iso.weekBasedYear()), day.get(iso.weekOfWeekBasedYear()));
     }
 
@@ -127,7 +137,7 @@ public class AlignmentService {
         } catch (RuntimeException e) {
             log.warn("Alignment commentary failed; falling back to facts-only note", e);
         }
-        return "*Không tạo được nhận xét AI lần này — dưới đây là số liệu thuần.*";
+        return "*Couldn't generate the AI commentary this time — the raw numbers are below.*";
     }
 
     private NoteDetail upsert(String title, List<String> tags, String markdown) {
@@ -153,19 +163,20 @@ public class AlignmentService {
                 today.plusDays(2).atStartOfDay(zone).toInstant(), zone);
         List<NoteSummary> staging = stagingNotes();
 
-        StringBuilder sb = new StringBuilder("## Số liệu\n");
-        section(sb, "Xong hôm nay (%d)".formatted(done.size()),
+        StringBuilder sb = new StringBuilder("## The numbers\n");
+        section(sb, "Done today (%d)".formatted(done.size()),
                 done.stream().map(t -> "- " + t.title()).toList());
-        section(sb, "Còn mở (%d, quá hạn %d)".formatted(overdue.size() + dueToday.size(), overdue.size()),
+        section(sb, "Still open (%d, %d overdue)".formatted(overdue.size() + dueToday.size(), overdue.size()),
                 java.util.stream.Stream.concat(
-                        overdue.stream().map(t -> "- %s — quá hạn %d ngày"
-                                .formatted(t.title(), ChronoUnit.DAYS.between(t.dueDate(), today))),
-                        dueToday.stream().map(t -> "- %s — hạn hôm nay%s"
+                        overdue.stream().map(t -> "- %s — overdue %s"
+                                .formatted(t.title(), count(ChronoUnit.DAYS.between(t.dueDate(), today), "day"))),
+                        dueToday.stream().map(t -> "- %s — due today%s"
                                 .formatted(t.title(), t.dueTime() == null ? "" : " " + TIME.format(t.dueTime()))))
                         .toList());
-        section(sb, "Note chờ duyệt / Staging (%d)".formatted(staging.size()),
+        section(sb, "Notes awaiting review / Staging (%d)".formatted(staging.size()),
                 staging.stream().map(n -> "- " + n.title()).toList());
-        section(sb, "Ngày mai (%d task, %d event)".formatted(tomorrow.size(), tomorrowEvents.size()),
+        section(sb, "Tomorrow (%s, %s)".formatted(
+                count(tomorrow.size(), "task"), count(tomorrowEvents.size(), "event")),
                 java.util.stream.Stream.concat(
                         tomorrow.stream().map(t -> "- Task: %s%s"
                                 .formatted(t.title(), t.dueTime() == null ? "" : " (" + TIME.format(t.dueTime()) + ")")),
@@ -183,15 +194,15 @@ public class AlignmentService {
                 .filter(t -> t.status() == TaskStatus.OPEN).toList();
         List<NoteSummary> staging = stagingNotes();
 
-        StringBuilder sb = new StringBuilder("## Số liệu tuần %s → %s\n".formatted(monday, monday.plusDays(6)));
-        section(sb, "Xong trong tuần (%d)".formatted(done.size()),
-                done.stream().map(t -> "- %s (hạn %s)".formatted(t.title(), t.dueDate())).toList());
-        section(sb, "Chưa xong (%d)".formatted(open.size()),
-                open.stream().map(t -> "- %s (hạn %s)".formatted(t.title(), t.dueDate())).toList());
-        section(sb, "Note chờ duyệt / Staging (%d)".formatted(staging.size()),
+        StringBuilder sb = new StringBuilder("## The numbers, week %s → %s\n".formatted(monday, monday.plusDays(6)));
+        section(sb, "Done this week (%d)".formatted(done.size()),
+                done.stream().map(t -> "- %s (due %s)".formatted(t.title(), t.dueDate())).toList());
+        section(sb, "Not done (%d)".formatted(open.size()),
+                open.stream().map(t -> "- %s (due %s)".formatted(t.title(), t.dueDate())).toList());
+        section(sb, "Notes awaiting review / Staging (%d)".formatted(staging.size()),
                 staging.stream().map(n -> "- " + n.title()).toList());
-        section(sb, "Tuần tới (%d task có hạn)".formatted(nextWeek.size()),
-                nextWeek.stream().map(t -> "- %s (hạn %s)".formatted(t.title(), t.dueDate())).toList());
+        section(sb, "Next week (%s with a due date)".formatted(count(nextWeek.size(), "task")),
+                nextWeek.stream().map(t -> "- %s (due %s)".formatted(t.title(), t.dueDate())).toList());
         return sb.toString().stripTrailing();
     }
 
@@ -203,17 +214,21 @@ public class AlignmentService {
 
     private String eventLine(CalendarEventSummary event, ZoneId zone) {
         if (event.allDay()) {
-            return "Cả ngày: " + event.title();
+            return "All day: " + event.title();
         }
         LocalDateTime start = LocalDateTime.ofInstant(event.startAt(), zone);
         LocalDateTime end = LocalDateTime.ofInstant(event.endAt(), zone);
         return "%s–%s %s".formatted(TIME.format(start), TIME.format(end), event.title());
     }
 
+    private static String count(long n, String noun) {
+        return n + " " + noun + (n == 1 ? "" : "s");
+    }
+
     private static void section(StringBuilder sb, String heading, List<String> lines) {
         sb.append("\n**").append(heading).append(":**\n");
         if (lines.isEmpty()) {
-            sb.append("- (không có)\n");
+            sb.append("- (none)\n");
         } else {
             lines.forEach(line -> sb.append(line).append('\n'));
         }
