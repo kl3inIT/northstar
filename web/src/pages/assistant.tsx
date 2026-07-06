@@ -1,7 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type ToolUIPart, type UIMessage } from 'ai'
-import { Loader2, MessageSquarePlus, PanelRightClose, PanelRightOpen, Trash2 } from 'lucide-react'
+import {
+  History as HistoryIcon,
+  Loader2,
+  MessageSquarePlus,
+  PanelRightClose,
+  PanelRightOpen,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import {
@@ -21,6 +28,13 @@ import {
 import { Suggestion } from '@/components/ai-elements/suggestion'
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '@/components/ai-elements/tool'
 import { Button } from '@/components/ui/button'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
 import { MicButton } from '@/components/mic-button'
 import { useStagingCount } from '@/lib/notes-api'
 import { useTodayTasks } from '@/lib/tasks-api'
@@ -116,6 +130,7 @@ export function AssistantPage() {
   const [historyOpen, setHistoryOpen] = useState(
     () => localStorage.getItem('assistant-history-open') !== '0',
   )
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false)
 
   function toggleHistory() {
     setHistoryOpen((open) => {
@@ -152,11 +167,53 @@ export function AssistantPage() {
     <div className="relative flex h-full w-full flex-1 overflow-hidden">
       <ChatColumn key={conversationId} conversationId={conversationId} />
 
+      {/* Mobile: history lives in a right-side Sheet (the aside is lg-only). */}
+      <Sheet open={mobileHistoryOpen} onOpenChange={setMobileHistoryOpen}>
+        <SheetTrigger asChild>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="absolute right-3 top-3 size-7 lg:hidden"
+            aria-label="Chat history"
+            title="Chat history"
+          >
+            <HistoryIcon className="size-4" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="right" className="flex w-80 flex-col gap-0 p-0">
+          <SheetHeader className="flex-row items-center justify-between space-y-0 border-b px-4 py-3">
+            <SheetTitle className="text-sm font-semibold">Chat history</SheetTitle>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="mr-6 size-7"
+              aria-label="New chat"
+              title="New chat"
+              onClick={() => {
+                setConversationId(crypto.randomUUID())
+                setMobileHistoryOpen(false)
+              }}
+            >
+              <MessageSquarePlus className="size-4" />
+            </Button>
+          </SheetHeader>
+          <HistoryList
+            conversations={conversations}
+            activeId={conversationId}
+            onSelect={(id) => {
+              setConversationId(id)
+              setMobileHistoryOpen(false)
+            }}
+            onRemove={remove}
+          />
+        </SheetContent>
+      </Sheet>
+
       {!historyOpen && (
         <Button
           size="icon"
           variant="ghost"
-          className="absolute right-3 top-3 size-7"
+          className="absolute right-3 top-3 hidden size-7 lg:inline-flex"
           aria-label="Show chat history"
           title="Show chat history"
           onClick={toggleHistory}
@@ -192,43 +249,64 @@ export function AssistantPage() {
             </Button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
-          {conversations.length === 0 && (
-            <p className="px-2 py-1 text-xs text-muted-foreground">No conversations yet.</p>
-          )}
-          {conversations.map((c) => (
-            <div
-              key={c.id}
-              className={cn(
-                'group flex w-full items-center gap-1 rounded-lg',
-                c.id === conversationId ? 'bg-muted' : 'hover:bg-muted/50',
-              )}
-            >
-              <button
-                type="button"
-                onClick={() => setConversationId(c.id)}
-                className="min-w-0 flex-1 px-2 py-2 text-left"
-              >
-                <span className="block truncate text-sm font-medium">{c.title}</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatLastAt(c.lastAt)} · {c.messages}
-                </span>
-              </button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="mr-1 size-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label="Delete conversation"
-                title="Delete conversation"
-                onClick={() => remove(c.id)}
-              >
-                <Trash2 className="size-3.5 text-muted-foreground" />
-              </Button>
-            </div>
-          ))}
-        </div>
+        <HistoryList
+          conversations={conversations}
+          activeId={conversationId}
+          onSelect={setConversationId}
+          onRemove={remove}
+        />
       </aside>
       )}
+    </div>
+  )
+}
+
+function HistoryList({
+  conversations,
+  activeId,
+  onSelect,
+  onRemove,
+}: {
+  conversations: ConversationSummary[]
+  activeId: string
+  onSelect: (id: string) => void
+  onRemove: (id: string) => void
+}) {
+  return (
+    <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 pt-2">
+      {conversations.length === 0 && (
+        <p className="px-2 py-1 text-xs text-muted-foreground">No conversations yet.</p>
+      )}
+      {conversations.map((c) => (
+        <div
+          key={c.id}
+          className={cn(
+            'group flex w-full items-center gap-1 rounded-lg',
+            c.id === activeId ? 'bg-muted' : 'hover:bg-muted/50',
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => onSelect(c.id)}
+            className="min-w-0 flex-1 px-2 py-2 text-left"
+          >
+            <span className="block truncate text-sm font-medium">{c.title}</span>
+            <span className="text-xs text-muted-foreground">
+              {formatLastAt(c.lastAt)} · {c.messages}
+            </span>
+          </button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="mr-1 size-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+            aria-label="Delete conversation"
+            title="Delete conversation"
+            onClick={() => onRemove(c.id)}
+          >
+            <Trash2 className="size-3.5 text-muted-foreground" />
+          </Button>
+        </div>
+      ))}
     </div>
   )
 }
