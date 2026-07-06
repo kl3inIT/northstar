@@ -17,7 +17,7 @@ export function MarkdownBody({ content, links }: { content: string; links: NoteR
   const byTitle = new Map(links.map((link) => [link.title.toLowerCase(), link]))
 
   return (
-    <div className="prose prose-zinc max-w-none prose-headings:font-semibold prose-a:font-medium">
+    <div className="prose prose-zinc max-w-none prose-headings:font-semibold prose-a:font-medium dark:prose-invert">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
