@@ -6,6 +6,7 @@ import {
   CheckSquare,
   Compass,
   FileText,
+  FolderKanban,
   LogOut,
   Settings,
   Sparkles,
@@ -39,7 +40,7 @@ import { useStagingCount } from '@/lib/notes-api'
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/' | '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines'
+  to?: '/' | '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines' | '/projects'
   exact?: boolean
 }
 
@@ -50,6 +51,7 @@ const NAV: NavItem[] = [
   { label: 'Calendar', icon: Calendar, to: '/calendar' },
   { label: 'Notes', icon: FileText, to: '/notes' },
   { label: 'Disciplines', icon: Compass, to: '/disciplines' },
+  { label: 'Projects', icon: FolderKanban, to: '/projects' },
   { label: 'Study', icon: BookOpen },
   { label: 'Scholarships', icon: Trophy },
   { label: 'Finance', icon: Wallet },

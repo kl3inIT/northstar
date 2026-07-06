@@ -154,7 +154,33 @@ export function DisciplinePage() {
         · {noteCount} notes
       </p>
 
-      <div className="mt-8 grid gap-10 lg:grid-cols-3">
+      <div className="mt-8 grid gap-10 lg:grid-cols-2 xl:grid-cols-4">
+        <SliceColumn title="Projects" emptyText="No projects yet — start one from the Projects page.">
+          {(overview.projects ?? []).map((p) => (
+            <Link key={p.id} to="/projects" className="group block py-2">
+              <div className="flex items-baseline gap-3">
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-sm group-hover:underline',
+                    p.status === 'DONE' && 'text-muted-foreground line-through',
+                  )}
+                >
+                  {p.name}
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {p.progressPercent ?? 0}%
+                </span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${p.progressPercent ?? 0}%` }}
+                />
+              </div>
+            </Link>
+          ))}
+        </SliceColumn>
+
         <SliceColumn title="Open tasks" emptyText="Nothing open — capture or plan something.">
           {overview.openTasks.map((t) => (
             <Link key={t.id} to="/tasks" className="group flex items-baseline gap-3 py-2">

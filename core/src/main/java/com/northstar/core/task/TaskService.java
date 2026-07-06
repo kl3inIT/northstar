@@ -1,6 +1,7 @@
 package com.northstar.core.task;
 
 import com.northstar.core.discipline.DisciplineService;
+import com.northstar.core.project.ProjectService;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -23,10 +24,12 @@ public class TaskService {
 
     private final TaskRepository tasks;
     private final DisciplineService disciplines;
+    private final ProjectService projects;
 
-    TaskService(TaskRepository tasks, DisciplineService disciplines) {
+    TaskService(TaskRepository tasks, DisciplineService disciplines, ProjectService projects) {
         this.tasks = tasks;
         this.disciplines = disciplines;
+        this.projects = projects;
     }
 
     @Transactional
@@ -62,6 +65,17 @@ public class TaskService {
     public TaskSummary setPlanned(UUID id, LocalDate plannedDate) {
         Task task = tasks.findById(id).orElseThrow(() -> new TaskNotFoundException(id));
         task.planFor(plannedDate);
+        return summary(task);
+    }
+
+    /** Attach to / detach from a project without touching anything else; null detaches. */
+    @Transactional
+    public TaskSummary setProject(UUID id, UUID projectId) {
+        if (projectId != null && !projects.exists(projectId)) {
+            throw new IllegalArgumentException("No project with id " + projectId);
+        }
+        Task task = tasks.findById(id).orElseThrow(() -> new TaskNotFoundException(id));
+        task.assignToProject(projectId);
         return summary(task);
     }
 
@@ -138,6 +152,13 @@ public class TaskService {
                 .stream().map(this::summary).toList();
     }
 
+    /** Every task of one project (open first is the caller's concern) — the project's agenda. */
+    @Transactional(readOnly = true)
+    public List<TaskSummary> byProject(UUID projectId) {
+        return tasks.findByProjectIdOrderByDueDateAscDueTimeAscCreatedAtAsc(projectId)
+                .stream().map(this::summary).toList();
+    }
+
     private void requireDiscipline(UUID disciplineId) {
         if (disciplineId != null && !disciplines.exists(disciplineId)) {
             throw new IllegalArgumentException("No discipline with id " + disciplineId);
@@ -151,6 +172,6 @@ public class TaskService {
     private TaskSummary summary(Task task) {
         return new TaskSummary(task.getId(), task.getTitle(), task.getNotes(), task.getStatus(),
                 task.getDueDate(), task.getDueTime(), task.getPlannedDate(), task.getCompletedAt(),
-                task.getCreatedAt(), task.getDisciplineId());
+                task.getCreatedAt(), task.getDisciplineId(), task.getProjectId());
     }
 }

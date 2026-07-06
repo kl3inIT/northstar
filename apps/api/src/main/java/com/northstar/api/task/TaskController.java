@@ -95,6 +95,18 @@ class TaskController {
         return tasks.setPlanned(id, request.plannedDate());
     }
 
+    /** Every task of one project — the project's agenda. */
+    @GetMapping("/by-project")
+    List<TaskSummary> byProject(@RequestParam("projectId") UUID projectId) {
+        return tasks.byProject(projectId);
+    }
+
+    /** Attach to / detach from a project (null detaches); touches nothing else. */
+    @PatchMapping("/{id}/project")
+    TaskSummary setProject(@PathVariable UUID id, @RequestBody TaskProjectRequest request) {
+        return tasks.setProject(id, request.projectId());
+    }
+
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void delete(@PathVariable UUID id) {

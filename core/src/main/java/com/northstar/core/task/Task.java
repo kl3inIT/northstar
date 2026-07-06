@@ -52,6 +52,10 @@ public class Task extends BaseEntity {
     @Column(name = "discipline_id")
     private UUID disciplineId;
 
+    /** Optional project this task is part of (the project's agenda). Plain UUID across modules. */
+    @Column(name = "project_id")
+    private UUID projectId;
+
     protected Task() {
         // for JPA
     }
@@ -95,6 +99,15 @@ public class Task extends BaseEntity {
 
     public UUID getDisciplineId() {
         return disciplineId;
+    }
+
+    public UUID getProjectId() {
+        return projectId;
+    }
+
+    /** Attach to / detach from a project without touching anything else; null detaches. */
+    public void assignToProject(UUID projectId) {
+        this.projectId = projectId;
     }
 
     public void edit(String title, String notes, LocalDate dueDate, LocalTime dueTime,

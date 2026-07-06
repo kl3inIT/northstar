@@ -22,5 +22,6 @@ public record TaskSummary(
         LocalDate plannedDate,
         Instant completedAt,
         @NotNull Instant createdAt,
-        UUID disciplineId) {
+        UUID disciplineId,
+        UUID projectId) {
 }

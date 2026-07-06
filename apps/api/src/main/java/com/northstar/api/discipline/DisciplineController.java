@@ -6,6 +6,7 @@ import com.northstar.core.discipline.DisciplineService;
 import com.northstar.core.discipline.DisciplineSummary;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteSummary;
+import com.northstar.core.project.ProjectService;
 import com.northstar.core.task.TaskService;
 import com.northstar.core.task.TaskSummary;
 import jakarta.validation.Valid;
@@ -48,13 +49,15 @@ class DisciplineController {
     private final TaskService tasks;
     private final CalendarEventService events;
     private final NoteService notes;
+    private final ProjectService projects;
 
     DisciplineController(DisciplineService disciplines, TaskService tasks,
-            CalendarEventService events, NoteService notes) {
+            CalendarEventService events, NoteService notes, ProjectService projects) {
         this.disciplines = disciplines;
         this.tasks = tasks;
         this.events = events;
         this.notes = notes;
+        this.projects = projects;
     }
 
     @GetMapping
@@ -100,8 +103,8 @@ class DisciplineController {
                 .toList();
         Page<NoteSummary> tagged = notes.listByAnyTag(nameTokens(discipline.name()),
                 PageRequest.of(0, SLICE_NOTES, Sort.by(Sort.Direction.DESC, "updatedAt")));
-        return new DisciplineOverview(discipline, openTasks, upcoming,
-                tagged.getContent(), tagged.getTotalElements());
+        return new DisciplineOverview(discipline, projects.listByDiscipline(id), openTasks,
+                upcoming, tagged.getContent(), tagged.getTotalElements());
     }
 
     private long noteCount(String disciplineName) {

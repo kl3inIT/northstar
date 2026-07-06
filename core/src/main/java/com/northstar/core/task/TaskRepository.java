@@ -33,4 +33,7 @@ interface TaskRepository extends JpaRepository<Task, UUID> {
     /** Open tasks of one discipline — the agenda inside a study block's details. */
     List<Task> findByStatusAndDisciplineIdOrderByDueDateAscDueTimeAscCreatedAtAsc(
             TaskStatus status, UUID disciplineId);
+
+    /** Every task of one project — the project's agenda. */
+    List<Task> findByProjectIdOrderByDueDateAscDueTimeAscCreatedAtAsc(UUID projectId);
 }

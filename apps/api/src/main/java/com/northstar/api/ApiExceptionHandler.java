@@ -3,6 +3,7 @@ package com.northstar.api;
 import com.northstar.core.calendar.CalendarEventNotFoundException;
 import com.northstar.core.discipline.DisciplineNotFoundException;
 import com.northstar.core.note.NoteNotFoundException;
+import com.northstar.core.project.ProjectNotFoundException;
 import com.northstar.core.task.TaskNotFoundException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -38,7 +39,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler({NoteNotFoundException.class, TaskNotFoundException.class,
-            CalendarEventNotFoundException.class, DisciplineNotFoundException.class})
+            CalendarEventNotFoundException.class, DisciplineNotFoundException.class,
+            ProjectNotFoundException.class})
     ProblemDetail notFound(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
