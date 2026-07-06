@@ -129,6 +129,30 @@ class CaptureServiceIntegrationTests {
     }
 
     @Test
+    void eventCaptureMapsIntoEventDraftAndPromptCarriesTheDeadlineVsEventRubric() {
+        modelReturns("""
+                {"reasoning":"Cuộc họp chiếm khoảng thời gian đó, user tham dự.",
+                 "kind":"EVENT",
+                 "event":{"title":"Họp nhóm EXE202","date":"2026-07-07",
+                          "startTime":"14:00","endTime":"","notes":"","disciplineName":""}}
+                """);
+
+        CaptureDraft draft = capture.draft("họp nhóm EXE202 2h chiều mai");
+
+        assertThat(draft.kind()).isEqualTo(CaptureDraft.Kind.EVENT);
+        assertThat(draft.event().title()).isEqualTo("Họp nhóm EXE202");
+        assertThat(draft.event().date()).isEqualTo("2026-07-07");
+        assertThat(draft.event().startTime()).isEqualTo("14:00");
+        ArgumentCaptor<Prompt> prompt = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(prompt.capture());
+        // The prompt must teach deadline-vs-happening, not time-keyword matching.
+        assertThat(prompt.getValue().getSystemMessage().getText())
+                .contains("BLOCKING A SPAN OF TIME")
+                .contains("nộp form 2h chiều mai")
+                .contains("họp nhóm 2h chiều mai");
+    }
+
+    @Test
     void taskCaptureMapsIntoTaskDraftWithResolvedDate() {
         modelReturns("""
                 {"kind":"TASK",

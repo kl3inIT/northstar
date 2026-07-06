@@ -184,12 +184,12 @@ public class CalendarEventService {
     private CalendarEventSummary summary(CalendarEvent event) {
         return new CalendarEventSummary(event.getId(), event.getTitle(), event.getNotes(),
                 event.getStartAt(), event.getEndAt(), event.isAllDay(), event.getColor(),
-                event.getDisciplineId(), event.getRrule());
+                event.getDisciplineId(), event.getRrule(), event.getCreatedAt());
     }
 
     private CalendarEventSummary occurrence(CalendarEvent master, Instant start, Duration duration) {
         return new CalendarEventSummary(master.getId(), master.getTitle(), master.getNotes(),
                 start, start.plus(duration), master.isAllDay(), master.getColor(),
-                master.getDisciplineId(), master.getRrule());
+                master.getDisciplineId(), master.getRrule(), master.getCreatedAt());
     }
 }

@@ -29,6 +29,8 @@ export interface IEvent {
   masterId?: string;
   /** Server-issued start of this occurrence — the "chỉ buổi này" key; survives drag. */
   occurrenceStart?: string;
+  /** When the row was captured/created — Capture's "Recent" list sorts by this. */
+  createdAt?: string;
   /** Original task row (kind "task") — drag needs its fields to PUT the new due date. */
   task?: {
     id: string;

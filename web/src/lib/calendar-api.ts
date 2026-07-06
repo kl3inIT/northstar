@@ -43,6 +43,7 @@ function toEvent(e: Schemas['CalendarEventSummary']): IEvent {
     rrule: e.rrule ?? undefined,
     masterId: recurring ? e.id : undefined,
     occurrenceStart: recurring ? e.startAt : undefined,
+    createdAt: e.createdAt,
   }
 }
 

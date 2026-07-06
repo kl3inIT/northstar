@@ -24,6 +24,7 @@ import {
 } from '@/components/ai-elements/prompt-input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { deleteEvent, useRangeEvents } from '@/lib/calendar-api'
 import { capture, deleteNote, type CaptureKind } from '@/lib/capture-api'
 import { MicButton } from '@/components/mic-button'
 import { useNotes } from '@/lib/notes-api'
@@ -51,6 +52,7 @@ export function CapturePage() {
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['tasks'] })
     queryClient.invalidateQueries({ queryKey: ['notes'] })
+    queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
   }
 
   function fire(raw: string, forced: CaptureKind | null) {
@@ -60,8 +62,9 @@ export function CapturePage() {
       .then((result) => {
         setPending((p) => p.filter((x) => x.key !== key))
         invalidate()
+        const label = result.kind === 'TASK' ? 'Task' : result.kind === 'EVENT' ? 'Event' : 'Note'
         toast.success(
-          `${result.kind === 'TASK' ? 'Task' : 'Note'}: ${result.title}`,
+          `${label}: ${result.title}`,
           {
             action: {
               label: 'Undo',
@@ -115,6 +118,12 @@ export function CapturePage() {
               <CheckSquare className="size-4" /> Add task
             </PromptInputButton>
             <PromptInputButton
+              variant={kind === 'EVENT' ? 'default' : 'ghost'}
+              onClick={() => setKind((k) => (k === 'EVENT' ? null : 'EVENT'))}
+            >
+              <CalendarDays className="size-4" /> Add event
+            </PromptInputButton>
+            <PromptInputButton
               variant={kind === 'NOTE' ? 'default' : 'ghost'}
               onClick={() => setKind((k) => (k === 'NOTE' ? null : 'NOTE'))}
             >
@@ -147,6 +156,8 @@ type Row = {
   dueDate?: string | null
   dueTime?: string | null
   folderPath?: string
+  startDate?: string
+  allDay?: boolean
   createdAt: string
 }
 
@@ -155,11 +166,28 @@ function formatDue(dueDate: string, dueTime: string | null | undefined): string 
   return `Due ${d}/${m}/${y}${dueTime ? ` · ${dueTime.slice(0, 5)}` : ''}`
 }
 
+function formatEventStart(startDate: string, allDay: boolean | undefined): string {
+  const d = new Date(startDate)
+  const date = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`
+  if (allDay) return `${date} · all day`
+  return `${date} · ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+/** Today → +30 days, anchored to the date so the react-query key is stable. */
+function eventWindow(): { from: string; to: string } {
+  const today = new Date()
+  const from = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const to = new Date(from.getTime() + 30 * 24 * 60 * 60 * 1000)
+  return { from: from.toISOString(), to: to.toISOString() }
+}
+
 /** One unified recent list — a finished capture surfaces at the top of it. */
 function RecentSection({ pending }: { pending: PendingCapture[] }) {
   const { data: notes = [] } = useNotes('')
   const { data: today = [] } = useTodayTasks()
   const { data: upcoming = [] } = useUpcomingTasks(30)
+  const range = eventWindow()
+  const { data: events = [] } = useRangeEvents(range.from, range.to)
   const [showAll, setShowAll] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -182,23 +210,49 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
     folderPath: n.folderPath,
     createdAt: n.createdAt,
   }))
-  const all = [...taskRows, ...noteRows].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+  // One row per event ROW (a recurring series expands into many occurrences —
+  // the capture list shows the series once, at its first upcoming occurrence).
+  const seenEventIds = new Set<string>()
+  const eventRows: Row[] = []
+  for (const e of events) {
+    const serverId = e.masterId ?? e.id
+    if (e.kind !== 'event' || !e.createdAt || seenEventIds.has(serverId)) continue
+    seenEventIds.add(serverId)
+    eventRows.push({
+      kind: 'EVENT',
+      key: `e-${serverId}`,
+      id: serverId,
+      title: e.title,
+      startDate: e.startDate,
+      allDay: e.allDay,
+      createdAt: e.createdAt,
+    })
+  }
+  const all = [...taskRows, ...noteRows, ...eventRows].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  )
   const rows = showAll ? all : all.slice(0, 8)
 
   function view(row: Row) {
     if (row.kind === 'NOTE' && row.slug) {
       navigate({ to: '/notes/$slug', params: { slug: row.slug } })
+    } else if (row.kind === 'EVENT') {
+      navigate({ to: '/calendar' })
     } else {
       navigate({ to: '/tasks' })
     }
   }
 
   function remove(row: Row) {
-    const del = row.kind === 'TASK' ? deleteTask(row.id) : deleteNote(row.id)
+    const del =
+      row.kind === 'TASK' ? deleteTask(row.id)
+      : row.kind === 'EVENT' ? deleteEvent(row.id)
+      : deleteNote(row.id)
     del
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
         queryClient.invalidateQueries({ queryKey: ['notes'] })
+        queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
         toast.success(`Deleted “${row.title}”`)
       })
       .catch(() => toast.error('Delete failed — try again.'))
@@ -226,8 +280,11 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
         ))}
         {rows.map((r) => (
           <div key={r.key} className="flex items-center gap-3 py-2">
-            <Badge variant={r.kind === 'TASK' ? 'default' : 'secondary'} className="shrink-0">
-              {r.kind === 'TASK' ? 'Task' : 'Note'}
+            <Badge
+              variant={r.kind === 'TASK' ? 'default' : r.kind === 'EVENT' ? 'outline' : 'secondary'}
+              className="shrink-0"
+            >
+              {r.kind === 'TASK' ? 'Task' : r.kind === 'EVENT' ? 'Event' : 'Note'}
             </Badge>
             {r.kind === 'NOTE' && r.slug ? (
               <Link
@@ -250,6 +307,11 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
                 <>
                   <CalendarDays className="size-3 shrink-0" />
                   <span>{r.dueDate ? formatDue(r.dueDate, r.dueTime) : 'someday'}</span>
+                </>
+              ) : r.kind === 'EVENT' ? (
+                <>
+                  <CalendarDays className="size-3 shrink-0" />
+                  <span>{r.startDate ? formatEventStart(r.startDate, r.allDay) : ''}</span>
                 </>
               ) : (
                 <>

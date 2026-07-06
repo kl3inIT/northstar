@@ -16,7 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
 /**
- * Classifies raw captured text (task vs note) and shapes it into a reviewable
+ * Classifies raw captured text (task vs event vs note) and shapes it into a reviewable
  * draft with one LLM call. The prompt carries today's date (so "hôm nay/mai/thứ 6"
  * resolve to real dates) and the existing folders, tags and note titles (so note
  * drafts land in the user's real organisation and wiki-links point at notes that
@@ -44,18 +44,25 @@ public class CaptureService {
             <classification>
             Classify by INTENT, never by surface keywords. The single test (GTD
             "is it actionable?"): after this item is saved, is it WAITING FOR THE
-            USER TO ACT (task) or WAITING TO BE LOOKED UP (note)?
+            USER TO ACT (task), BLOCKING A SPAN OF TIME on the calendar (event),
+            or WAITING TO BE LOOKED UP (note)?
             - TASK: a commitment or intention to do something that has not
               happened yet — even with no deadline (an undated task is fine).
               A bare verb+topic with no substance is an intention, so a TASK.
+            - EVENT: an appointment/occasion that HAPPENS AT a specific time —
+              the user attends it rather than completes it (meeting, class,
+              exam sitting, call, gym session, trip). An EVENT always has a
+              date; a time reference on a to-do is a deadline, NOT an event.
             - NOTE: the text already CONTAINS the knowledge — a fact, insight,
               summary, idea, quote. It informs; it does not wait to be done.
+            - Task-vs-event tie-breaker: "do X BY/BEFORE time" -> TASK (deadline);
+              "X takes place AT/FROM time" -> EVENT (occupied time).
             - Tie-breaker: intention without content -> TASK; content, even when
               it opens with a verb, -> NOTE.
 
             In `reasoning`, argue the user's intent in one short sentence BEFORE
-            choosing `kind`. Fill only the draft matching `kind`; the other one
-            stays null.
+            choosing `kind`. Fill only the draft matching `kind`; the other two
+            stay null.
             </classification>
 
             <examples>
@@ -68,6 +75,12 @@ public class CaptureService {
               with a verb, but it records something learned.
             - "nộp form học bổng trước thứ 6" -> TASK — a commitment with a
               deadline; resolve "thứ 6" to a date.
+            - "nộp form 2h chiều mai" -> TASK — the time is a DEADLINE to finish
+              by, not a span the user sits in.
+            - "họp nhóm 2h chiều mai" -> EVENT — the meeting OCCUPIES that time;
+              the user attends it.
+            - "thi IELTS sáng thứ 7" -> EVENT — an exam sitting happens at that
+              time; startTime from the text, endTime "" when the text gives none.
             </examples>
 
             <task_shape>
@@ -84,6 +97,20 @@ public class CaptureService {
               <user_context>) this task clearly trains, else "". Never invent one.
             </task_shape>
 
+            <event_shape>
+            Every field must be present; when a value is absent write "" — NEVER
+            guess one.
+            - title: short noun phrase naming the occasion (drop filler).
+            - date: ISO date — an event always has one; resolve relative words
+              against today.
+            - startTime: ISO clock time ("14:00") when the text names one, else
+              "" (the event becomes all-day).
+            - endTime: ISO clock time ONLY when the text names an end or a
+              duration ("2-4pm", "họp 2 tiếng từ 14h"), else "".
+            - notes: extra detail beyond the title (location, agenda), else "".
+            - disciplineName: same rule as tasks — exact existing name or "".
+            </event_shape>
+
             <note_shape>
             - Clean the text into Markdown WITHOUT inventing facts or padding:
               a short capture stays short — never restate the title as a heading,
@@ -97,7 +124,8 @@ public class CaptureService {
 
             <self_check>
             Before answering, re-scan the source once for: a missed time reference,
-            a clock time mistaken for a date, a discipline that clearly fits.
+            a clock time mistaken for a date, a deadline misread as an event (or
+            the reverse), a discipline that clearly fits.
             </self_check>
 
             <user_context>

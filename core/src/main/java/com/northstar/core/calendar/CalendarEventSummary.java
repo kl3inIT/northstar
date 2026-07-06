@@ -21,5 +21,6 @@ public record CalendarEventSummary(
         boolean allDay,
         @NotNull ColorName color,
         UUID disciplineId,
-        String rrule) {
+        String rrule,
+        @NotNull Instant createdAt) {
 }
