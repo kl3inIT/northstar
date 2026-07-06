@@ -98,6 +98,11 @@ public class TaskService {
         tasks.deleteById(id);
     }
 
+    @Transactional(readOnly = true)
+    public TaskSummary find(UUID id) {
+        return summary(tasks.findById(id).orElseThrow(() -> new TaskNotFoundException(id)));
+    }
+
     /**
      * Overdue + due-today open tasks, tasks planned for today (or earlier — plans
      * roll forward), plus tasks completed today (zone-local).

@@ -1,6 +1,8 @@
 package com.northstar.core.assistant;
 
+import static com.northstar.core.assistant.ToolSupport.disciplineIdByName;
 import static com.northstar.core.assistant.ToolSupport.local;
+import static com.northstar.core.assistant.ToolSupport.parseColor;
 import static com.northstar.core.assistant.ToolSupport.parseDate;
 import static com.northstar.core.assistant.ToolSupport.parseTime;
 import static com.northstar.core.assistant.ToolSupport.required;
@@ -9,14 +11,17 @@ import static com.northstar.core.assistant.ToolSupport.zone;
 import com.northstar.core.calendar.CalendarEventService;
 import com.northstar.core.calendar.CalendarEventSummary;
 import com.northstar.core.calendar.FreeSlot;
+import com.northstar.core.discipline.DisciplineService;
 import com.northstar.core.shared.ColorName;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
-import java.util.Locale;
+import java.util.UUID;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.ai.tool.annotation.Tool;
@@ -48,10 +53,27 @@ class CalendarTools implements NorthstarTool {
             use before proposing a study session or picking a meeting time. All-day \
             deadline banners do not block a slot.""";
 
-    private final CalendarEventService events;
+    private static final String UPDATE_EVENT = """
+            Edit an existing event by its id (ids come from upcoming_events). Only pass \
+            the fields to change — omitted fields keep their value. For a recurring event \
+            this edits the WHOLE series; to change just one occurrence, cancel_occurrence \
+            it and create_event a standalone replacement.""";
 
-    CalendarTools(CalendarEventService events) {
+    private static final String DELETE_EVENT = """
+            Delete an event by its id — for a recurring event this removes the WHOLE \
+            series. To drop a single occurrence use cancel_occurrence instead.""";
+
+    private static final String CANCEL_OCCURRENCE = """
+            Skip exactly one occurrence of a recurring event ('huỷ lớp tối nay'): the \
+            series continues, only that date's occurrence disappears. The start must be \
+            an occurrence's exact local start from upcoming_events.""";
+
+    private final CalendarEventService events;
+    private final DisciplineService disciplines;
+
+    CalendarTools(CalendarEventService events, DisciplineService disciplines) {
         this.events = events;
+        this.disciplines = disciplines;
     }
 
     @Tool(name = "upcoming_events", description = UPCOMING_EVENTS)
@@ -90,7 +112,10 @@ class CalendarTools implements NorthstarTool {
                     required = false) String rrule,
             @ToolParam(description = "Display color: BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE or GRAY; defaults to BLUE", required = false)
             @McpToolParam(description = "Display color: BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE or GRAY; defaults to BLUE",
-                    required = false) String color) {
+                    required = false) String color,
+            @ToolParam(description = "Discipline name the event belongs to (see list_disciplines); omit for none", required = false)
+            @McpToolParam(description = "Discipline name the event belongs to (see list_disciplines); omit for none",
+                    required = false) String disciplineName) {
         ZoneId zone = zone();
         LocalDate day = required("date", parseDate("date", date));
         Instant startAt = day.atTime(required("startTime", parseTime("startTime", startTime)))
@@ -98,7 +123,84 @@ class CalendarTools implements NorthstarTool {
         Instant endAt = day.atTime(required("endTime", parseTime("endTime", endTime)))
                 .atZone(zone).toInstant();
         return EventView.of(events.create(title, eventNotes, startAt, endAt, false,
-                parseColor(color), null, rrule), zone);
+                parseColor(color, ColorName.BLUE), disciplineIdByName(disciplines, disciplineName),
+                rrule), zone);
+    }
+
+    @Tool(name = "update_event", description = UPDATE_EVENT)
+    @McpTool(name = "update_event", description = UPDATE_EVENT,
+            annotations = @McpTool.McpAnnotations(destructiveHint = false, idempotentHint = true,
+                    openWorldHint = false))
+    EventView updateEvent(
+            @ToolParam(description = "The event's UUID")
+            @McpToolParam(description = "The event's UUID", required = true) String eventId,
+            @ToolParam(description = "New title; omit to keep", required = false)
+            @McpToolParam(description = "New title; omit to keep", required = false) String title,
+            @ToolParam(description = "New date yyyy-MM-dd; omit to keep", required = false)
+            @McpToolParam(description = "New date yyyy-MM-dd; omit to keep", required = false) String date,
+            @ToolParam(description = "New start time HH:mm; omit to keep", required = false)
+            @McpToolParam(description = "New start time HH:mm; omit to keep", required = false) String startTime,
+            @ToolParam(description = "New end time HH:mm; omit to keep", required = false)
+            @McpToolParam(description = "New end time HH:mm; omit to keep", required = false) String endTime,
+            @ToolParam(description = "New notes; omit to keep, 'none' to clear", required = false)
+            @McpToolParam(description = "New notes; omit to keep, 'none' to clear",
+                    required = false) String eventNotes,
+            @ToolParam(description = "New recurrence rule; omit to keep, 'none' to make it a one-off", required = false)
+            @McpToolParam(description = "New recurrence rule; omit to keep, 'none' to make it a one-off",
+                    required = false) String rrule,
+            @ToolParam(description = "New display color; omit to keep", required = false)
+            @McpToolParam(description = "New display color; omit to keep", required = false) String color) {
+        ZoneId zone = zone();
+        CalendarEventSummary current = events.find(UUID.fromString(eventId));
+        LocalDateTime curStart = LocalDateTime.ofInstant(current.startAt(), zone);
+        LocalDateTime curEnd = LocalDateTime.ofInstant(current.endAt(), zone);
+        LocalDate day = date == null || date.isBlank() ? curStart.toLocalDate() : parseDate("date", date);
+        LocalTime start = startTime == null || startTime.isBlank()
+                ? curStart.toLocalTime() : parseTime("startTime", startTime);
+        LocalTime end = endTime == null || endTime.isBlank()
+                ? curEnd.toLocalTime() : parseTime("endTime", endTime);
+        // Editing times on an all-day banner turns it into a normal timed block.
+        boolean allDay = current.allDay() && (startTime == null || startTime.isBlank());
+        return EventView.of(events.update(current.id(),
+                title == null || title.isBlank() ? current.title() : title,
+                ToolSupport.resolve(eventNotes, current.notes(), String::strip),
+                day.atTime(start).atZone(zone).toInstant(),
+                day.atTime(end).atZone(zone).toInstant(),
+                allDay,
+                parseColor(color, current.color()),
+                current.disciplineId(),
+                ToolSupport.resolve(rrule, current.rrule(), String::strip)), zone);
+    }
+
+    @Tool(name = "delete_event", description = DELETE_EVENT)
+    @McpTool(name = "delete_event", description = DELETE_EVENT,
+            annotations = @McpTool.McpAnnotations(destructiveHint = true, openWorldHint = false))
+    String deleteEvent(
+            @ToolParam(description = "The event's UUID")
+            @McpToolParam(description = "The event's UUID", required = true) String eventId) {
+        UUID id = UUID.fromString(eventId);
+        CalendarEventSummary victim = events.find(id);
+        events.delete(id);
+        return "Deleted event \"" + victim.title() + "\""
+                + (victim.rrule() != null ? " (the whole series)" : "");
+    }
+
+    @Tool(name = "cancel_occurrence", description = CANCEL_OCCURRENCE)
+    @McpTool(name = "cancel_occurrence", description = CANCEL_OCCURRENCE,
+            annotations = @McpTool.McpAnnotations(destructiveHint = true, idempotentHint = true,
+                    openWorldHint = false))
+    String cancelOccurrence(
+            @ToolParam(description = "The recurring event's UUID")
+            @McpToolParam(description = "The recurring event's UUID", required = true) String eventId,
+            @ToolParam(description = "The occurrence's local start, 'yyyy-MM-dd HH:mm', exactly as upcoming_events returned it")
+            @McpToolParam(description = "The occurrence's local start, 'yyyy-MM-dd HH:mm', exactly as upcoming_events returned it",
+                    required = true) String occurrenceStart) {
+        ZoneId zone = zone();
+        Instant start = LocalDateTime
+                .parse(occurrenceStart.strip(), DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                .atZone(zone).toInstant();
+        events.cancelOccurrence(UUID.fromString(eventId), start);
+        return "Cancelled the " + occurrenceStart + " occurrence; the series continues.";
     }
 
     @Tool(name = "find_free_slots", description = FIND_FREE_SLOTS)
@@ -147,15 +249,4 @@ class CalendarTools implements NorthstarTool {
         }
     }
 
-    private static ColorName parseColor(String value) {
-        if (value == null || value.isBlank()) {
-            return ColorName.BLUE;
-        }
-        try {
-            return ColorName.valueOf(value.strip().toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(
-                    "color must be one of BLUE, GREEN, RED, YELLOW, PURPLE, ORANGE, GRAY — got '" + value + "'");
-        }
-    }
 }

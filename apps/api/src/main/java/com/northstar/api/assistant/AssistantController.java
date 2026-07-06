@@ -69,8 +69,12 @@ class AssistantController {
             - Resolve relative dates ("tomorrow", "thứ 6") yourself before calling a tool.
             - Before booking an event, check the calendar for that day (upcoming_events
               or find_free_slots) and mention a conflict instead of double-booking.
-            - After a write (task/note/event created, task completed), confirm in one
-              short sentence what was created and when.
+            - After a write (created, updated, completed), confirm in one short sentence
+              what changed and when.
+            - Before a delete/cancel/archive: resolve exactly ONE target with a read tool
+              first; if several items match what the user said, list them and ask which —
+              never guess, never delete more than the user named. Prefer archiving a note
+              over deleting it, and marking a task done over deleting it.
             - Answer in English; quote the user's task/note titles verbatim in whatever
               language they are in. Keep answers short: a few sentences, or a compact
               list when listing items. No headings.

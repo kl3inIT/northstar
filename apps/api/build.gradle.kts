@@ -17,6 +17,12 @@ dependencies {
     implementation(libs.spring.ai.starter.openai)
     // Durable assistant conversation memory (spring_ai_chat_memory, Flyway V12).
     implementation("org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc")
+    // Dynamic tool discovery: only search_tools goes to the model up front; the
+    // advisor expands discovered tools per conversation. Lucene backs the index
+    // (lucene-core is optional in the library — the starter's pin, minus its
+    // auto-config, which can't see our @Qualifier'd ChatClient).
+    implementation(libs.spring.ai.tool.search.advisor)
+    implementation(libs.lucene.core)
 
     runtimeOnly("org.postgresql:postgresql")
     runtimeOnly("org.springframework.modulith:spring-modulith-actuator")

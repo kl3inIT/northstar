@@ -5,6 +5,7 @@ import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteStatus;
 import com.northstar.core.note.NoteSummary;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.ai.tool.annotation.Tool;
@@ -31,6 +32,18 @@ class NoteTools implements NorthstarTool {
             short capture short; reference related existing notes inline as [[Exact Title]] \
             only when clearly related.""";
 
+    private static final String UPDATE_NOTE = """
+            Edit an existing note: retitle, move to another folder, retag, REPLACE the \
+            whole Markdown body, or change its working state (status RESOURCE = approved \
+            knowledge, STAGING = back to review, ARCHIVED = soft-delete, restorable — when \
+            the user asks to delete a note, archive it, never lose the text). Use for \
+            corrections and rewrites; to add to the end without retyping the body, use \
+            append_to_note. Only pass the fields to change.""";
+
+    private static final String APPEND_TO_NOTE = """
+            Add Markdown to the END of an existing note, keeping everything already there \
+            ('thêm vào note X ...'). Returns the updated note.""";
+
     private final NoteService notes;
 
     NoteTools(NoteService notes) {
@@ -56,6 +69,75 @@ class NoteTools implements NorthstarTool {
             @ToolParam(description = "The note's slug, e.g. 'kinh-nghiem-apply-hoc-bong'")
             @McpToolParam(description = "The note's slug, e.g. 'kinh-nghiem-apply-hoc-bong'",
                     required = true) String slug) {
+        return notes.getBySlug(slug)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No note with slug '" + slug + "' — find slugs via search_notes."));
+    }
+
+    @Tool(name = "update_note", description = UPDATE_NOTE)
+    @McpTool(name = "update_note", description = UPDATE_NOTE,
+            annotations = @McpTool.McpAnnotations(destructiveHint = false, idempotentHint = true,
+                    openWorldHint = false))
+    NoteDetail updateNote(
+            @ToolParam(description = "The note's slug, from search_notes/get_note")
+            @McpToolParam(description = "The note's slug, from search_notes/get_note",
+                    required = true) String slug,
+            @ToolParam(description = "New title; pass '' or omit to keep", required = false)
+            @McpToolParam(description = "New title; pass '' or omit to keep", required = false) String title,
+            @ToolParam(description = "New folder path like 'English/IELTS'; pass '' or omit to keep, 'none' for root", required = false)
+            @McpToolParam(description = "New folder path like 'English/IELTS'; pass '' or omit to keep, 'none' for root",
+                    required = false) String folderPath,
+            @ToolParam(description = "REPLACEMENT Markdown body (full text, not a diff); pass '' or omit to keep — to add to the end use append_to_note", required = false)
+            @McpToolParam(description = "REPLACEMENT Markdown body (full text, not a diff); pass '' or omit to keep — to add to the end use append_to_note",
+                    required = false) String contentMarkdown,
+            @ToolParam(description = "Replacement tag list (1-4 lowercase tags); pass [] or omit to keep", required = false)
+            @McpToolParam(description = "Replacement tag list (1-4 lowercase tags); pass [] or omit to keep",
+                    required = false) List<String> tags,
+            @ToolParam(description = "New working state: RESOURCE, STAGING or ARCHIVED; pass '' or omit to keep", required = false)
+            @McpToolParam(description = "New working state: RESOURCE, STAGING or ARCHIVED; pass '' or omit to keep",
+                    required = false) String status) {
+        NoteDetail current = bySlug(slug);
+        NoteDetail updated = notes.update(current.id(),
+                title == null || title.isBlank() ? current.title() : title,
+                ToolSupport.resolve(folderPath, current.folderPath(), String::strip),
+                contentMarkdown == null || contentMarkdown.isBlank()
+                        ? current.contentMarkdown() : contentMarkdown,
+                tags == null || tags.isEmpty() ? current.tags() : tags,
+                null);
+        if (status != null && !status.isBlank()) {
+            updated = notes.setStatus(current.id(), parseStatus(status));
+        }
+        return updated;
+    }
+
+    @Tool(name = "append_to_note", description = APPEND_TO_NOTE)
+    @McpTool(name = "append_to_note", description = APPEND_TO_NOTE,
+            annotations = @McpTool.McpAnnotations(destructiveHint = false, openWorldHint = false))
+    NoteDetail appendToNote(
+            @ToolParam(description = "The note's slug, from search_notes/get_note")
+            @McpToolParam(description = "The note's slug, from search_notes/get_note",
+                    required = true) String slug,
+            @ToolParam(description = "Markdown to add at the end of the note body")
+            @McpToolParam(description = "Markdown to add at the end of the note body",
+                    required = true) String markdown) {
+        NoteDetail current = bySlug(slug);
+        String body = current.contentMarkdown() == null || current.contentMarkdown().isBlank()
+                ? markdown.strip()
+                : current.contentMarkdown().stripTrailing() + "\n\n" + markdown.strip();
+        return notes.update(current.id(), current.title(), current.folderPath(), body,
+                current.tags(), null);
+    }
+
+    private static NoteStatus parseStatus(String status) {
+        try {
+            return NoteStatus.valueOf(status.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                    "status must be RESOURCE, STAGING or ARCHIVED — got '" + status + "'");
+        }
+    }
+
+    private NoteDetail bySlug(String slug) {
         return notes.getBySlug(slug)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "No note with slug '" + slug + "' — find slugs via search_notes."));
