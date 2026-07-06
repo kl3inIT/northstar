@@ -32,6 +32,19 @@ public class DisciplineService {
         return summary(discipline);
     }
 
+    @Transactional(readOnly = true)
+    public DisciplineSummary find(UUID id) {
+        return summary(disciplines.findById(id).orElseThrow(() -> new DisciplineNotFoundException(id)));
+    }
+
+    @Transactional
+    public DisciplineSummary update(UUID id, String name, ColorName color) {
+        Discipline discipline = disciplines.findById(id)
+                .orElseThrow(() -> new DisciplineNotFoundException(id));
+        discipline.edit(name.strip(), color);
+        return summary(discipline);
+    }
+
     /** Existence check for modules that FK to a discipline. */
     @Transactional(readOnly = true)
     public boolean exists(UUID id) {

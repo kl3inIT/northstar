@@ -1,5 +1,6 @@
 package com.northstar.core.note;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -22,6 +23,14 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
 
     /** One working-state tab (Staging / Resources / Archive). */
     Page<Note> findByStatus(NoteStatus status, Pageable pageable);
+
+    /** Notes carrying ANY of the tags, one working state excluded. */
+    @Query("""
+            SELECT DISTINCT n FROM Note n JOIN n.tags t
+            WHERE t IN :tags AND n.status <> :excluded
+            """)
+    Page<Note> findByAnyTag(@Param("tags") Collection<String> tags,
+            @Param("excluded") NoteStatus excluded, Pageable pageable);
 
     /** A ranked full-text hit: note id plus a {@code <mark>}-highlighted body fragment. */
     interface SearchHit {

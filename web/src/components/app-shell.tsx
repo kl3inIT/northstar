@@ -4,6 +4,7 @@ import {
   Bot,
   Calendar,
   CheckSquare,
+  Compass,
   FileText,
   LogOut,
   Settings,
@@ -38,7 +39,7 @@ import { useStagingCount } from '@/lib/notes-api'
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/' | '/notes' | '/tasks' | '/calendar' | '/assistant'
+  to?: '/' | '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines'
   exact?: boolean
 }
 
@@ -48,6 +49,7 @@ const NAV: NavItem[] = [
   { label: 'Tasks', icon: CheckSquare, to: '/tasks' },
   { label: 'Calendar', icon: Calendar, to: '/calendar' },
   { label: 'Notes', icon: FileText, to: '/notes' },
+  { label: 'Disciplines', icon: Compass, to: '/disciplines' },
   { label: 'Study', icon: BookOpen },
   { label: 'Scholarships', icon: Trophy },
   { label: 'Finance', icon: Wallet },

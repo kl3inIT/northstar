@@ -2,6 +2,7 @@ package com.northstar.core.note;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -120,6 +121,23 @@ public class NoteService {
     @Transactional(readOnly = true)
     public Page<NoteSummary> listByStatus(NoteStatus status, Pageable pageable) {
         return notes.findByStatus(status, pageable).map(this::summary);
+    }
+
+    /**
+     * Notes carrying ANY of the tags, archived excluded — the MFI bridge to the
+     * LDP spine: a note "belongs" to a discipline by carrying one of the
+     * discipline name's words as a tag (e.g. "English · IELTS" → english, ielts).
+     */
+    @Transactional(readOnly = true)
+    public Page<NoteSummary> listByAnyTag(Collection<String> tags, Pageable pageable) {
+        List<String> cleaned = tags.stream()
+                .map(t -> t.strip().toLowerCase(Locale.ROOT))
+                .filter(t -> !t.isBlank())
+                .toList();
+        if (cleaned.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        return notes.findByAnyTag(cleaned, NoteStatus.ARCHIVED, pageable).map(this::summary);
     }
 
     @Transactional(readOnly = true)

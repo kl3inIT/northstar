@@ -48,4 +48,9 @@ public class Discipline extends BaseEntity {
     public ColorName getColor() {
         return color;
     }
+
+    public void edit(String name, ColorName color) {
+        this.name = name;
+        this.color = color;
+    }
 }
