@@ -1,4 +1,4 @@
-import { Clock, Plus } from 'lucide-react'
+import { Clock, Plus, Star } from 'lucide-react'
 import { useState } from 'react'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import {
   useCreateTask,
   useSetTaskDone,
+  useSetTaskPlanned,
   useTodayTasks,
   useUpcomingTasks,
   type Task,
@@ -28,17 +29,26 @@ function dueChip(task: Task): string | null {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-/** Today — overdue + due-today (+ done today) with a plain, no-AI quick-add. */
+/**
+ * Today — deadline-late (Overdue), plus everything to touch today: due today OR
+ * starred/planned for today (do-vs-due: plans roll forward, deadlines don't move).
+ */
 export function TodayPage() {
   const today = localToday()
   const { data: todayList = [], isLoading } = useTodayTasks()
   const { data: upcoming = [] } = useUpcomingTasks(7)
   const createTask = useCreateTask()
   const setDone = useSetTaskDone()
+  const setPlanned = useSetTaskPlanned()
   const [title, setTitle] = useState('')
 
   const overdue = todayList.filter((t) => t.status === 'OPEN' && t.dueDate !== null && t.dueDate < today)
-  const dueToday = todayList.filter((t) => t.status === 'OPEN' && t.dueDate === today)
+  const dueToday = todayList.filter(
+    (t) =>
+      t.status === 'OPEN' &&
+      !(t.dueDate !== null && t.dueDate < today) &&
+      (t.dueDate === today || (t.plannedDate !== null && t.plannedDate <= today)),
+  )
   const doneToday = todayList.filter((t) => t.status === 'DONE')
 
   function onQuickAdd(e: React.KeyboardEvent) {
@@ -52,6 +62,13 @@ export function TodayPage() {
   function toggle(task: Task) {
     setDone.mutate({ id: task.id, done: task.status === 'OPEN' })
   }
+
+  function toggleStar(task: Task) {
+    const starred = task.plannedDate !== null && task.plannedDate <= today
+    setPlanned.mutate({ id: task.id, plannedDate: starred ? null : today })
+  }
+
+  const isStarred = (t: Task) => t.plannedDate !== null && t.plannedDate <= today
 
   return (
     <div className="w-full min-w-0 flex-1 overflow-auto px-10 py-8">
@@ -81,22 +98,32 @@ export function TodayPage() {
           {overdue.length > 0 && (
             <Section label="Overdue" count={overdue.length} tone="danger">
               {overdue.map((t) => (
-                <TaskRow key={t.id} task={t} chip={dueChip(t)} overdue onToggle={() => toggle(t)} />
+                <TaskRow
+                  key={t.id}
+                  task={t}
+                  chip={dueChip(t)}
+                  overdue
+                  starred={isStarred(t)}
+                  onStar={() => toggleStar(t)}
+                  onToggle={() => toggle(t)}
+                />
               ))}
             </Section>
           )}
           <Section label="Today" count={dueToday.length + doneToday.length}>
             {dueToday.length === 0 && doneToday.length === 0 && (
               <p className="py-2 text-sm text-muted-foreground">
-                Chưa có task cho hôm nay — thêm ở ô trên hoặc Capture (⌃⇧K).
+                Chưa có task cho hôm nay — thêm ở ô trên, bấm ⭐ một task, hoặc Capture (⌃⇧K).
               </p>
             )}
             {dueToday.map((t) => (
               <TaskRow
                 key={t.id}
                 task={t}
-                chip={t.dueTime ? t.dueTime.slice(0, 5) : null}
-                timeChip
+                chip={t.dueDate === today && t.dueTime ? t.dueTime.slice(0, 5) : dueChip(t)}
+                timeChip={t.dueDate === today && t.dueTime !== null}
+                starred={isStarred(t)}
+                onStar={() => toggleStar(t)}
                 onToggle={() => toggle(t)}
               />
             ))}
@@ -104,10 +131,18 @@ export function TodayPage() {
               <TaskRow key={t.id} task={t} chip={null} onToggle={() => toggle(t)} />
             ))}
           </Section>
-          {upcoming.length > 0 && (
+          {upcoming.filter((t) => !isStarred(t)).length > 0 && (
             <Section label="Upcoming" muted>
-              {upcoming.map((t) => (
-                <TaskRow key={t.id} task={t} chip={dueChip(t)} dimmed onToggle={() => toggle(t)} />
+              {upcoming.filter((t) => !isStarred(t)).map((t) => (
+                <TaskRow
+                  key={t.id}
+                  task={t}
+                  chip={dueChip(t)}
+                  dimmed
+                  starred={isStarred(t)}
+                  onStar={() => toggleStar(t)}
+                  onToggle={() => toggle(t)}
+                />
               ))}
             </Section>
           )}
@@ -165,6 +200,8 @@ function TaskRow({
   timeChip,
   overdue,
   dimmed,
+  starred,
+  onStar,
   onToggle,
 }: {
   task: Task
@@ -172,11 +209,13 @@ function TaskRow({
   timeChip?: boolean
   overdue?: boolean
   dimmed?: boolean
+  starred?: boolean
+  onStar?: () => void
   onToggle: () => void
 }) {
   const done = task.status === 'DONE'
   return (
-    <div className={cn('flex items-center gap-3 py-2.5', dimmed && 'opacity-60')}>
+    <div className={cn('group flex items-center gap-3 py-2.5', dimmed && 'opacity-60')}>
       <Checkbox
         checked={done}
         onCheckedChange={onToggle}
@@ -186,6 +225,25 @@ function TaskRow({
       <span className={cn('flex-1 truncate text-sm', done && 'text-muted-foreground line-through')}>
         {task.title}
       </span>
+      {onStar && (
+        <button
+          type="button"
+          aria-label={starred ? 'Bỏ khỏi hôm nay' : 'Làm hôm nay'}
+          title={starred ? 'Bỏ khỏi hôm nay' : 'Làm hôm nay (không đổi deadline)'}
+          onClick={onStar}
+          className={cn(
+            'shrink-0 transition-opacity',
+            starred ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+          )}
+        >
+          <Star
+            className={cn(
+              'size-4',
+              starred ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/50 hover:text-amber-400',
+            )}
+          />
+        </button>
+      )}
       {chip && (
         <span className="flex shrink-0 items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground">
           {timeChip && <Clock className="size-3" />}

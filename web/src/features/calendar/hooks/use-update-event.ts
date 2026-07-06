@@ -27,6 +27,7 @@ export function useUpdateEvent() {
           notes: event.task.notes ?? undefined,
           dueDate: format(parseISO(event.startDate), "yyyy-MM-dd"),
           dueTime: event.task.dueTime ?? undefined,
+          plannedDate: event.task.plannedDate ?? undefined,
           disciplineId: event.task.disciplineId ?? undefined,
         },
       });

@@ -30,7 +30,14 @@ export interface IEvent {
   /** Server-issued start of this occurrence — the "chỉ buổi này" key; survives drag. */
   occurrenceStart?: string;
   /** Original task row (kind "task") — drag needs its fields to PUT the new due date. */
-  task?: { id: string; title: string; notes: string | null; dueTime: string | null; disciplineId: string | null };
+  task?: {
+    id: string;
+    title: string;
+    notes: string | null;
+    dueTime: string | null;
+    plannedDate: string | null;
+    disciplineId: string | null;
+  };
 }
 
 export interface ICalendarCell {

@@ -14,6 +14,8 @@ export type Task = {
   status: TaskStatus
   dueDate: string | null
   dueTime: string | null
+  /** Do-vs-due "do" day (Things-style star); independent of the deadline. */
+  plannedDate: string | null
   completedAt: string | null
   createdAt: string
   disciplineId: string | null
@@ -32,6 +34,7 @@ function toTask(t: Schemas['TaskSummary']): Task {
     status: (t.status ?? 'OPEN') as TaskStatus,
     dueDate: t.dueDate ?? null,
     dueTime: t.dueTime ?? null,
+    plannedDate: t.plannedDate ?? null,
     completedAt: t.completedAt ?? null,
     createdAt: t.createdAt ?? '',
     disciplineId: t.disciplineId ?? null,
@@ -100,6 +103,16 @@ export async function setTaskDone(id: string, done: boolean): Promise<Task> {
   return toTask(data as Schemas['TaskSummary'])
 }
 
+/** Star/unstar the "do" day (null clears); never moves the deadline. */
+export async function setTaskPlanned(id: string, plannedDate: string | null): Promise<Task> {
+  const { data, error } = await api.PATCH('/api/tasks/{id}/planned', {
+    params: { path: { id } },
+    body: { plannedDate: plannedDate ?? undefined },
+  })
+  if (error) throw error
+  return toTask(data as Schemas['TaskSummary'])
+}
+
 export async function deleteTask(id: string): Promise<void> {
   const { error } = await api.DELETE('/api/tasks/{id}', { params: { path: { id } } })
   if (error) throw error
@@ -149,6 +162,15 @@ export function useSetTaskDone() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: ({ id, done }: { id: string; done: boolean }) => setTaskDone(id, done),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+  })
+}
+
+export function useSetTaskPlanned() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, plannedDate }: { id: string; plannedDate: string | null }) =>
+      setTaskPlanned(id, plannedDate),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tasks'] }),
   })
 }

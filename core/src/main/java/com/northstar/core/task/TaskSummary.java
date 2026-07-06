@@ -8,9 +8,9 @@ import java.util.UUID;
 
 /**
  * Read model for task lists (Today, upcoming, board and calendar views).
- * {@code notes}, {@code dueDate}, {@code dueTime}, {@code completedAt} and
- * {@code disciplineId} are genuinely nullable; the {@code @NotNull} marks make
- * the rest required in the generated OpenAPI client.
+ * {@code notes}, {@code dueDate}, {@code dueTime}, {@code plannedDate},
+ * {@code completedAt} and {@code disciplineId} are genuinely nullable; the
+ * {@code @NotNull} marks make the rest required in the generated OpenAPI client.
  */
 public record TaskSummary(
         @NotNull UUID id,
@@ -19,6 +19,7 @@ public record TaskSummary(
         @NotNull TaskStatus status,
         LocalDate dueDate,
         LocalTime dueTime,
+        LocalDate plannedDate,
         Instant completedAt,
         @NotNull Instant createdAt,
         UUID disciplineId) {

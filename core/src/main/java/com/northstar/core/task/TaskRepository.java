@@ -16,6 +16,10 @@ interface TaskRepository extends JpaRepository<Task, UUID> {
     List<Task> findByStatusAndDueDateBetweenOrderByDueDateAscDueTimeAscCreatedAtAsc(
             TaskStatus status, LocalDate from, LocalDate to);
 
+    /** Open tasks planned on or before {@code date} — plans roll forward into Today. */
+    List<Task> findByStatusAndPlannedDateLessThanEqualOrderByPlannedDateAscCreatedAtAsc(
+            TaskStatus status, LocalDate date);
+
     /** Undated open tasks — "someday". */
     List<Task> findByStatusAndDueDateIsNullOrderByCreatedAtAsc(TaskStatus status);
 

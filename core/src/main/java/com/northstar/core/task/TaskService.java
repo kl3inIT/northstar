@@ -5,7 +5,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,21 +32,36 @@ public class TaskService {
     @Transactional
     public TaskSummary create(String title, String notes, LocalDate dueDate, LocalTime dueTime,
             UUID disciplineId) {
+        return create(title, notes, dueDate, dueTime, null, disciplineId);
+    }
+
+    @Transactional
+    public TaskSummary create(String title, String notes, LocalDate dueDate, LocalTime dueTime,
+            LocalDate plannedDate, UUID disciplineId) {
         requireDiscipline(disciplineId);
         Task task = new Task(UUID.randomUUID(), title.strip(),
                 notes == null || notes.isBlank() ? null : notes.strip(),
                 dueDate, dueTime, disciplineId);
+        task.planFor(plannedDate);
         tasks.save(task);
         return summary(task);
     }
 
     @Transactional
     public TaskSummary update(UUID id, String title, String notes, LocalDate dueDate, LocalTime dueTime,
-            UUID disciplineId) {
+            LocalDate plannedDate, UUID disciplineId) {
         requireDiscipline(disciplineId);
         Task task = tasks.findById(id).orElseThrow(() -> new TaskNotFoundException(id));
         task.edit(title.strip(), notes == null || notes.isBlank() ? null : notes.strip(),
-                dueDate, dueTime, disciplineId);
+                dueDate, dueTime, plannedDate, disciplineId);
+        return summary(task);
+    }
+
+    /** Star/unstar the "do" date without touching the deadline; null clears the plan. */
+    @Transactional
+    public TaskSummary setPlanned(UUID id, LocalDate plannedDate) {
+        Task task = tasks.findById(id).orElseThrow(() -> new TaskNotFoundException(id));
+        task.planFor(plannedDate);
         return summary(task);
     }
 
@@ -67,18 +84,23 @@ public class TaskService {
         tasks.deleteById(id);
     }
 
-    /** Overdue + due-today open tasks, plus tasks completed today (zone-local). */
+    /**
+     * Overdue + due-today open tasks, tasks planned for today (or earlier — plans
+     * roll forward), plus tasks completed today (zone-local).
+     */
     @Transactional(readOnly = true)
     public List<TaskSummary> today(ZoneId zone) {
         LocalDate today = LocalDate.now(zone);
         Instant startOfDay = today.atStartOfDay(zone).toInstant();
-        List<TaskSummary> open = tasks
-                .findByStatusAndDueDateLessThanEqualOrderByDueDateAscDueTimeAscCreatedAtAsc(TaskStatus.OPEN, today)
-                .stream().map(this::summary).toList();
+        Map<UUID, Task> open = new LinkedHashMap<>();
+        tasks.findByStatusAndDueDateLessThanEqualOrderByDueDateAscDueTimeAscCreatedAtAsc(TaskStatus.OPEN, today)
+                .forEach(task -> open.put(task.getId(), task));
+        tasks.findByStatusAndPlannedDateLessThanEqualOrderByPlannedDateAscCreatedAtAsc(TaskStatus.OPEN, today)
+                .forEach(task -> open.putIfAbsent(task.getId(), task));
         List<TaskSummary> doneToday = tasks
                 .findByStatusAndCompletedAtGreaterThanEqualOrderByCompletedAtDesc(TaskStatus.DONE, startOfDay)
                 .stream().map(this::summary).toList();
-        return concat(open, doneToday);
+        return concat(open.values().stream().map(this::summary).toList(), doneToday);
     }
 
     /** Open tasks due within the next {@code days} days after today. */
@@ -128,7 +150,7 @@ public class TaskService {
 
     private TaskSummary summary(Task task) {
         return new TaskSummary(task.getId(), task.getTitle(), task.getNotes(), task.getStatus(),
-                task.getDueDate(), task.getDueTime(), task.getCompletedAt(), task.getCreatedAt(),
-                task.getDisciplineId());
+                task.getDueDate(), task.getDueTime(), task.getPlannedDate(), task.getCompletedAt(),
+                task.getCreatedAt(), task.getDisciplineId());
     }
 }

@@ -52,6 +52,31 @@ class TaskServiceIntegrationTests {
     }
 
     @Test
+    void plannedTasksJoinTodayAndRollForwardWithoutTouchingTheDeadline() {
+        LocalDate today = LocalDate.now(ZONE);
+        // Deadline far away, but starred to work on today.
+        TaskSummary starredToday = tasks.create("Viết essay Chevening", null, today.plusDays(10), null, null);
+        tasks.setPlanned(starredToday.id(), today);
+        // Planned yesterday, never done: the plan rolls forward into today.
+        TaskSummary rolledOver = tasks.create("Đọc lại notes HSK", null, null, null, null);
+        tasks.setPlanned(rolledOver.id(), today.minusDays(1));
+        // Planned for the future: not today's business.
+        TaskSummary plannedAhead = tasks.create("Ôn mock speaking", null, null, null, null);
+        tasks.setPlanned(plannedAhead.id(), today.plusDays(3));
+
+        var todayList = tasks.today(ZONE);
+
+        assertThat(todayList).extracting(TaskSummary::id).contains(starredToday.id(), rolledOver.id());
+        assertThat(todayList).extracting(TaskSummary::id).doesNotContain(plannedAhead.id());
+        // Starring never moved the deadline; unstarring clears only the plan.
+        TaskSummary starred = todayList.stream()
+                .filter(t -> t.id().equals(starredToday.id())).findFirst().orElseThrow();
+        assertThat(starred.dueDate()).isEqualTo(today.plusDays(10));
+        assertThat(starred.plannedDate()).isEqualTo(today);
+        assertThat(tasks.setPlanned(starredToday.id(), null).plannedDate()).isNull();
+    }
+
+    @Test
     void upcomingWindowsExcludeTodayAndReopenWorks() {
         LocalDate today = LocalDate.now(ZONE);
         tasks.create("Đóng học phí", null, today.plusDays(5), null, null);

@@ -39,7 +39,14 @@ function taskToEvent(task: Task, today: string): IEvent {
     color: taskColor(task, today),
     kind: 'task',
     taskDone: task.status === 'DONE',
-    task: { id: task.id, title: task.title, notes: task.notes, dueTime: task.dueTime, disciplineId: task.disciplineId },
+    task: {
+      id: task.id,
+      title: task.title,
+      notes: task.notes,
+      dueTime: task.dueTime,
+      plannedDate: task.plannedDate,
+      disciplineId: task.disciplineId,
+    },
   }
 }
 

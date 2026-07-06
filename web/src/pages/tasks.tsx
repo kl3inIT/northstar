@@ -1,4 +1,4 @@
-import { Clock } from 'lucide-react'
+import { Clock, Star } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { toast } from 'sonner'
@@ -13,7 +13,14 @@ import {
   type DragEndEvent,
 } from '@/components/kibo-ui/kanban'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
-import { useRangeTasks, useSetTaskDone, useSomedayTasks, useUpdateTask, type Task } from '@/lib/tasks-api'
+import {
+  useRangeTasks,
+  useSetTaskDone,
+  useSetTaskPlanned,
+  useSomedayTasks,
+  useUpdateTask,
+  type Task,
+} from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
 
 function iso(d: Date): string {
@@ -225,6 +232,7 @@ function TaskKanban({ groups, today, disciplines }: { groups: Group[]; today: st
           notes: task.notes ?? undefined,
           dueDate,
           dueTime: dueDate ? (task.dueTime ?? undefined) : undefined,
+          plannedDate: task.plannedDate ?? undefined,
           disciplineId: task.disciplineId ?? undefined,
         },
       })
@@ -301,7 +309,12 @@ function BoardCard({ task, overdue, disciplines }: { task: Task; overdue?: boole
         className={cn('mt-0.5 rounded-full', overdue && 'border-destructive')}
       />
       <div className="min-w-0 flex-1">
-        <p className={cn('line-clamp-2 text-sm leading-snug', done && 'text-muted-foreground line-through')}>{task.title}</p>
+        <div className="flex items-start gap-1.5">
+          <p className={cn('line-clamp-2 flex-1 text-sm leading-snug', done && 'text-muted-foreground line-through')}>
+            {task.title}
+          </p>
+          {!done && <StarButton task={task} className="mt-0.5" />}
+        </div>
         {(discipline || task.dueDate) && (
           <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
             {discipline && (
@@ -321,6 +334,39 @@ function BoardCard({ task, overdue, disciplines }: { task: Task; overdue?: boole
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * The do-vs-due star: "hôm nay tôi sẽ đụng việc này" — sets plannedDate=today
+ * (or clears it), never the deadline. Kanban columns stay deadline-based.
+ */
+function StarButton({ task, className }: { task: Task; className?: string }) {
+  const setPlanned = useSetTaskPlanned()
+  const today = iso(new Date())
+  const starred = task.plannedDate !== null && task.plannedDate <= today
+  return (
+    <button
+      type="button"
+      aria-label={starred ? 'Bỏ khỏi hôm nay' : 'Làm hôm nay'}
+      title={starred ? 'Bỏ khỏi hôm nay' : 'Làm hôm nay (không đổi deadline)'}
+      disabled={setPlanned.isPending}
+      onClick={(e) => {
+        e.stopPropagation()
+        setPlanned.mutate(
+          { id: task.id, plannedDate: starred ? null : today },
+          { onSuccess: () => toast.success(starred ? 'Đã bỏ khỏi hôm nay' : 'Sẽ làm hôm nay — deadline giữ nguyên') },
+        )
+      }}
+      className={cn('shrink-0', className)}
+    >
+      <Star
+        className={cn(
+          'size-4',
+          starred ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/50 hover:text-amber-400',
+        )}
+      />
+    </button>
   )
 }
 
@@ -364,6 +410,7 @@ function TaskLine({
       <span className={cn('min-w-0 flex-1 truncate text-sm', done && 'text-muted-foreground line-through')}>
         {task.title}
       </span>
+      {!done && <StarButton task={task} />}
       {discipline && (
         <span
           title={discipline.name}

@@ -14,10 +14,12 @@ import java.util.UUID;
 
 /**
  * A task. {@code dueDate} is optional (null = someday); {@code dueTime} refines a
- * dated task onto a calendar slot later. Status is deliberately binary — the
- * methodology's friction rule wants "done?" to be a yes/no question.
- * {@code completedAt} is domain data (drives the Today view), unlike the audit
- * timestamps inherited from {@link BaseEntity}.
+ * dated task onto a calendar slot later. {@code plannedDate} is the Things-style
+ * "do" date — the day the user intends to work on it — independent of the
+ * deadline: starring a task for today must never move its due date. Status is
+ * deliberately binary — the methodology's friction rule wants "done?" to be a
+ * yes/no question. {@code completedAt} is domain data (drives the Today view),
+ * unlike the audit timestamps inherited from {@link BaseEntity}.
  */
 @Entity
 @Table(name = "task")
@@ -39,6 +41,9 @@ public class Task extends BaseEntity {
 
     @Column(name = "due_time")
     private LocalTime dueTime;
+
+    @Column(name = "planned_date")
+    private LocalDate plannedDate;
 
     @Column(name = "completed_at")
     private Instant completedAt;
@@ -80,6 +85,10 @@ public class Task extends BaseEntity {
         return dueTime;
     }
 
+    public LocalDate getPlannedDate() {
+        return plannedDate;
+    }
+
     public Instant getCompletedAt() {
         return completedAt;
     }
@@ -88,12 +97,19 @@ public class Task extends BaseEntity {
         return disciplineId;
     }
 
-    public void edit(String title, String notes, LocalDate dueDate, LocalTime dueTime, UUID disciplineId) {
+    public void edit(String title, String notes, LocalDate dueDate, LocalTime dueTime,
+            LocalDate plannedDate, UUID disciplineId) {
         this.title = title;
         this.notes = notes;
         this.dueDate = dueDate;
         this.dueTime = dueTime;
+        this.plannedDate = plannedDate;
         this.disciplineId = disciplineId;
+    }
+
+    /** The "do" side of do-vs-due: (re)schedule my work day; null = unplanned. */
+    public void planFor(LocalDate plannedDate) {
+        this.plannedDate = plannedDate;
     }
 
     public void complete(Instant now) {

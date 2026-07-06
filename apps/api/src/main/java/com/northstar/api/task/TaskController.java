@@ -75,18 +75,24 @@ class TaskController {
     @ResponseStatus(HttpStatus.CREATED)
     TaskSummary create(@Valid @RequestBody TaskRequest request) {
         return tasks.create(request.title(), request.notes(), request.dueDate(), request.dueTime(),
-                request.disciplineId());
+                request.plannedDate(), request.disciplineId());
     }
 
     @PutMapping("/{id}")
     TaskSummary update(@PathVariable UUID id, @Valid @RequestBody TaskRequest request) {
         return tasks.update(id, request.title(), request.notes(), request.dueDate(), request.dueTime(),
-                request.disciplineId());
+                request.plannedDate(), request.disciplineId());
     }
 
     @PatchMapping("/{id}/status")
     TaskSummary setStatus(@PathVariable UUID id, @RequestBody TaskStatusRequest request) {
         return tasks.setDone(id, request.done());
+    }
+
+    /** Star/unstar the "do" day (null clears); never moves the deadline. */
+    @PatchMapping("/{id}/planned")
+    TaskSummary setPlanned(@PathVariable UUID id, @RequestBody TaskPlannedRequest request) {
+        return tasks.setPlanned(id, request.plannedDate());
     }
 
     @DeleteMapping("/{id}")
