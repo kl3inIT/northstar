@@ -82,6 +82,30 @@ class CaptureServiceIntegrationTests {
     }
 
     @Test
+    void classificationPromptCarriesTheActionabilityRubricAndReasoningMaps() {
+        modelReturns("""
+                {"reasoning":"Chỉ là ý định nghiên cứu, chưa có nội dung kiến thức.",
+                 "kind":"TASK","task":{"title":"Research về memoryOS"}}
+                """);
+
+        CaptureDraft draft = capture.draft("research về memoryOS");
+
+        assertThat(draft.kind()).isEqualTo(CaptureDraft.Kind.TASK);
+        assertThat(draft.reasoning()).contains("ý định");
+        assertThat(draft.task().dueDate()).isNull();
+        ArgumentCaptor<Prompt> prompt = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(prompt.capture());
+        String system = prompt.getValue().getSystemMessage().getText();
+        // Intent rubric, not keyword lists: the GTD actionability test + the
+        // contrastive examples must be what the model classifies with.
+        assertThat(system)
+                .contains("is it actionable?")
+                .contains("WAITING TO BE LOOKED UP")
+                .contains("research về memoryOS")
+                .contains("Tie-breaker");
+    }
+
+    @Test
     void taskCaptureMapsIntoTaskDraftWithResolvedDate() {
         modelReturns("""
                 {"kind":"TASK",

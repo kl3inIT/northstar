@@ -37,9 +37,31 @@ public class CaptureService {
 
             Today is %s (%s).
 
-            CLASSIFY as TASK when the text is primarily something the user must do —
-            an action, errand or deadline ("phải làm", "nộp", "deadline", "remember to").
-            Then fill `task` only:
+            Classify by INTENT, never by surface keywords. The single test (GTD
+            "is it actionable?"): after this item is saved, is it WAITING FOR THE
+            USER TO ACT (task) or WAITING TO BE LOOKED UP (note)?
+            - TASK: a commitment or intention to do something that has not
+              happened yet — even with no deadline (an undated task is fine).
+              A bare verb+topic with no substance is an intention, so a TASK.
+            - NOTE: the text already CONTAINS the knowledge — a fact, insight,
+              summary, idea, quote. It informs; it does not wait to be done.
+            - Tie-breaker: intention without content -> TASK; content, even when
+              it opens with a verb, -> NOTE.
+
+            Contrastive examples (input -> kind — why):
+            - "research về memoryOS" -> TASK — only an intention, no knowledge
+              content yet; no time reference, so omit dueDate.
+            - "MemoryOS: memory 3 tầng cho LLM agent, mô phỏng cách OS quản lý
+              RAM/disk" -> NOTE — the knowledge is already in the text.
+            - "hôm nay học được cách dùng 把 trong câu chữ Hán" -> NOTE — opens
+              with a verb, but it records something learned.
+            - "nộp form học bổng trước thứ 6" -> TASK — a commitment with a
+              deadline; resolve "thứ 6" to a date.
+
+            In `reasoning`, argue the user's intent in one short sentence BEFORE
+            choosing `kind`.
+
+            For a TASK fill `task` only:
             - title: short imperative phrase (drop filler like "hôm nay tôi phải")
             - dueDate: ISO date. Resolve relative words against today ("hôm nay"=today,
               "mai"=tomorrow, "thứ 6"=the next Friday). Omit if no time reference.
@@ -53,8 +75,7 @@ public class CaptureService {
             Existing disciplines:
             %s
 
-            CLASSIFY as NOTE when the text is knowledge worth keeping (an idea, a
-            learning, reference material). Then fill `note` only:
+            For a NOTE fill `note` only:
             - Clean the text into Markdown WITHOUT inventing facts or padding:
               a short capture stays short — never restate the title as a heading,
               never turn a single sentence into bullet points.
