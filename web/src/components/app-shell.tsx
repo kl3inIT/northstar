@@ -44,10 +44,10 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { label: 'Today', icon: Sun, to: '/', exact: true },
+  { label: 'Assistant', icon: Bot, to: '/assistant' },
   { label: 'Tasks', icon: CheckSquare, to: '/tasks' },
   { label: 'Calendar', icon: Calendar, to: '/calendar' },
   { label: 'Notes', icon: FileText, to: '/notes' },
-  { label: 'Assistant', icon: Bot, to: '/assistant' },
   { label: 'Study', icon: BookOpen },
   { label: 'Scholarships', icon: Trophy },
   { label: 'Finance', icon: Wallet },
