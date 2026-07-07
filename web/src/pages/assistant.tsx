@@ -1,13 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport, type ToolUIPart, type UIMessage } from 'ai'
+import { DefaultChatTransport, type FileUIPart, type ToolUIPart, type UIMessage } from 'ai'
 import {
   History as HistoryIcon,
   Loader2,
   MessageSquarePlus,
   PanelRightClose,
   PanelRightOpen,
+  Paperclip,
   Trash2,
+  X,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -23,6 +25,7 @@ import {
   PromptInputFooter,
   PromptInputSubmit,
   PromptInputTextarea,
+  usePromptInputAttachments,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input'
 import { Suggestion } from '@/components/ai-elements/suggestion'
@@ -366,7 +369,12 @@ function AssistantChat({
           .filter((p) => p.type === 'text')
           .map((p) => (p as { text: string }).text)
           .join('')
-        return { body: { message: text, conversationId } }
+        // Image parts ride along as data URLs; the api turns them into
+        // vision content parts for the current turn only.
+        const attachments = (last?.parts ?? [])
+          .filter((p): p is FileUIPart => p.type === 'file')
+          .map((p) => ({ mediaType: p.mediaType, dataUrl: p.url }))
+        return { body: { message: text, conversationId, attachments } }
       },
     }),
   })
@@ -375,14 +383,32 @@ function AssistantChat({
 
   function onSubmit(message: PromptInputMessage) {
     const trimmed = message.text.trim()
-    if (!trimmed) return
+    const images = message.files.filter((f) => f.mediaType?.startsWith('image/'))
+    if (!trimmed && images.length === 0) return
     setText('')
-    sendMessage({ text: trimmed })
+    sendMessage({ text: trimmed, files: images })
   }
 
   const input = (
-    <PromptInput onSubmit={onSubmit} className={PILL_INPUT}>
+    <PromptInput
+      onSubmit={onSubmit}
+      className={PILL_INPUT}
+      accept="image/*"
+      multiple
+      maxFiles={3}
+      maxFileSize={8 * 1024 * 1024}
+      onError={(err) =>
+        toast.error(
+          err.code === 'max_file_size'
+            ? 'Images must be under 8MB.'
+            : err.code === 'max_files'
+              ? 'Up to 3 images per message.'
+              : 'Only images can be attached.',
+        )
+      }
+    >
       <PromptInputBody>
+        <AttachmentStrip />
         <PromptInputTextarea
           placeholder="Message Northstar…"
           autoFocus
@@ -392,7 +418,7 @@ function AssistantChat({
         />
       </PromptInputBody>
       <PromptInputFooter>
-        <span />
+        <AttachButton />
         <div className="flex items-center gap-1">
           <MicButton value={text} onChange={setText} compact />
           <PromptInputSubmit status={status} className="rounded-full" />
@@ -435,6 +461,17 @@ function AssistantChat({
                   if (part.type === 'text') {
                     return <MessageResponse key={i}>{part.text}</MessageResponse>
                   }
+                  if (part.type === 'file' && (part as FileUIPart).mediaType?.startsWith('image/')) {
+                    const file = part as FileUIPart
+                    return (
+                      <img
+                        key={i}
+                        src={file.url}
+                        alt={file.filename ?? 'attached image'}
+                        className="my-1 max-h-64 max-w-full rounded-lg border object-contain"
+                      />
+                    )
+                  }
                   if (part.type.startsWith('tool-')) {
                     const tool = part as ToolUIPart
                     return (
@@ -463,6 +500,51 @@ function AssistantChat({
       </Conversation>
 
       <div className="mx-auto w-full max-w-3xl px-4 pb-6">{input}</div>
+    </div>
+  )
+}
+
+/** Paperclip in the composer footer — opens the image picker (paste and drop also work). */
+function AttachButton() {
+  const attachments = usePromptInputAttachments()
+  return (
+    <Button
+      type="button"
+      size="icon"
+      variant="ghost"
+      className="size-8 rounded-full text-muted-foreground"
+      aria-label="Attach images"
+      title="Attach images"
+      onClick={() => attachments.openFileDialog()}
+    >
+      <Paperclip className="size-4" />
+    </Button>
+  )
+}
+
+/** Thumbnails of images queued for the next message, each removable. */
+function AttachmentStrip() {
+  const attachments = usePromptInputAttachments()
+  if (attachments.files.length === 0) return null
+  return (
+    <div className="flex w-full flex-wrap justify-start gap-2 px-3 pt-3">
+      {attachments.files.map((file) => (
+        <div key={file.id} className="group relative">
+          <img
+            src={file.url}
+            alt={file.filename ?? 'attached image'}
+            className="size-14 rounded-lg border object-cover"
+          />
+          <button
+            type="button"
+            aria-label="Remove image"
+            onClick={() => attachments.remove(file.id)}
+            className="absolute -right-1.5 -top-1.5 rounded-full border bg-background p-0.5 shadow-sm"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
+      ))}
     </div>
   )
 }

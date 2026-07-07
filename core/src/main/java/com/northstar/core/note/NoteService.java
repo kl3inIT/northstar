@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,10 +36,12 @@ public class NoteService {
 
     private final NoteRepository notes;
     private final NoteLinkRepository links;
+    private final ApplicationEventPublisher events;
 
-    NoteService(NoteRepository notes, NoteLinkRepository links) {
+    NoteService(NoteRepository notes, NoteLinkRepository links, ApplicationEventPublisher events) {
         this.notes = notes;
         this.links = links;
+        this.events = events;
     }
 
     /** Hand-written note: born a trusted {@link NoteStatus#RESOURCE}. */
@@ -56,6 +59,7 @@ public class NoteService {
         notes.save(note);
         syncOutgoingLinks(note);
         resolveInboundLinks(note);
+        events.publishEvent(new NoteSaved(note.getId()));
         return detail(note);
     }
 
@@ -65,6 +69,7 @@ public class NoteService {
         Note note = notes.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
         note.moveTo(status);
         notes.saveAndFlush(note);
+        events.publishEvent(new NoteSaved(note.getId()));
         return detail(note);
     }
 
@@ -86,6 +91,7 @@ public class NoteService {
         syncOutgoingLinks(note);
         // Flush now so @LastModifiedDate/@Version are current in the response.
         notes.saveAndFlush(note);
+        events.publishEvent(new NoteSaved(note.getId()));
         return detail(note);
     }
 
@@ -98,11 +104,17 @@ public class NoteService {
         inbound.forEach(link -> link.resolveTo(null));
         links.saveAll(inbound);
         notes.delete(note);
+        events.publishEvent(new NoteDeleted(id));
     }
 
     @Transactional(readOnly = true)
     public Optional<NoteDetail> getBySlug(String slug) {
         return notes.findBySlug(slug).map(this::detail);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<NoteDetail> findById(UUID id) {
+        return notes.findById(id).map(this::detail);
     }
 
     /** Exact-title lookup (case-insensitive) — deterministic-title upserts (alignment journal). */

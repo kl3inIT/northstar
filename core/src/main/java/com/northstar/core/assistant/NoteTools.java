@@ -3,7 +3,8 @@ package com.northstar.core.assistant;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteStatus;
-import com.northstar.core.note.NoteSummary;
+import com.northstar.core.search.SearchResult;
+import com.northstar.core.search.SearchService;
 import java.util.List;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
@@ -15,15 +16,19 @@ import org.springframework.stereotype.Component;
 @Component
 class NoteTools implements NorthstarTool {
 
-    private static final String SEARCH_NOTES = """
-            Full-text search over the user's personal knowledge base (study notes for \
-            IELTS/HSK, scholarship research, project notes, journal). Returns title, slug, \
-            folder, tags and a highlighted snippet per hit. Use this BEFORE answering \
-            questions about the user's studies, plans or previously saved knowledge.""";
+    private static final String SEARCH_KNOWLEDGE = """
+            Search the user's personal knowledge base (study notes for IELTS/HSK, \
+            scholarship research, project notes, journal). Hybrid retrieval: exact \
+            keywords AND meaning both match, so a paraphrased question ("cách viết mở \
+            bài IELTS") finds notes that never contain those words. Returns title, slug \
+            and a snippet per hit, best first. Use this BEFORE answering questions about \
+            the user's studies, plans or previously saved knowledge; read a promising \
+            hit in full with get_note. If results look off, retry once with different \
+            phrasing before concluding the note does not exist.""";
 
     private static final String GET_NOTE = """
             Read one note in full (Markdown body, tags, outgoing links and backlinks) \
-            by its slug — slugs come from search_notes results.""";
+            by its slug — slugs come from search_knowledge results.""";
 
     private static final String CREATE_NOTE = """
             Save new knowledge into the user's knowledge base as a Markdown note. Use when \
@@ -43,21 +48,25 @@ class NoteTools implements NorthstarTool {
             Add Markdown to the END of an existing note, keeping everything already there \
             ('thêm vào note X ...'). Returns the updated note.""";
 
-    private final NoteService notes;
+    private static final int SEARCH_LIMIT = 8;
 
-    NoteTools(NoteService notes) {
+    private final NoteService notes;
+    private final SearchService search;
+
+    NoteTools(NoteService notes, SearchService search) {
         this.notes = notes;
+        this.search = search;
     }
 
-    @Tool(name = "search_notes", description = SEARCH_NOTES)
-    @McpTool(name = "search_notes", description = SEARCH_NOTES,
+    @Tool(name = "search_knowledge", description = SEARCH_KNOWLEDGE)
+    @McpTool(name = "search_knowledge", description = SEARCH_KNOWLEDGE,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false,
                     openWorldHint = false))
-    List<NoteSummary> searchNotes(
-            @ToolParam(description = "Plain keyword query; quoted \"phrases\" and -exclusions are supported")
-            @McpToolParam(description = "Plain keyword query; quoted \"phrases\" and -exclusions are supported",
+    List<SearchResult> searchKnowledge(
+            @ToolParam(description = "What to look for — plain keywords or a natural-language question, in the note's language where known")
+            @McpToolParam(description = "What to look for — plain keywords or a natural-language question, in the note's language where known",
                     required = true) String query) {
-        return notes.search(query);
+        return search.search(query, SEARCH_LIMIT);
     }
 
     @Tool(name = "get_note", description = GET_NOTE)
@@ -70,7 +79,7 @@ class NoteTools implements NorthstarTool {
                     required = true) String slug) {
         return notes.getBySlug(slug)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "No note with slug '" + slug + "' — find slugs via search_notes."));
+                        "No note with slug '" + slug + "' — find slugs via search_knowledge."));
     }
 
     @Tool(name = "update_note", description = UPDATE_NOTE)
@@ -78,8 +87,8 @@ class NoteTools implements NorthstarTool {
             annotations = @McpTool.McpAnnotations(destructiveHint = false, idempotentHint = true,
                     openWorldHint = false))
     NoteDetail updateNote(
-            @ToolParam(description = "The note's slug, from search_notes/get_note")
-            @McpToolParam(description = "The note's slug, from search_notes/get_note",
+            @ToolParam(description = "The note's slug, from search_knowledge/get_note")
+            @McpToolParam(description = "The note's slug, from search_knowledge/get_note",
                     required = true) String slug,
             @ToolParam(description = "New title; pass '' or omit to keep", required = false)
             @McpToolParam(description = "New title; pass '' or omit to keep", required = false) String title,
@@ -113,8 +122,8 @@ class NoteTools implements NorthstarTool {
     @McpTool(name = "append_to_note", description = APPEND_TO_NOTE,
             annotations = @McpTool.McpAnnotations(destructiveHint = false, openWorldHint = false))
     NoteDetail appendToNote(
-            @ToolParam(description = "The note's slug, from search_notes/get_note")
-            @McpToolParam(description = "The note's slug, from search_notes/get_note",
+            @ToolParam(description = "The note's slug, from search_knowledge/get_note")
+            @McpToolParam(description = "The note's slug, from search_knowledge/get_note",
                     required = true) String slug,
             @ToolParam(description = "Markdown to add at the end of the note body")
             @McpToolParam(description = "Markdown to add at the end of the note body",
@@ -130,7 +139,7 @@ class NoteTools implements NorthstarTool {
     private NoteDetail bySlug(String slug) {
         return notes.getBySlug(slug)
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "No note with slug '" + slug + "' — find slugs via search_notes."));
+                        "No note with slug '" + slug + "' — find slugs via search_knowledge."));
     }
 
     @Tool(name = "create_note", description = CREATE_NOTE)

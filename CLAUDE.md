@@ -76,7 +76,7 @@ showing evidence. Use the MCP tool when connected (primary); else the fallback.
 
 | Gate | Primary (MCP, if connected) | Fallback (always) |
 |---|---|---|
-| **1 · API & static** | verify EVERY unfamiliar symbol via **Context7** before typing it, AND run the JetBrains inspection (`get_file_problems`) per file | `./gradlew compileJava` + `pnpm -C web typecheck` + `./gradlew :core:test` + the mechanical checks in `northstar-static-analysis` |
+| **1 · API & static** | verify EVERY unfamiliar symbol against **the jar/sources in the Gradle cache** (Context7 only for usage patterns) before typing it, AND run the JetBrains inspection (`get_file_problems`) per file | `./gradlew compileJava` + `pnpm -C web typecheck` + `./gradlew :core:test` + the mechanical checks in `northstar-static-analysis` |
 | **2 · Context loads** | *(no MCP substitute)* | `./gradlew --no-daemon clean test` — boots the Spring context, runs Flyway + Testcontainers tests, then EXITS |
 | **3 · Runs / renders** | drive the running app with **Playwright** (SPA) | `/run` and `/verify` skills; or `bootRun` in the background, poll `http://localhost:8888/actuator/health` until UP, drive, then shut down |
 
@@ -123,8 +123,9 @@ would make — generate it, don't draw it.
 
 This stack rides recent majors (Boot 4, Modulith 2, Testcontainers 2, Tailwind 4,
 React 19) where Boot-3 / Tailwind-3 muscle memory is actively wrong. Before typing any
-symbol not already in this repo's `src/`, verify it (Context7 primary; else grep a call
-site or read the jar/`.d.ts`) — and verify it is the **current, non-deprecated** name,
+symbol not already in this repo's `src/`, verify it (the jar/sources in the Gradle
+cache or `node_modules` `.d.ts` are primary; grep a call site; Context7 only for usage
+patterns/snippets) — and verify it is the **current, non-deprecated** name,
 not a shim: a deprecated symbol compiles (with a warning) and hides that it was renamed
 (e.g. `org.testcontainers.containers.PostgreSQLContainer` → `org.testcontainers.postgresql.PostgreSQLContainer`;
 `@MockBean` → `@MockitoBean`). A deprecation warning is a blocker to fix now. Catalogued
@@ -137,7 +138,7 @@ failure modes on this stack:
 
 - **`cannot find symbol` / `package ... does not exist` on a Spring annotation** → it
   moved in Boot 4. E.g. `@EntityScan` is now `org.springframework.boot.persistence.autoconfigure`,
-  and the web starter is `spring-boot-starter-webmvc`. Verify via Context7, do not guess.
+  and the web starter is `spring-boot-starter-webmvc`. Verify in the jar, do not guess.
 - **`ApplicationModules.of(...)` throws `IllegalArgumentException`** → the type must be
   `@Modulithic` / `@Modulith` / `@SpringBootApplication` (see `NorthstarModules`).
 - **`:core:test` fails (verify())** → a `core` module reached into another module's

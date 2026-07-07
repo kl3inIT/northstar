@@ -14,9 +14,16 @@ dependencies {
     // (behavior hints) alongside @Tool, so the SAME definition serves the in-app
     // chat (ChatClient) and the mcp app (published to external agents).
     api("org.springframework.ai:spring-ai-mcp-annotations")
+    // VectorStore/SearchRequest API only — the PgVectorStore bean (and the
+    // embedding model that feeds it) lives in the app (api); elsewhere the
+    // search module degrades to keyword-only via ObjectProvider.
+    api("org.springframework.ai:spring-ai-vector-store")
 
-    // Internal to :core.
-    implementation("org.springframework.modulith:spring-modulith-starter-jpa")
+    // Internal to :core. Event Publication Registry rides JDBC, not JPA: the JPA
+    // flavor maps its own @Entity, which collides with ddl-auto: validate unless
+    // the entity scan and a hand-guessed DDL match Hibernate's naming — the JDBC
+    // flavor has no entity and ships the official Postgres DDL (copied into V15).
+    implementation("org.springframework.modulith:spring-modulith-starter-jdbc")
 
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")
     testImplementation("org.junit.jupiter:junit-jupiter")

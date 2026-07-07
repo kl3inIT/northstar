@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.TextStyle;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -17,12 +18,14 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.content.Media;
 import java.time.Instant;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -53,6 +56,7 @@ class AssistantController {
     private static final String TEXT_PART_ID = "0";
     private static final String DEFAULT_CONVERSATION_ID = "default";
     private static final long TURN_TIMEOUT_MILLIS = 120_000L;
+    private static final int MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
     // Follows the project prompt rubric: role, explicit output language, date
     // injection, tool guidance as behavior (not keyword lists), length anchor.
@@ -101,10 +105,43 @@ class AssistantController {
         response.setHeader(UI_MESSAGE_STREAM_HEADER, "v1");
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform");
 
+        List<Media> images = request.attachments() == null ? List.of()
+                : request.attachments().stream().map(AssistantController::toImage).toList();
+        String message = request.message() == null ? "" : request.message().strip();
+        if (message.isBlank() && images.isEmpty()) {
+            throw new IllegalArgumentException("Send a message, an image, or both.");
+        }
+
         SseEmitter emitter = new SseEmitter(TURN_TIMEOUT_MILLIS);
-        UiMessageStream.pipe(streamTurn(request.message().strip(), conversationId(request.conversationId())),
+        UiMessageStream.pipe(streamTurn(message, images, conversationId(request.conversationId())),
                 emitter, json);
         return emitter;
+    }
+
+    /**
+     * data-URL attachment → Spring AI {@link Media}. Images only: the OpenAI
+     * adapter sends byte[] image media as a data-URL content part the model can
+     * see; other mime types silently degrade to base64 text, so reject them.
+     */
+    private static Media toImage(Attachment attachment) {
+        if (!attachment.mediaType().toLowerCase(Locale.ROOT).startsWith("image/")) {
+            throw new IllegalArgumentException(
+                    "Only image attachments are supported (got " + attachment.mediaType() + ")");
+        }
+        String base64 = attachment.dataUrl().substring(attachment.dataUrl().indexOf(',') + 1);
+        byte[] bytes;
+        try {
+            bytes = Base64.getDecoder().decode(base64);
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("Attachment is not valid base64 image data", e);
+        }
+        if (bytes.length > MAX_IMAGE_BYTES) {
+            throw new IllegalArgumentException("Image too large — keep attachments under 8MB");
+        }
+        return Media.builder()
+                .mimeType(MimeTypeUtils.parseMimeType(attachment.mediaType()))
+                .data(bytes)
+                .build();
     }
 
     /** The stored transcript (user/assistant text only) for rehydrating the UI on load. */
@@ -159,7 +196,7 @@ class AssistantController {
         return stripped.length() <= 80 ? stripped : stripped.substring(0, 77) + "…";
     }
 
-    private Flux<Part> streamTurn(String userMessage, String conversationId) {
+    private Flux<Part> streamTurn(String userMessage, List<Media> images, String conversationId) {
         Sinks.Many<Part> toolEvents = Sinks.many().unicast().onBackpressureBuffer();
         Consumer<Part> emit = toolEvents::tryEmitNext;
 
@@ -168,7 +205,10 @@ class AssistantController {
         Flux<Part> deltas = chat.prompt()
                 .system(SYSTEM_PROMPT.formatted(today,
                         today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH)))
-                .user(userMessage)
+                // An image-only turn still needs a text part — a bare space keeps
+                // the content array valid without smuggling in prompt text.
+                .user(u -> u.text(userMessage.isBlank() ? " " : userMessage)
+                        .media(images.toArray(Media[]::new)))
                 .tools(tools.toArray())
                 .toolContext(Map.of(EventEmittingToolManager.EVENTS_KEY, emit))
                 .advisors(a -> a.param(ChatMemory.CONVERSATION_ID, conversationId))
@@ -194,7 +234,12 @@ class AssistantController {
                 : Stream.of(new HistoryMessage(role, text));
     }
 
-    record ChatRequest(@NotBlank @Size(max = 20_000) String message, String conversationId) {
+    record ChatRequest(@Size(max = 20_000) String message, String conversationId,
+            @Size(max = 3) List<@Valid Attachment> attachments) {
+    }
+
+    /** One pasted/picked image, as the data URL the browser already holds. */
+    record Attachment(@NotBlank String mediaType, @NotBlank @Size(max = 12_000_000) String dataUrl) {
     }
 
     record HistoryMessage(String role, String text) {

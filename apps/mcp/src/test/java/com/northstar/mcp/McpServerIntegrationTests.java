@@ -49,8 +49,8 @@ class McpServerIntegrationTests {
         post(session, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
 
         String tools = post(session, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}").body();
-        assertThat(tools).contains("search_notes", "get_note", "create_note",
-                "today_tasks", "upcoming_tasks", "create_task", "complete_task",
+        assertThat(tools).contains("search_knowledge", "get_note", "create_note",
+                "today_tasks", "upcoming_tasks", "create_task", "set_task_done",
                 "upcoming_events", "create_event", "find_free_slots");
         // MCP behavior hints ride along so clients can gate confirmation UX.
         assertThat(tools).contains("\"readOnlyHint\":true", "\"destructiveHint\":false");

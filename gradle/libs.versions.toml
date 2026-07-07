@@ -24,6 +24,8 @@ springdoc-webmvc = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ap
 spring-ai-client-chat = { module = "org.springframework.ai:spring-ai-client-chat" }
 spring-ai-starter-openai = { module = "org.springframework.ai:spring-ai-starter-model-openai" }
 spring-ai-tool-search-advisor = { module = "org.springframework.ai:spring-ai-tool-search-advisor" }
+spring-ai-vector-store = { module = "org.springframework.ai:spring-ai-vector-store" }
+spring-ai-starter-pgvector = { module = "org.springframework.ai:spring-ai-starter-vector-store-pgvector" }
 lucene-core = { module = "org.apache.lucene:lucene-core", version.ref = "lucene" }
 
 # Convention-plugin build dependencies (used by :build-logic)

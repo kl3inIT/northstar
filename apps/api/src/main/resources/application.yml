@@ -36,12 +36,36 @@ spring:
       # No temperature: gpt-5.5 is a reasoning model and rejects any value but 1.
       chat:
         model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
+      # Embedding config KEPT the `.options` nesting (unlike chat above — verified
+      # in OpenAiEmbeddingProperties). 3-large shortened to 1536 dims (Matryoshka):
+      # best multilingual quality (Vietnamese notes) at a pgvector-indexable width.
+      embedding:
+        options:
+          model: text-embedding-3-large
+          dimensions: 1536
+    vectorstore:
+      pgvector:
+        # Flyway owns the schema (V14) — HNSW + cosine are the defaults.
+        initialize-schema: false
+        dimensions: 1536
     chat:
       memory:
         repository:
           jdbc:
             # Flyway owns the schema (V12) — never let the repository DDL race it.
             initialize-schema: never
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          # Flyway owns event_publication (V15).
+          enabled: false
+      # An embedding job interrupted by a crash/redeploy replays at next start
+      # instead of being lost (the startup backfill is the belt to this brace).
+      republish-outstanding-events-on-restart: true
+      # Completed publications are deleted, not kept — nothing reads the history
+      # and the outbox table stays lean.
+      completion-mode: delete
   servlet:
     multipart:
       # Voice capture uploads; Whisper's own cap is 25MB.
