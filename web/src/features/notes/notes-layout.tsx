@@ -135,7 +135,10 @@ export function NotesLayout() {
             </>
           )}
         </div>
-        <ScrollArea className="flex-1 px-2 pb-2">
+        {/* Radix wraps viewport children in a display:table div that sizes to
+            content — force it to block so the rows honor the pane width and
+            `truncate`/`line-clamp` work instead of overflowing off the right. */}
+        <ScrollArea className="flex-1 px-2 pb-2 [&_[data-slot=scroll-area-viewport]>div]:!block">
           {tab === 'staging' ? (
             <StatusList status="STAGING" activeSlug={params.slug} />
           ) : tab === 'archive' ? (

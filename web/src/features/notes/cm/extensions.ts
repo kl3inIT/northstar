@@ -12,6 +12,7 @@ import {
   keymap,
 } from '@codemirror/view'
 import { headingDecorations } from './heading-decorations'
+import { highlightDecorations } from './highlight-decorations'
 import { taskCheckboxes } from './task-checkbox'
 import { noteEditorTheme } from './theme'
 import { wikiLinkAutocomplete } from './wiki-link-autocomplete'
@@ -56,6 +57,7 @@ export function buildEditorExtensions({
     EditorView.lineWrapping,
     cmPlaceholder(placeholder),
     wikiLinkDecorations,
+    highlightDecorations,
     headingDecorations,
     taskCheckboxes,
     // Cmd/Ctrl+click a [[wiki link]] → open the linked note (like Obsidian).

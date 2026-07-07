@@ -1,5 +1,5 @@
 import { Link, useParams } from '@tanstack/react-router'
-import { Archive, Check, ChevronLeft, Clock, FileText, Info, Link2, Pencil, Undo2 } from 'lucide-react'
+import { Archive, Check, ChevronLeft, Clock, FileText, Info, Link2, List, Pencil, Undo2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { MarkdownBody } from '@/components/markdown-body'
@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { noteOutline } from '@/lib/note-outline'
+import { textStats } from '@/lib/text-stats'
 import { useNote, useSetNoteStatus } from '@/lib/notes-api'
 import type { NoteDetail, NoteRef } from '@/lib/notes-types'
 import { NoteEditor } from './note-editor'
@@ -47,6 +49,7 @@ export function NoteView() {
   }
 
   const crumbs = note.folderPath ? note.folderPath.split('/') : []
+  const stats = textStats(note.contentMarkdown)
 
   return (
     <div className="flex min-w-0 flex-1">
@@ -74,6 +77,11 @@ export function NoteView() {
           <span className="flex items-center gap-1.5">
             <Clock className="size-3.5" /> Updated {formatDate(note.updatedAt)}
           </span>
+          {stats.words > 0 && (
+            <span className="flex items-center gap-1.5">
+              <FileText className="size-3.5" /> {stats.words} words · ~{stats.minutes} min
+            </span>
+          )}
           {note.tags.map((tag) => (
             <Badge key={tag}>#{tag}</Badge>
           ))}
@@ -146,8 +154,34 @@ function StatusBanner({ note }: { note: NoteDetail }) {
 }
 
 function RightPanel({ note }: { note: NoteDetail }) {
+  const outline = noteOutline(note.contentMarkdown)
   return (
     <div className="space-y-6">
+      {outline.length > 1 && (
+        <>
+          <section>
+            <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
+              <List className="size-4 text-muted-foreground" /> Outline
+            </h2>
+            <nav className="space-y-1 text-sm">
+              {outline.map((h) => (
+                <button
+                  key={h.id}
+                  type="button"
+                  onClick={() =>
+                    document.getElementById(h.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                  }
+                  style={{ paddingLeft: `${(h.level - 1) * 0.75}rem` }}
+                  className="block w-full truncate text-left text-muted-foreground hover:text-foreground"
+                >
+                  {h.text}
+                </button>
+              ))}
+            </nav>
+          </section>
+          <Separator />
+        </>
+      )}
       <section>
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold">
           <Link2 className="size-4 text-muted-foreground" /> Backlinks

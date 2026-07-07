@@ -96,6 +96,12 @@
     font-weight: 600;
   }
 
+  /* ==highlight== run. */
+  & .cm-highlight {
+    background: color-mix(in oklch, var(--primary) 20%, transparent);
+    border-radius: 0.25rem;
+  }
+
   /* Interactive task checkbox rendered over the `[ ]` / `[x]` source. */
   & .cm-task-checkbox {
     vertical-align: middle;

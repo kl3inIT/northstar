@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { fileUrl, uploadFile } from '@/lib/files-api'
 import { useNoteIndex, useUpdateNote } from '@/lib/notes-api'
 import type { NoteDetail } from '@/lib/notes-types'
+import { textStats } from '@/lib/text-stats'
 import { NoteCmEditor, type NoteCmEditorHandle } from './cm/note-cm-editor'
 
 function tagsToText(tags: string[]): string {
@@ -38,6 +39,7 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
   const update = useUpdateNote()
   const { data: index } = useNoteIndex()
   const titles = (index ?? []).map((n) => n.title)
+  const stats = textStats(content)
 
   /**
    * Paste or drop files → upload to the attachment vault, insert at the caret:
@@ -153,6 +155,9 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
             </Button>
           </div>
         </div>
+        <p className="text-xs text-muted-foreground">
+          {stats.words} words · ~{stats.minutes} min read
+        </p>
         {update.isError && (
           <p className="text-sm text-destructive">
             {(update.error as { status?: number } | null)?.status === 409

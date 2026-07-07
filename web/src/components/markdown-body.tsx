@@ -3,7 +3,9 @@ import { cjk } from '@streamdown/cjk'
 import { code } from '@streamdown/code'
 import { math } from '@streamdown/math'
 import { mermaid } from '@streamdown/mermaid'
-import { Streamdown } from 'streamdown'
+import rehypeSlug from 'rehype-slug'
+import { defaultRehypePlugins, defaultRemarkPlugins, Streamdown } from 'streamdown'
+import { remarkHighlight } from '@/lib/remark-highlight'
 import type { NoteRef } from '@/lib/notes-types'
 
 const WIKI = /\[\[\s*([^\]|]+?)\s*(?:\|\s*([^\]]*?)\s*)?\]\]/g
@@ -40,11 +42,13 @@ export function MarkdownBody({ content, links }: { content: string; links: NoteR
   const byTitle = new Map(links.map((link) => [link.title.toLowerCase(), link]))
 
   return (
-    <div className="text-[0.95rem] leading-7 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+    <div className="text-[0.95rem] leading-7 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_:is(h1,h2,h3,h4)]:scroll-mt-4">
       <Streamdown
         plugins={plugins}
         parseIncompleteMarkdown={false}
         urlTransform={safeUrl}
+        remarkPlugins={[...Object.values(defaultRemarkPlugins), remarkHighlight]}
+        rehypePlugins={[...Object.values(defaultRehypePlugins), rehypeSlug]}
         components={{
           a({ href, children }) {
             if (href?.startsWith('wiki:')) {
