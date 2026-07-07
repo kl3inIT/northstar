@@ -36,15 +36,27 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
   const navigate = useNavigate()
   const update = useUpdateNote()
 
-  /** Paste or drop an image → upload to the attachment vault, insert ![](…) at the caret. */
-  async function insertImages(files: File[]) {
-    const images = files.filter((f) => f.type.startsWith('image/'))
-    if (images.length === 0) return
+  /**
+   * Paste or drop files → upload to the attachment vault, insert at the caret:
+   * images render inline as ![](…), documents (pdf/docx/…) become [name](…)
+   * links. Uploaded documents are Tika-extracted and embedded by the api, so
+   * search_knowledge finds their content, not just this note's text.
+   */
+  async function insertFiles(files: File[]) {
+    const MAX_BYTES = 25 * 1024 * 1024 // matches the api's multipart cap
+    const oversize = files.filter((f) => f.size > MAX_BYTES)
+    if (oversize.length > 0) {
+      toast.error(`${oversize[0].name} is over the 25MB limit.`)
+    }
+    const uploadable = files.filter((f) => f.size <= MAX_BYTES)
+    if (uploadable.length === 0) return
     try {
       const markdown = await Promise.all(
-        images.map(async (f) => {
-          const meta = await uploadFile(f, f.name || 'image')
-          return `![${meta.filename}](${fileUrl(meta.id)})`
+        uploadable.map(async (f) => {
+          const meta = await uploadFile(f, f.name || 'file')
+          return f.type.startsWith('image/')
+            ? `![${meta.filename}](${fileUrl(meta.id)})`
+            : `[${meta.filename}](${fileUrl(meta.id)})`
         }),
       )
       const el = textareaRef.current
@@ -52,7 +64,7 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
       const inserted = markdown.join('\n')
       setContent((prev) => `${prev.slice(0, at)}${inserted}${prev.slice(at)}`)
     } catch {
-      toast.error('Image upload failed — try again.')
+      toast.error('Upload failed — try again.')
     }
   }
 
@@ -145,19 +157,19 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
           onChange={(e) => setContent(e.target.value)}
           onPaste={(e) => {
             const files = [...e.clipboardData.files]
-            if (files.some((f) => f.type.startsWith('image/'))) {
+            if (files.length > 0) {
               e.preventDefault()
-              insertImages(files)
+              insertFiles(files)
             }
           }}
           onDrop={(e) => {
             const files = [...e.dataTransfer.files]
-            if (files.some((f) => f.type.startsWith('image/'))) {
+            if (files.length > 0) {
               e.preventDefault()
-              insertImages(files)
+              insertFiles(files)
             }
           }}
-          placeholder="Write in Markdown. Link notes with [[Title]]. Paste images to attach them."
+          placeholder="Write in Markdown. Link notes with [[Title]]. Paste or drop images and files (PDF, DOCX…) to attach them."
           className="min-h-0 resize-none rounded-none border-0 px-4 py-6 md:px-10 md:py-8 font-mono text-sm leading-relaxed shadow-none focus-visible:ring-0"
         />
         <div className="min-h-0 overflow-auto px-4 py-6 md:px-10 md:py-8">
