@@ -1,0 +1,39 @@
+# Northstar Conventions
+
+## Code
+
+- Keep business logic in `core` modules first; expose it through `apps/api`,
+  `apps/mcp`, or `apps/worker` as thin delivery adapters.
+- Cross-module calls go through public module APIs or events, not another
+  module's internals.
+- Java package root is `com.northstar`.
+- App classes are explicitly named `NorthstarApiApplication`,
+  `NorthstarMcpApplication`, and `NorthstarWorkerApplication`.
+- Prefer existing local helpers and module patterns before adding new
+  abstractions.
+
+## Schema
+
+- Add Flyway migrations in `core/src/main/resources/db/migration`.
+- Keep JPA mappings and migrations in lockstep; `ddl-auto: validate` must pass.
+- The API owns production migrations. MCP and worker validate the migrated
+  schema.
+
+## Client Contract
+
+- Do not edit generated client files by hand.
+- Change the API contract at the backend, regenerate `contracts/openapi.json`,
+  then run `pnpm -C web gen:api`.
+- `web/src/lib/api.gen.d.ts` is generated.
+
+## Frontend
+
+- Use the existing Vite, React 19, Tailwind v4, shadcn/ui, TanStack Router, and
+  TanStack Query patterns.
+- Run `pnpm -C web typecheck`; Vite/esbuild does not typecheck by itself.
+
+## Commits
+
+- Keep changes scoped to the requested behavior.
+- Do not include unrelated generated or cleanup churn.
+- Mention verification evidence in completion reports.

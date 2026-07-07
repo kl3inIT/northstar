@@ -10,7 +10,7 @@
 #     -f docker/docker-compose.yml \
 #     --env-file .env up -d
 #
-# One-time server bootstrap (see docs/ops/DEPLOY.md):
+# One-time server bootstrap:
 #   docker network create northstar-proxy
 #   docker network create northstar-internal
 #   docker network connect northstar-proxy nginx-proxy-manager
