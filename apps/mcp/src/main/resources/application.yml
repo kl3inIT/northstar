@@ -36,3 +36,18 @@ spring:
 
 server:
   port: ${NORTHSTAR_MCP_PORT:8081}
+
+# Abuse guard for the PUBLIC, no-auth MCP endpoint (/mcp). Two-layer request-rate
+# limit (global + per client IP, IP taken from X-Forwarded-For behind NPM) plus a
+# request-body cap; every call is logged for audit. Defaults mirror jmix-mcp-docs.
+# Tune here or set enabled=false to turn it off.
+northstar:
+  mcp:
+    rate-limit:
+      enabled: true
+      global-capacity: 800
+      global-window: 1m
+      ip-capacity: 300
+      ip-window: 1h
+      max-body-bytes: 262144
+      max-tracked-ips: 50000
