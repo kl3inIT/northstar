@@ -17,14 +17,18 @@ import org.springframework.stereotype.Component;
 class NoteTools implements NorthstarTool {
 
     private static final String SEARCH_KNOWLEDGE = """
-            Search the user's personal knowledge base (study notes for IELTS/HSK, \
-            scholarship research, project notes, journal). Hybrid retrieval: exact \
-            keywords AND meaning both match, so a paraphrased question ("cách viết mở \
-            bài IELTS") finds notes that never contain those words. Returns title, slug \
-            and a snippet per hit, best first. Use this BEFORE answering questions about \
-            the user's studies, plans or previously saved knowledge; read a promising \
-            hit in full with get_note. If results look off, retry once with different \
-            phrasing before concluding the note does not exist.""";
+            Search the user's personal knowledge base AND uploaded files (study notes \
+            for IELTS/HSK, scholarship research, project notes, journal, plus PDFs, \
+            documents and images they saved). Hybrid retrieval: exact keywords AND \
+            meaning both match, so a paraphrased question ("cách viết mở bài IELTS") \
+            finds notes that never contain those words. Each hit has source ('note' or \
+            'file'), title, url, snippet, and for notes a slug. Use this BEFORE \
+            answering questions about the user's studies, plans or previously saved \
+            knowledge. Read a promising note hit in full with get_note (its slug); \
+            file hits cannot be opened with get_note — use their snippet. When your \
+            answer draws on a hit, cite it inline as a markdown link: [title](url). \
+            If results look off, retry once with different phrasing before concluding \
+            the source does not exist.""";
 
     private static final String GET_NOTE = """
             Read one note in full (Markdown body, tags, outgoing links and backlinks) \

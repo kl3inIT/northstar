@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type FileUIPart, type ToolUIPart, type UIMessage } from 'ai'
 import {
@@ -52,6 +53,31 @@ import { cn } from '@/lib/utils'
  * speaks the AI SDK UI Message Stream the api emits; conversations are
  * durable (JDBC memory) and /history rehydrates on switch.
  */
+
+/**
+ * Citation links from search_knowledge: an in-app note link rides the router
+ * (same tab, no Streamdown link-safety modal); file downloads and external
+ * URLs open a new tab. Overriding `a` replaces Streamdown's dialog-wrapped
+ * link component entirely.
+ */
+const CITATION_LINK = 'font-medium text-primary underline underline-offset-2 hover:no-underline'
+
+const CHAT_MARKDOWN_COMPONENTS = {
+  a: ({ href, children }: { href?: string; children?: ReactNode }) => {
+    if (href?.startsWith('/notes/')) {
+      return (
+        <Link to="/notes/$slug" params={{ slug: href.slice('/notes/'.length) }} className={CITATION_LINK}>
+          {children}
+        </Link>
+      )
+    }
+    return (
+      <a href={href} target="_blank" rel="noreferrer" className={CITATION_LINK}>
+        {children}
+      </a>
+    )
+  },
+}
 
 /** Kills the InputGroup chrome: zeromail's input is a soft pill, no border, no ring. */
 const PILL_INPUT =
@@ -469,7 +495,11 @@ function AssistantChat({
               <MessageContent>
                 {m.parts.map((part, i) => {
                   if (part.type === 'text') {
-                    return <MessageResponse key={i}>{part.text}</MessageResponse>
+                    return (
+                      <MessageResponse key={i} components={CHAT_MARKDOWN_COMPONENTS}>
+                        {part.text}
+                      </MessageResponse>
+                    )
                   }
                   if (part.type === 'file' && (part as FileUIPart).mediaType?.startsWith('image/')) {
                     const file = part as FileUIPart

@@ -3,8 +3,10 @@ package com.northstar.core.attachment;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,9 +22,11 @@ public class AttachmentService {
     public static final int MAX_BYTES = 25 * 1024 * 1024;
 
     private final AttachmentRepository attachments;
+    private final ApplicationEventPublisher events;
 
-    AttachmentService(AttachmentRepository attachments) {
+    AttachmentService(AttachmentRepository attachments, ApplicationEventPublisher events) {
         this.attachments = attachments;
+        this.events = events;
     }
 
     /** Stores the file, or returns the existing row when these exact bytes are already kept. */
@@ -39,8 +43,18 @@ public class AttachmentService {
         String hash = sha256(data);
         return attachments.findBySha256(hash)
                 .map(this::view)
-                .orElseGet(() -> view(attachments.save(
-                        new Attachment(UUID.randomUUID(), cleanName, cleanMime, hash, data))));
+                .orElseGet(() -> {
+                    AttachmentView saved = view(attachments.save(
+                            new Attachment(UUID.randomUUID(), cleanName, cleanMime, hash, data)));
+                    events.publishEvent(new AttachmentStored(saved.id()));
+                    return saved;
+                });
+    }
+
+    /** Every attachment id — the search backfill's scan; bytes stay in the database. */
+    @Transactional(readOnly = true)
+    public List<UUID> listIds() {
+        return attachments.findAllIds();
     }
 
     @Transactional(readOnly = true)

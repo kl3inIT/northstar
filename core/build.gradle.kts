@@ -19,6 +19,10 @@ dependencies {
     // search module degrades to keyword-only via ObjectProvider.
     api("org.springframework.ai:spring-ai-vector-store")
 
+    // Internal to :core — text extraction for attachment ETL (pdf/docx/pptx/html);
+    // the search module reads uploaded bytes through it before embedding.
+    implementation("org.springframework.ai:spring-ai-tika-document-reader")
+
     // Internal to :core. Event Publication Registry rides JDBC, not JPA: the JPA
     // flavor maps its own @Entity, which collides with ddl-auto: validate unless
     // the entity scan and a hand-guessed DDL match Hibernate's naming — the JDBC
