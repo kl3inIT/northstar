@@ -39,6 +39,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { MicButton } from '@/components/mic-button'
+import { fileUrl, uploadFile } from '@/lib/files-api'
 import { useStagingCount } from '@/lib/notes-api'
 import { useTodayTasks } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
@@ -369,24 +370,33 @@ function AssistantChat({
           .filter((p) => p.type === 'text')
           .map((p) => (p as { text: string }).text)
           .join('')
-        // Image parts ride along as data URLs; the api turns them into
-        // vision content parts for the current turn only.
-        const attachments = (last?.parts ?? [])
+        // Image parts point at stored files (/api/files/{id}, uploaded on
+        // submit); the api loads the bytes for the model and keeps markdown
+        // markers in memory so history re-renders them.
+        const attachmentIds = (last?.parts ?? [])
           .filter((p): p is FileUIPart => p.type === 'file')
-          .map((p) => ({ mediaType: p.mediaType, dataUrl: p.url }))
-        return { body: { message: text, conversationId, attachments } }
+          .map((p) => p.url.split('/').pop())
+          .filter(Boolean)
+        return { body: { message: text, conversationId, attachmentIds } }
       },
     }),
   })
 
   const [text, setText] = useState('')
 
-  function onSubmit(message: PromptInputMessage) {
+  async function onSubmit(message: PromptInputMessage) {
     const trimmed = message.text.trim()
     const images = message.files.filter((f) => f.mediaType?.startsWith('image/'))
     if (!trimmed && images.length === 0) return
+    let uploaded: FileUIPart[] = []
+    try {
+      uploaded = await Promise.all(images.map(uploadImage))
+    } catch {
+      toast.error('Image upload failed — try again.')
+      throw new Error('upload failed') // keeps the composer content for retry
+    }
     setText('')
-    sendMessage({ text: trimmed, files: images })
+    sendMessage({ text: trimmed, files: uploaded })
   }
 
   const input = (
@@ -502,6 +512,16 @@ function AssistantChat({
       <div className="mx-auto w-full max-w-3xl px-4 pb-6">{input}</div>
     </div>
   )
+}
+
+/**
+ * Stores one composer image in the attachment vault (V16) and rewrites its
+ * part to the durable /api/files URL the api and history both understand.
+ */
+async function uploadImage(file: FileUIPart): Promise<FileUIPart> {
+  const blob = await fetch(file.url).then((r) => r.blob())
+  const meta = await uploadFile(blob, file.filename ?? 'image')
+  return { ...file, url: fileUrl(meta.id) }
 }
 
 /** Paperclip in the composer footer — opens the image picker (paste and drop also work). */
