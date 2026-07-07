@@ -19,3 +19,14 @@ spring:
     open-in-view: false
   flyway:
     enabled: false
+  modulith:
+    events:
+      jdbc:
+        schema-initialization:
+          enabled: false
+      # Pinned false (the default) as an invariant: the worker shares the api's
+      # event_publication table but lacks the api's AI beans (vector store,
+      # chat model), so replaying the api's incomplete backlog here would
+      # complete those publications as no-ops — a note would silently never be
+      # embedded. Only the api republishes its own backlog.
+      republish-outstanding-events-on-restart: false

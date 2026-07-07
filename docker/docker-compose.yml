@@ -1,4 +1,4 @@
-# Northstar — application services (api, web; mcp behind a profile).
+# Northstar — application services (api, web, worker; mcp behind a profile).
 #
 #   docker compose \
 #     -f docker/docker-compose.infra.yml \
@@ -7,10 +7,6 @@
 #
 # Image vars are overridden by the deploy workflow with versioned/rollback
 # refs; left empty they fall back to locally-built :latest tags.
-#
-# The worker app is deliberately ABSENT: it is still an empty shell (no
-# scheduled jobs, no event listeners). Add a `worker` service mirroring `api`
-# when the first async job lands.
 name: northstar
 
 x-logging: &default-logging
@@ -91,6 +87,34 @@ services:
       interval: 30s
       timeout: 10s
       start_period: 90s
+      retries: 3
+    logging: *default-logging
+
+  # Background worker: no HTTP surface, internal network only. Consumes its
+  # own Modulith events / scheduled jobs against the same database; the api
+  # keeps its own event backlog (see worker application.yml re: republish).
+  worker:
+    build:
+      context: ..
+      dockerfile: apps/worker/Dockerfile
+    image: ${NORTHSTAR_WORKER_IMAGE:-northstar-worker:latest}
+    container_name: northstar-worker
+    restart: unless-stopped
+    env_file: ../.env
+    environment:
+      NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
+      NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
+      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
+    mem_limit: 512m
+    mem_reservation: 256m
+    memswap_limit: 512m
+    networks:
+      - northstar-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f org.springframework.boot.loader.launch.JarLauncher || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
       retries: 3
     logging: *default-logging
 

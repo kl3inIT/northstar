@@ -74,7 +74,7 @@ jobs:
 
           echo "::group::Snapshot previous image digests for rollback"
           : > .last-deploy.txt
-          for c in northstar-api northstar-web northstar-mcp; do
+          for c in northstar-api northstar-web northstar-mcp northstar-worker; do
             docker inspect --format="$c {{index .Image}}" "$c" 2>/dev/null | tee -a .last-deploy.txt || true
           done
           echo "::endgroup::"
@@ -82,12 +82,13 @@ jobs:
           export NORTHSTAR_API_IMAGE="ghcr.io/${OWNER}/northstar-api:${DEPLOY_TAG}"
           export NORTHSTAR_WEB_IMAGE="ghcr.io/${OWNER}/northstar-web:${DEPLOY_TAG}"
           export NORTHSTAR_MCP_IMAGE="ghcr.io/${OWNER}/northstar-mcp:${DEPLOY_TAG}"
+          export NORTHSTAR_WORKER_IMAGE="ghcr.io/${OWNER}/northstar-worker:${DEPLOY_TAG}"
 
           echo "::group::Pull and recreate"
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-            --env-file .env pull api web
+            --env-file .env pull api web worker
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-            --env-file .env up -d --no-build api web
+            --env-file .env up -d --no-build api web worker
           echo "::endgroup::"
 
           echo "::group::Wait for api readiness"
@@ -98,6 +99,21 @@ jobs:
             if [[ $attempt -eq 60 ]]; then
               echo "::error::api failed readiness within 120s"
               docker compose -f docker/docker-compose.yml logs --tail=200 api web
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "::endgroup::"
+
+          echo "::group::Wait for worker liveness"
+          # No HTTP surface — healthy means the container's pgrep healthcheck
+          # passes (start_period 60s, so give it a couple of minutes).
+          for attempt in {1..60}; do
+            state=$(docker inspect --format '{{.State.Health.Status}}' northstar-worker 2>/dev/null || echo missing)
+            if [[ "$state" == "healthy" ]]; then echo "worker healthy"; break; fi
+            if [[ $attempt -eq 60 ]]; then
+              echo "::error::worker not healthy within 120s (state=$state)"
+              docker compose -f docker/docker-compose.yml logs --tail=100 worker
               exit 1
             fi
             sleep 2
@@ -141,15 +157,19 @@ jobs:
           fi
           prev_api=$(awk '/^northstar-api /{print $2}' .last-deploy.txt)
           prev_web=$(awk '/^northstar-web /{print $2}' .last-deploy.txt)
+          prev_worker=$(awk '/^northstar-worker /{print $2}' .last-deploy.txt)
           if [[ -z "${prev_api}${prev_web}" ]]; then
             echo "::error::Snapshot holds no image IDs — manual intervention required."
             exit 1
           fi
-          echo "::warning::Deploy failed — rolling back (api=${prev_api} web=${prev_web})"
+          echo "::warning::Deploy failed — rolling back (api=${prev_api} web=${prev_web} worker=${prev_worker:-none})"
+          # First worker deploy has no previous image; roll api+web back and
+          # leave the new worker in place (it is additive, not on the request path).
           NORTHSTAR_API_IMAGE="${prev_api}" \
           NORTHSTAR_WEB_IMAGE="${prev_web}" \
+          NORTHSTAR_WORKER_IMAGE="${prev_worker:-ghcr.io/kl3init/northstar-worker:main}" \
             docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-              --env-file .env up -d --no-build api web
+              --env-file .env up -d --no-build api web worker
           docker exec nginx-proxy-manager nginx -s reload >/dev/null 2>&1 || true
           for attempt in {1..60}; do
             if docker exec northstar-api curl -fsS http://localhost:8888/actuator/health >/dev/null 2>&1; then
