@@ -34,6 +34,9 @@ interface TaskRepository extends JpaRepository<Task, UUID> {
     List<Task> findByStatusAndDisciplineIdOrderByDueDateAscDueTimeAscCreatedAtAsc(
             TaskStatus status, UUID disciplineId);
 
+    /** All tasks linked to one discipline, regardless of status. */
+    long countByDisciplineId(UUID disciplineId);
+
     /** Every task of one project — the project's agenda. */
     List<Task> findByProjectIdOrderByDueDateAscDueTimeAscCreatedAtAsc(UUID projectId);
 }

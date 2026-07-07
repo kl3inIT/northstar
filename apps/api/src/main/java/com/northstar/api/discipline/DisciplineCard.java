@@ -8,5 +8,8 @@ record DisciplineCard(
         @NotNull DisciplineSummary discipline,
         long openTasks,
         long upcomingEvents,
-        long notes) {
+        long notes,
+        long projects,
+        long linkedTasks,
+        long linkedEvents) {
 }

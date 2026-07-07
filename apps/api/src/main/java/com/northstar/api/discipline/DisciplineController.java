@@ -19,6 +19,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -78,6 +80,19 @@ class DisciplineController {
         return disciplines.update(id, request.name(), request.color());
     }
 
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void delete(@PathVariable UUID id) {
+        DisciplineSummary discipline = disciplines.find(id);
+        DeletionGuard guard = deletionGuard(id);
+        if (!guard.empty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Move or delete linked work before deleting discipline \"%s\": %s projects, %s tasks, %s events"
+                            .formatted(discipline.name(), guard.projects(), guard.tasks(), guard.events()));
+        }
+        disciplines.delete(id);
+    }
+
     /** The /disciplines grid: every discipline with its live counts. */
     @GetMapping("/cards")
     List<DisciplineCard> cards(@RequestHeader(name = "X-Timezone", required = false) String tz) {
@@ -86,10 +101,16 @@ class DisciplineController {
                 .filter(e -> e.disciplineId() != null)
                 .collect(Collectors.groupingBy(CalendarEventSummary::disciplineId, Collectors.counting()));
         return disciplines.list().stream()
-                .map(d -> new DisciplineCard(d,
-                        tasks.openByDiscipline(d.id()).size(),
-                        eventCounts.getOrDefault(d.id(), 0L),
-                        noteCount(d.name())))
+                .map(d -> {
+                    DeletionGuard guard = deletionGuard(d.id());
+                    return new DisciplineCard(d,
+                            tasks.openByDiscipline(d.id()).size(),
+                            eventCounts.getOrDefault(d.id(), 0L),
+                            noteCount(d.name()),
+                            guard.projects(),
+                            guard.tasks(),
+                            guard.events());
+                })
                 .toList();
     }
 
@@ -113,6 +134,13 @@ class DisciplineController {
         return notes.listByAnyTag(nameTokens(disciplineName), PageRequest.of(0, 1)).getTotalElements();
     }
 
+    private DeletionGuard deletionGuard(UUID disciplineId) {
+        return new DeletionGuard(
+                projects.countByDiscipline(disciplineId),
+                tasks.countByDiscipline(disciplineId),
+                events.countByDiscipline(disciplineId));
+    }
+
     /**
      * The MFI tag bridge: a note belongs to a discipline when it carries one of
      * the discipline name's words as a tag ("English · IELTS" → english, ielts).
@@ -127,6 +155,12 @@ class DisciplineController {
             return tz == null ? ZoneId.systemDefault() : ZoneId.of(tz);
         } catch (Exception e) {
             return ZoneId.systemDefault();
+        }
+    }
+
+    private record DeletionGuard(long projects, long tasks, long events) {
+        boolean empty() {
+            return projects == 0 && tasks == 0 && events == 0;
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.northstar.api;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -69,5 +70,40 @@ class ApiErrorContractTests {
                         .content("{\"title\":\"Conflict probe\",\"contentMarkdown\":\"v2\",\"version\":99}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409));
+    }
+
+    @Test
+    void emptyDisciplineCanBeDeleted() throws Exception {
+        String created = mvc.perform(post("/api/disciplines")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Delete probe\",\"color\":\"GRAY\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String disciplineId = JsonPath.read(created, "$.id");
+
+        mvc.perform(delete("/api/disciplines/{id}", disciplineId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void disciplineWithLinkedWorkRendersConflictProblem() throws Exception {
+        String created = mvc.perform(post("/api/disciplines")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Busy discipline\",\"color\":\"BLUE\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String disciplineId = JsonPath.read(created, "$.id");
+
+        mvc.perform(post("/api/projects")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Linked project","disciplineId":"%s"}
+                                """.formatted(disciplineId)))
+                .andExpect(status().isCreated());
+
+        mvc.perform(delete("/api/disciplines/{id}", disciplineId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.detail", containsString("Move or delete linked work")));
     }
 }

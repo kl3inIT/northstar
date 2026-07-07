@@ -72,6 +72,13 @@ async function updateDiscipline(id: string, body: DisciplineInput): Promise<Disc
   return data as Discipline
 }
 
+async function deleteDiscipline(id: string): Promise<void> {
+  const { error } = await api.DELETE('/api/disciplines/{id}', {
+    params: { path: { id } },
+  })
+  if (error) throw error
+}
+
 function useInvalidateDisciplines() {
   const queryClient = useQueryClient()
   return () => {
@@ -92,4 +99,9 @@ export function useUpdateDiscipline() {
     mutationFn: ({ id, ...body }: DisciplineInput & { id: string }) => updateDiscipline(id, body),
     onSuccess: invalidate,
   })
+}
+
+export function useDeleteDiscipline() {
+  const invalidate = useInvalidateDisciplines()
+  return useMutation({ mutationFn: deleteDiscipline, onSuccess: invalidate })
 }

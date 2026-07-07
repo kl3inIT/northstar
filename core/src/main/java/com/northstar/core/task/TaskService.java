@@ -158,6 +158,12 @@ public class TaskService {
                 .stream().map(this::summary).toList();
     }
 
+    /** All tasks linked to one discipline, including completed tasks. */
+    @Transactional(readOnly = true)
+    public long countByDiscipline(UUID disciplineId) {
+        return tasks.countByDisciplineId(disciplineId);
+    }
+
     /** Every task of one project (open first is the caller's concern) — the project's agenda. */
     @Transactional(readOnly = true)
     public List<TaskSummary> byProject(UUID projectId) {

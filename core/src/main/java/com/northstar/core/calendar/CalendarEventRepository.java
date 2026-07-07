@@ -13,4 +13,7 @@ interface CalendarEventRepository extends JpaRepository<CalendarEvent, UUID> {
 
     /** Recurring masters whose series has started before the window's end — expanded in code. */
     List<CalendarEvent> findByRruleIsNotNullAndStartAtLessThan(Instant to);
+
+    /** Master rows linked to one discipline, including recurring series. */
+    long countByDisciplineId(UUID disciplineId);
 }

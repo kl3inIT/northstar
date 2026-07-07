@@ -8,8 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The discipline module's public API — the LDP spine other modules FK to.
- * Deliberately minimal for now: list for pickers, create for setup, and an
- * existence check so referencing modules can validate a discipline id.
+ * Referencing modules validate against this API, while delete safety is
+ * composed by delivery/tool layers that can inspect those references.
  */
 @Service
 public class DisciplineService {
@@ -43,6 +43,14 @@ public class DisciplineService {
                 .orElseThrow(() -> new DisciplineNotFoundException(id));
         discipline.edit(name.strip(), color);
         return summary(discipline);
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        if (!disciplines.existsById(id)) {
+            throw new DisciplineNotFoundException(id);
+        }
+        disciplines.deleteById(id);
     }
 
     /** Existence check for modules that FK to a discipline. */

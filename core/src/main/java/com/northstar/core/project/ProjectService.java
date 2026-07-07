@@ -34,6 +34,11 @@ public class ProjectService {
     }
 
     @Transactional(readOnly = true)
+    public long countByDiscipline(UUID disciplineId) {
+        return projects.countByDisciplineId(disciplineId);
+    }
+
+    @Transactional(readOnly = true)
     public ProjectSummary find(UUID id) {
         return summary(get(id));
     }

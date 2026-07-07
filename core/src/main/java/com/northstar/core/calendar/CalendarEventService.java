@@ -101,6 +101,12 @@ public class CalendarEventService {
         return summary(events.findById(id).orElseThrow(() -> new CalendarEventNotFoundException(id)));
     }
 
+    /** Master rows linked to one discipline, including recurring series. */
+    @Transactional(readOnly = true)
+    public long countByDiscipline(UUID disciplineId) {
+        return events.countByDisciplineId(disciplineId);
+    }
+
     @Transactional
     public CalendarEventSummary create(String title, String notes, Instant startAt, Instant endAt,
             boolean allDay, ColorName color, UUID disciplineId, String rrule) {

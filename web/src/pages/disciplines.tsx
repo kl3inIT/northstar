@@ -4,8 +4,10 @@ import {
   CalendarDays,
   CheckSquare,
   FileText,
+  FolderKanban,
   Pencil,
   Plus,
+  Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -13,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -28,10 +31,12 @@ import {
 } from '@/components/ui/select'
 import {
   useCreateDiscipline,
+  useDeleteDiscipline,
   useDisciplineCards,
   useDisciplineOverview,
   useUpdateDiscipline,
   type Discipline,
+  type DisciplineCard,
   type DisciplineInput,
 } from '@/lib/disciplines-api'
 import { DISCIPLINE_DOT as DOT, DISCIPLINE_COLORS } from '@/lib/discipline-colors'
@@ -53,6 +58,7 @@ function formatTime(isoInstant: string): string {
 export function DisciplinesPage() {
   const { data: cards = [], isLoading } = useDisciplineCards()
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState<DisciplineCard | null>(null)
   const navigate = useNavigate()
 
   return (
@@ -71,30 +77,12 @@ export function DisciplinesPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => (
-          <button
+          <DisciplineCardItem
             key={card.discipline.id}
-            type="button"
-            onClick={() =>
-              navigate({ to: '/disciplines/$id', params: { id: card.discipline.id } })
-            }
-            className="rounded-xl border p-5 text-left transition-colors hover:bg-accent/50"
-          >
-            <div className="flex items-center gap-2.5">
-              <span className={cn('size-3 shrink-0 rounded-full', DOT[card.discipline.color])} />
-              <span className="truncate text-base font-semibold">{card.discipline.name}</span>
-            </div>
-            <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <CheckSquare className="size-3.5" /> {card.openTasks} open
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <CalendarDays className="size-3.5" /> {card.upcomingEvents} this week
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <FileText className="size-3.5" /> {card.notes} notes
-              </span>
-            </div>
-          </button>
+            card={card}
+            onOpen={() => navigate({ to: '/disciplines/$id', params: { id: card.discipline.id } })}
+            onDelete={() => setDeleting(card)}
+          />
         ))}
         {!isLoading && cards.length === 0 && (
           <p className="col-span-full py-10 text-center text-sm text-muted-foreground">
@@ -104,6 +92,62 @@ export function DisciplinesPage() {
       </div>
 
       {creating && <DisciplineDialog open onClose={() => setCreating(false)} />}
+      {deleting && (
+        <DeleteDisciplineDialog
+          card={deleting}
+          onClose={() => setDeleting(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function DisciplineCardItem({
+  card,
+  onOpen,
+  onDelete,
+}: {
+  card: DisciplineCard
+  onOpen: () => void
+  onDelete: () => void
+}) {
+  const blocked = linkedWorkCount(card) > 0
+  return (
+    <div className="rounded-xl border p-5 transition-colors hover:bg-accent/50">
+      <div className="flex items-start gap-3">
+        <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
+          <div className="flex items-center gap-2.5">
+            <span className={cn('size-3 shrink-0 rounded-full', DOT[card.discipline.color])} />
+            <span className="truncate text-base font-semibold">{card.discipline.name}</span>
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <FolderKanban className="size-3.5" /> {card.projects ?? 0} projects
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckSquare className="size-3.5" /> {card.openTasks} open
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="size-3.5" /> {card.upcomingEvents} this week
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <FileText className="size-3.5" /> {card.notes} notes
+            </span>
+          </div>
+        </button>
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          disabled={blocked}
+          className="text-muted-foreground hover:text-destructive"
+          aria-label={`Delete ${card.discipline.name}`}
+          title={blocked ? deleteBlockedTitle(card) : `Delete ${card.discipline.name}`}
+          onClick={onDelete}
+        >
+          <Trash2 className="size-4" />
+        </Button>
+      </div>
     </div>
   )
 }
@@ -113,6 +157,8 @@ export function DisciplinePage() {
   const { id } = useParams({ from: '/disciplines/$id' })
   const { data: overview, isLoading } = useDisciplineOverview(id)
   const [editing, setEditing] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const navigate = useNavigate()
 
   if (isLoading || !overview) {
     return <div className="w-full flex-1 px-4 py-6 md:px-10 md:py-8" />
@@ -138,6 +184,16 @@ export function DisciplinePage() {
           onClick={() => setEditing(true)}
         >
           <Pencil className="size-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-8 text-muted-foreground hover:text-destructive"
+          aria-label="Delete discipline"
+          title="Delete discipline"
+          onClick={() => setDeleting(true)}
+        >
+          <Trash2 className="size-4" />
         </Button>
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
@@ -232,6 +288,13 @@ export function DisciplinePage() {
           open
           onClose={() => setEditing(false)}
           existing={{ id: d.id, name: d.name, color: d.color }}
+        />
+      )}
+      {deleting && (
+        <DeleteDisciplineDialog
+          target={{ discipline: { id: d.id, name: d.name, color: d.color } }}
+          onClose={() => setDeleting(false)}
+          onDeleted={() => navigate({ to: '/disciplines' })}
         />
       )}
     </div>
@@ -335,4 +398,81 @@ function DisciplineDialog({
       </DialogContent>
     </Dialog>
   )
+}
+
+function DeleteDisciplineDialog({
+  card,
+  target,
+  onClose,
+  onDeleted,
+}: {
+  card?: DisciplineCard
+  target?: DisciplineDeleteTarget
+  onClose: () => void
+  onDeleted?: () => void
+}) {
+  const remove = useDeleteDiscipline()
+  const discipline = card?.discipline ?? target?.discipline
+  const blocked = card ? linkedWorkCount(card) > 0 : false
+
+  if (!discipline) return null
+  const selected = discipline
+
+  function submit() {
+    if (blocked) return
+    remove
+      .mutateAsync(selected.id)
+      .then(() => {
+        toast.success(`Deleted "${selected.name}"`)
+        onDeleted?.()
+        onClose()
+      })
+      .catch(() => toast.error('Delete failed — move linked projects, tasks or events first.'))
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Delete discipline?</DialogTitle>
+          <DialogDescription>
+            This permanently removes "{discipline.name}". Notes with matching tags are kept.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+          {card ? (
+            blocked ? (
+              <p>{deleteBlockedTitle(card)}</p>
+            ) : (
+              <p>No linked projects, tasks or events were found for this discipline.</p>
+            )
+          ) : (
+            <p>
+              If projects, tasks or events are still linked, the server will refuse this delete.
+            </p>
+          )}
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="destructive" onClick={submit} disabled={blocked || remove.isPending}>
+            <Trash2 className="size-4" /> Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+type DisciplineDeleteTarget = {
+  discipline: Discipline
+}
+
+function linkedWorkCount(card: DisciplineCard): number {
+  return (card.projects ?? 0) + (card.linkedTasks ?? 0) + (card.linkedEvents ?? 0)
+}
+
+function deleteBlockedTitle(card: DisciplineCard): string {
+  return `Move or delete linked work first: ${card.projects ?? 0} projects, ${card.linkedTasks ?? 0} tasks, ${card.linkedEvents ?? 0} events`
 }
