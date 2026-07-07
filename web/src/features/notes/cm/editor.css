@@ -96,6 +96,14 @@
     font-weight: 600;
   }
 
+  /* Interactive task checkbox rendered over the `[ ]` / `[x]` source. */
+  & .cm-task-checkbox {
+    vertical-align: middle;
+    margin: 0 0.15rem;
+    cursor: pointer;
+    accent-color: var(--primary);
+  }
+
   /* [[wiki link]] chip — matches the reading view's resolved-link pill. */
   & .cm-wikilink {
     color: var(--primary);
