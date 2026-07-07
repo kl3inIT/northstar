@@ -24,6 +24,9 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
     /** One working-state tab (Staging / Resources / Archive). */
     Page<Note> findByStatus(NoteStatus status, Pageable pageable);
 
+    /** Every note in one exact folder — small, curated folders (assistant memory). */
+    List<Note> findByFolderPathOrderByTitleAsc(String folderPath);
+
     /** Notes carrying ANY of the tags, one working state excluded. */
     @Query("""
             SELECT DISTINCT n FROM Note n JOIN n.tags t

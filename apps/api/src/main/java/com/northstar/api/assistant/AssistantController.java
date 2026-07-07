@@ -1,5 +1,6 @@
 package com.northstar.api.assistant;
 
+import com.northstar.core.assistant.MemoryTools;
 import com.northstar.core.assistant.NorthstarTool;
 import com.northstar.core.attachment.AttachmentContent;
 import com.northstar.core.attachment.AttachmentService;
@@ -72,6 +73,9 @@ class AssistantController {
             - Ground every answer about the user's plans, studies or knowledge in tool
               results — call the tools instead of guessing; search notes before claiming
               something is not written down.
+            - When an answer draws on search_knowledge results, cite each source used
+              inline as a markdown link — [title](url) with the hit's url — so the user
+              can open the note or file you are quoting.
             - Resolve relative dates ("tomorrow", "thứ 6") yourself before calling a tool.
             - Before booking an event, check the calendar for that day (upcoming_events
               or find_free_slots) and mention a conflict instead of double-booking.
@@ -92,16 +96,18 @@ class AssistantController {
     private final ObjectMapper json;
     private final JdbcClient jdbc;
     private final AttachmentService attachments;
+    private final MemoryTools longTermMemory;
 
     AssistantController(@Qualifier(AssistantConfig.ASSISTANT_CHAT_CLIENT) ChatClient chat,
             ChatMemory memory, List<NorthstarTool> tools, ObjectMapper json, JdbcClient jdbc,
-            AttachmentService attachments) {
+            AttachmentService attachments, MemoryTools longTermMemory) {
         this.chat = chat;
         this.memory = memory;
         this.tools = tools;
         this.json = json;
         this.jdbc = jdbc;
         this.attachments = attachments;
+        this.longTermMemory = longTermMemory;
     }
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -215,8 +221,11 @@ class AssistantController {
         ZoneId zone = ZoneId.systemDefault();
         LocalDate today = LocalDate.now(zone);
         Flux<Part> deltas = chat.prompt()
+                // Memory rules + the LIVE index ride the system prompt every
+                // turn, so the model knows what it remembers without a tool call.
                 .system(SYSTEM_PROMPT.formatted(today,
-                        today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH)))
+                        today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH))
+                        + "\n\n" + longTermMemory.promptSection())
                 // Never blank: an image-only turn's text is its markdown markers.
                 .user(u -> u.text(userMessage).media(images.toArray(Media[]::new)))
                 .tools(tools.toArray())

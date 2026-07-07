@@ -136,6 +136,17 @@ public class NoteService {
     }
 
     /**
+     * Every note in one exact folder, title order, unpaged — for small curated
+     * folders the caller owns end-to-end (the assistant's Memory folder), not
+     * for browsing arbitrary user folders.
+     */
+    @Transactional(readOnly = true)
+    public List<NoteSummary> listByFolder(String folderPath) {
+        return notes.findByFolderPathOrderByTitleAsc(NoteText.normalizeFolderPath(folderPath))
+                .stream().map(this::summary).toList();
+    }
+
+    /**
      * Notes carrying ANY of the tags, archived excluded — the MFI bridge to the
      * LDP spine: a note "belongs" to a discipline by carrying one of the
      * discipline name's words as a tag (e.g. "English · IELTS" → english, ielts).
