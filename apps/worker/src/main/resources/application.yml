@@ -4,6 +4,11 @@ spring:
   main:
     # No web server; run as a background process.
     web-application-type: none
+    # With virtual threads enabled the @Scheduled/@Async executors are daemon
+    # threads, so a headless (non-web) context has nothing to keep the JVM
+    # alive and exits right after startup — Docker then crash-loops it. This
+    # registers a single non-daemon thread that parks until shutdown.
+    keep-alive: true
   threads:
     virtual:
       # @Scheduled + event listeners run on virtual threads — cheap to block on
