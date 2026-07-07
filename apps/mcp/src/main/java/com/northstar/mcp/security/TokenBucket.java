@@ -16,19 +16,16 @@ final class TokenBucket {
 
     private double tokens;
     private long lastRefillNanos;
-    private long lastAccessNanos;
 
     TokenBucket(long capacity, long refillTokens, Duration refillPeriod, long nowNanos) {
         this.capacity = capacity;
         this.refillPerNano = (double) refillTokens / refillPeriod.toNanos();
         this.tokens = capacity;
         this.lastRefillNanos = nowNanos;
-        this.lastAccessNanos = nowNanos;
     }
 
     synchronized boolean tryConsume(long nowNanos) {
         refill(nowNanos);
-        lastAccessNanos = nowNanos;
         if (tokens >= 1.0) {
             tokens -= 1.0;
             return true;
@@ -44,16 +41,6 @@ final class TokenBucket {
         }
         double nanosNeeded = (1.0 - tokens) / refillPerNano;
         return Math.max(1, (long) Math.ceil(nanosNeeded / 1_000_000_000.0));
-    }
-
-    /** Full again = idle since the last consume; safe to evict from the per-IP map. */
-    synchronized boolean isIdle(long nowNanos) {
-        refill(nowNanos);
-        return tokens >= capacity;
-    }
-
-    long lastAccessNanos() {
-        return lastAccessNanos;
     }
 
     private void refill(long nowNanos) {

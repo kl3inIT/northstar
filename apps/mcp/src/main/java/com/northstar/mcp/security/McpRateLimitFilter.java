@@ -36,12 +36,23 @@ public class McpRateLimitFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
             FilterChain chain) throws ServletException, IOException {
-        String ip = clientIp(request);
+        // The REAL client IP, resolved by Tomcat's RemoteIpValve (server.forward-
+        // headers-strategy=native) which trusts only the NPM proxy and takes the
+        // hop NPM appended — a client-supplied X-Forwarded-For cannot spoof it.
+        String ip = request.getRemoteAddr();
+        String uri = safeForLog(request.getRequestURI());
 
         long length = request.getContentLengthLong();
+        if (bodyExpected(request) && length < 0) {
+            // No declared Content-Length (e.g. chunked) → the size cap can't be
+            // enforced up front, so require one on this no-auth write endpoint.
+            log.warn("MCP {} {} ip={} rejected: missing Content-Length", request.getMethod(), uri, ip);
+            writeError(response, HttpStatus.LENGTH_REQUIRED, "length_required", 0);
+            return;
+        }
         if (length > props.getMaxBodyBytes()) {
             log.warn("MCP {} {} ip={} rejected: body {}B over cap {}B",
-                    request.getMethod(), request.getRequestURI(), ip, length, props.getMaxBodyBytes());
+                    request.getMethod(), uri, ip, length, props.getMaxBodyBytes());
             writeError(response, HttpStatus.CONTENT_TOO_LARGE, "request_too_large", 0);
             return;
         }
@@ -49,8 +60,7 @@ public class McpRateLimitFilter extends OncePerRequestFilter {
         McpRateLimiter.Rejection rejection = limiter.check(ip);
         if (rejection != null) {
             log.warn("MCP {} {} ip={} rate-limited ({} limit), retry after {}s",
-                    request.getMethod(), request.getRequestURI(), ip, rejection.limit(),
-                    rejection.retryAfterSeconds());
+                    request.getMethod(), uri, ip, rejection.limit(), rejection.retryAfterSeconds());
             response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(rejection.retryAfterSeconds()));
             writeError(response, HttpStatus.TOO_MANY_REQUESTS, "rate_limited", rejection.retryAfterSeconds());
             return;
@@ -62,23 +72,18 @@ public class McpRateLimitFilter extends OncePerRequestFilter {
         } finally {
             long ms = (System.nanoTime() - start) / 1_000_000;
             log.info("MCP {} {} ip={} status={} {}ms",
-                    request.getMethod(), request.getRequestURI(), ip, response.getStatus(), ms);
+                    request.getMethod(), uri, ip, response.getStatus(), ms);
         }
     }
 
-    /** Real client IP behind the NPM reverse proxy — remoteAddr would be NPM's container IP. */
-    private static String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            int comma = forwarded.indexOf(',');
-            return (comma > 0 ? forwarded.substring(0, comma) : forwarded).trim();
-        }
-        String realIp = request.getHeader("X-Real-IP");
-        if (realIp != null && !realIp.isBlank()) {
-            return realIp.trim();
-        }
-        String remote = request.getRemoteAddr();
-        return remote != null ? remote : "unknown";
+    private static boolean bodyExpected(HttpServletRequest request) {
+        String method = request.getMethod();
+        return "POST".equals(method) || "PUT".equals(method) || "PATCH".equals(method);
+    }
+
+    /** Strip CR/LF so a header/URI value can't forge extra log lines (log injection). */
+    private static String safeForLog(String value) {
+        return value == null ? "" : value.replaceAll("[\\r\\n]", "_");
     }
 
     private static void writeError(HttpServletResponse response, HttpStatus status, String error,
