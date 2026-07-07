@@ -3,8 +3,8 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 Northstar is a personal-growth OS + Obsidian-lite knowledge base. Product intent and
-decisions live in [`AGENTS.md`](./AGENTS.md), [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md),
-and [`docs/PRODUCT_PLAN.md`](./docs/PRODUCT_PLAN.md) — read those for *what* to build.
+decisions live in [`AGENTS.md`](./AGENTS.md) and [`PROJECT_CONTEXT.md`](./PROJECT_CONTEXT.md)
+— read those for *what* to build.
 This file is *how* to work in the repo: stack, commands, architecture, and the gates.
 
 ## Stack
@@ -61,7 +61,7 @@ client types; regenerate.
 `ddl-auto: validate`, so every `@Entity`/`@Column` MUST match a migration column.
 
 **The methodology spine.** `life_goals` and `disciplines` (the LDP Life→Disciplines→
-Projects model, see `docs/PRODUCT_PLAN.md` §0.16) exist from V1; other modules FK to a
+Projects model, see `PROJECT_CONTEXT.md`) exist from V1; other modules FK to a
 discipline. This is what makes Study↔Scholarship (requirement-gap) one product, not
 two apps.
 
