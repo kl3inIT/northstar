@@ -13,6 +13,7 @@ import {
   type DragEndEvent,
 } from '@/components/kibo-ui/kanban'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
+import { DISCIPLINE_DOT as DOT } from '@/lib/discipline-colors'
 import {
   useRangeTasks,
   useSetTaskDone,
@@ -31,16 +32,6 @@ function addDays(isoDate: string, days: number): string {
   const d = new Date(isoDate + 'T00:00:00')
   d.setDate(d.getDate() + days)
   return iso(d)
-}
-
-const DOT: Record<Discipline['color'], string> = {
-  BLUE: 'bg-blue-600',
-  GREEN: 'bg-green-600',
-  RED: 'bg-red-600',
-  YELLOW: 'bg-yellow-600',
-  PURPLE: 'bg-purple-600',
-  ORANGE: 'bg-orange-600',
-  GRAY: 'bg-neutral-600',
 }
 
 /**

@@ -55,10 +55,14 @@ import { cn } from '@/lib/utils'
  */
 
 /**
- * Citation links from search_knowledge: an in-app note link rides the router
- * (same tab, no Streamdown link-safety modal); file downloads and external
- * URLs open a new tab. Overriding `a` replaces Streamdown's dialog-wrapped
- * link component entirely.
+ * Citation links from search_knowledge. Overriding `a` replaces Streamdown's
+ * dialog-wrapped link component, so we re-establish its safety ourselves:
+ *  - in-app note links ride the router (same tab, SPA);
+ *  - same-origin links (our own /api/files downloads) open a new tab directly;
+ *  - EXTERNAL links are model-authored and could be smuggled in by a
+ *    prompt-injection payload inside a note or an uploaded document, so they
+ *    reveal their real destination and require a confirmation before leaving
+ *    the app — the guard Streamdown's dialog used to provide.
  */
 const CITATION_LINK = 'font-medium text-primary underline underline-offset-2 hover:no-underline'
 
@@ -71,8 +75,26 @@ const CHAT_MARKDOWN_COMPONENTS = {
         </Link>
       )
     }
+    if (href?.startsWith('/')) {
+      return (
+        <a href={href} target="_blank" rel="noreferrer" className={CITATION_LINK}>
+          {children}
+        </a>
+      )
+    }
     return (
-      <a href={href} target="_blank" rel="noreferrer" className={CITATION_LINK}>
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer nofollow"
+        className={CITATION_LINK}
+        onClick={(e) => {
+          const ok = window.confirm(
+            `This link was written by the assistant and leads outside Northstar:\n\n${href}\n\nOpen it?`,
+          )
+          if (!ok) e.preventDefault()
+        }}
+      >
         {children}
       </a>
     )

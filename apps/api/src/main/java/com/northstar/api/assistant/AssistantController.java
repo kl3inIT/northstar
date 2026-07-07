@@ -19,6 +19,7 @@ import java.util.stream.Stream;
 import java.util.function.Consumer;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.content.Media;
@@ -58,7 +59,13 @@ class AssistantController {
     private static final String UI_MESSAGE_STREAM_HEADER = "x-vercel-ai-ui-message-stream";
     private static final String TEXT_PART_ID = "0";
     private static final String DEFAULT_CONVERSATION_ID = "default";
-    private static final long TURN_TIMEOUT_MILLIS = 120_000L;
+    // A turn can chain several tool calls plus a reasoning-model reply (each LLM
+    // call already allows 60s + 2 retries), so 120s truncated long turns. 240s
+    // gives them room while staying under the edge's proxy_read_timeout (300s),
+    // so on timeout the api emits its own error frame before NPM cuts the socket.
+    private static final long TURN_TIMEOUT_MILLIS = 240_000L;
+    /** Per-image cap for chat vision input — base64 inflates this ~33% upstream. */
+    private static final int MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
     // Follows the project prompt rubric: role, explicit output language, date
     // injection, tool guidance as behavior (not keyword lists), length anchor.
@@ -92,6 +99,7 @@ class AssistantController {
 
     private final ChatClient chat;
     private final ChatMemory memory;
+    private final ChatMemoryRepository memoryRepository;
     private final List<NorthstarTool> tools;
     private final ObjectMapper json;
     private final JdbcClient jdbc;
@@ -99,10 +107,11 @@ class AssistantController {
     private final MemoryTools longTermMemory;
 
     AssistantController(@Qualifier(AssistantConfig.ASSISTANT_CHAT_CLIENT) ChatClient chat,
-            ChatMemory memory, List<NorthstarTool> tools, ObjectMapper json, JdbcClient jdbc,
-            AttachmentService attachments, MemoryTools longTermMemory) {
+            ChatMemory memory, ChatMemoryRepository memoryRepository, List<NorthstarTool> tools,
+            ObjectMapper json, JdbcClient jdbc, AttachmentService attachments, MemoryTools longTermMemory) {
         this.chat = chat;
         this.memory = memory;
+        this.memoryRepository = memoryRepository;
         this.tools = tools;
         this.json = json;
         this.jdbc = jdbc;
@@ -150,6 +159,15 @@ class AssistantController {
             throw new IllegalArgumentException(
                     "Only image attachments can be sent to chat (got " + content.meta().mimeType() + ")");
         }
+        // The vault caps uploads at 25MB, but a chat image rides to OpenAI as
+        // base64 (≈+33%); several 25MB images would blow past the provider's
+        // request limit and fail the whole turn with an opaque error. Reject up
+        // front with an actionable message (mirrors the web's 8MB composer cap).
+        if (content.data().length > MAX_IMAGE_BYTES) {
+            throw new IllegalArgumentException(
+                    "Image too large — keep chat images under 8MB (got "
+                            + (content.data().length / (1024 * 1024)) + "MB)");
+        }
         return content;
     }
 
@@ -165,7 +183,9 @@ class AssistantController {
     /** The stored transcript (user/assistant text only) for rehydrating the UI on load. */
     @GetMapping("/history")
     List<HistoryMessage> history(@RequestParam(required = false) String conversationId) {
-        return memory.get(conversationId(conversationId)).stream()
+        // The FULL transcript, straight from the repository — not memory.get(), which
+        // returns only the model's recent window (WindowedChatMemory).
+        return memoryRepository.findByConversationId(conversationId(conversationId)).stream()
                 .flatMap(message -> switch (message) {
                     case UserMessage user -> textOf(user.getText(), "user");
                     case AssistantMessage assistant -> textOf(assistant.getText(), "assistant");

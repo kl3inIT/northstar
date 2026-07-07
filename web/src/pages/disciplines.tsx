@@ -34,19 +34,10 @@ import {
   type Discipline,
   type DisciplineInput,
 } from '@/lib/disciplines-api'
+import { DISCIPLINE_DOT as DOT, DISCIPLINE_COLORS } from '@/lib/discipline-colors'
 import { cn } from '@/lib/utils'
 
-const DOT: Record<Discipline['color'], string> = {
-  BLUE: 'bg-blue-600',
-  GREEN: 'bg-green-600',
-  RED: 'bg-red-600',
-  YELLOW: 'bg-yellow-600',
-  PURPLE: 'bg-purple-600',
-  ORANGE: 'bg-orange-600',
-  GRAY: 'bg-neutral-600',
-}
-
-const COLORS = Object.keys(DOT) as Discipline['color'][]
+const COLORS = DISCIPLINE_COLORS
 
 function formatDay(isoInstant: string): string {
   const d = new Date(isoInstant)

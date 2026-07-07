@@ -49,6 +49,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
+import { DISCIPLINE_HEX as HEX } from '@/lib/discipline-colors'
 import {
   useAddMilestone,
   useCreateProject,
@@ -65,17 +66,6 @@ import {
 } from '@/lib/projects-api'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
-
-/** ColorName → a real CSS color for the Gantt status dot/bar. */
-const HEX: Record<Discipline['color'], string> = {
-  BLUE: '#2563eb',
-  GREEN: '#16a34a',
-  RED: '#dc2626',
-  YELLOW: '#ca8a04',
-  PURPLE: '#9333ea',
-  ORANGE: '#ea580c',
-  GRAY: '#525252',
-}
 
 function iso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

@@ -105,7 +105,7 @@ public class CalendarEventService {
     public CalendarEventSummary create(String title, String notes, Instant startAt, Instant endAt,
             boolean allDay, ColorName color, UUID disciplineId, String rrule) {
         requireValidSpan(startAt, endAt);
-        requireDiscipline(disciplineId);
+        disciplines.requireExists(disciplineId);
         CalendarEvent event = new CalendarEvent(UUID.randomUUID(), title.strip(), clean(notes),
                 startAt, endAt, allDay, color, disciplineId, cleanRrule(rrule));
         events.save(event);
@@ -117,7 +117,7 @@ public class CalendarEventService {
     public CalendarEventSummary update(UUID id, String title, String notes, Instant startAt,
             Instant endAt, boolean allDay, ColorName color, UUID disciplineId, String rrule) {
         requireValidSpan(startAt, endAt);
-        requireDiscipline(disciplineId);
+        disciplines.requireExists(disciplineId);
         CalendarEvent event = events.findById(id).orElseThrow(() -> new CalendarEventNotFoundException(id));
         event.edit(title.strip(), clean(notes), startAt, endAt, allDay, color, disciplineId, cleanRrule(rrule));
         return summary(event);
@@ -155,11 +155,6 @@ public class CalendarEventService {
         events.deleteById(id);
     }
 
-    private void requireDiscipline(UUID disciplineId) {
-        if (disciplineId != null && !disciplines.exists(disciplineId)) {
-            throw new IllegalArgumentException("No discipline with id " + disciplineId);
-        }
-    }
 
     private static void requireValidSpan(Instant startAt, Instant endAt) {
         if (!endAt.isAfter(startAt)) {

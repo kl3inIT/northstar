@@ -14,6 +14,15 @@ export async function listNotes(status?: NoteStatus): Promise<NoteSummary[]> {
   return (data?.content ?? []) as NoteSummary[]
 }
 
+/** Just the total for a status tab — one row fetched, count read from the page metadata. */
+export async function countNotes(status?: NoteStatus): Promise<number> {
+  const { data, error } = await api.GET('/api/notes', {
+    params: { query: { page: 0, size: 1, status } },
+  })
+  if (error) throw error
+  return data?.page?.totalElements ?? 0
+}
+
 export async function searchNotes(query: string): Promise<NoteSummary[]> {
   const { data, error } = await api.GET('/api/notes/search', { params: { query: { q: query } } })
   if (error) throw error
@@ -62,12 +71,11 @@ export function useNotesByStatus(status: NoteStatus) {
   return useQuery({ queryKey: ['notes', status], queryFn: () => listNotes(status) })
 }
 
-/** Badge count for the staging review queue (sidebar + tab). */
+/** Badge count for the staging review queue (sidebar + tab) — total only, not the rows. */
 export function useStagingCount() {
   return useQuery({
-    queryKey: ['notes', 'STAGING'],
-    queryFn: () => listNotes('STAGING'),
-    select: (notes) => notes.length,
+    queryKey: ['notes', 'STAGING', 'count'],
+    queryFn: () => countNotes('STAGING'),
     staleTime: 30_000,
   })
 }

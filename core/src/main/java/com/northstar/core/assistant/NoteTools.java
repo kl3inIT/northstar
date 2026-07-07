@@ -6,6 +6,7 @@ import com.northstar.core.note.NoteStatus;
 import com.northstar.core.search.SearchResult;
 import com.northstar.core.search.SearchService;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.ai.tool.annotation.Tool;
@@ -81,9 +82,7 @@ class NoteTools implements NorthstarTool {
             @ToolParam(description = "The note's slug, e.g. 'kinh-nghiem-apply-hoc-bong'")
             @McpToolParam(description = "The note's slug, e.g. 'kinh-nghiem-apply-hoc-bong'",
                     required = true) String slug) {
-        return notes.getBySlug(slug)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "No note with slug '" + slug + "' — find slugs via search_knowledge."));
+        return bySlug(slug);
     }
 
     @Tool(name = "update_note", description = UPDATE_NOTE)
@@ -105,9 +104,9 @@ class NoteTools implements NorthstarTool {
             @ToolParam(description = "Replacement tag list (1-4 lowercase tags); pass [] or omit to keep", required = false)
             @McpToolParam(description = "Replacement tag list (1-4 lowercase tags); pass [] or omit to keep",
                     required = false) List<String> tags,
-            @ToolParam(description = "New working state (RESOURCE = approved, STAGING = back to review, ARCHIVED = soft-delete); omit to keep", required = false)
-            @McpToolParam(description = "New working state (RESOURCE = approved, STAGING = back to review, ARCHIVED = soft-delete); omit to keep",
-                    required = false) NoteStatus status) {
+            @ToolParam(description = "New working state (RESOURCE = approved, STAGING = back to review, ARCHIVED = soft-delete); pass '' or omit to keep", required = false)
+            @McpToolParam(description = "New working state (RESOURCE = approved, STAGING = back to review, ARCHIVED = soft-delete); pass '' or omit to keep",
+                    required = false) String status) {
         NoteDetail current = bySlug(slug);
         NoteDetail updated = notes.update(current.id(),
                 title == null || title.isBlank() ? current.title() : title,
@@ -116,10 +115,26 @@ class NoteTools implements NorthstarTool {
                         ? current.contentMarkdown() : contentMarkdown,
                 tags == null || tags.isEmpty() ? current.tags() : tags,
                 null);
-        if (status != null) {
-            updated = notes.setStatus(current.id(), status);
+        // Blank-tolerant, like the sibling string args: an MCP client that always
+        // populates optionals may send status "" (the published "pass '' to keep"
+        // contract) — binding that to a raw enum would fail the whole tool call.
+        NoteStatus newStatus = parseStatus(status);
+        if (newStatus != null) {
+            updated = notes.setStatus(current.id(), newStatus);
         }
         return updated;
+    }
+
+    private static NoteStatus parseStatus(String status) {
+        if (status == null || status.isBlank()) {
+            return null; // keep the current status
+        }
+        try {
+            return NoteStatus.valueOf(status.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("status must be RESOURCE, STAGING or ARCHIVED "
+                    + "(or '' to keep), got '" + status + "'");
+        }
     }
 
     @Tool(name = "append_to_note", description = APPEND_TO_NOTE)

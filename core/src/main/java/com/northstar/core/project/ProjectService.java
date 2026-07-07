@@ -47,7 +47,7 @@ public class ProjectService {
     @Transactional
     public ProjectSummary create(String name, String notes, UUID disciplineId,
             LocalDate startDate, LocalDate targetDate) {
-        requireDiscipline(disciplineId);
+        disciplines.requireExists(disciplineId);
         requireValidSpan(startDate, targetDate);
         Project project = new Project(UUID.randomUUID(), name.strip(), clean(notes),
                 disciplineId, startDate, targetDate);
@@ -58,7 +58,7 @@ public class ProjectService {
     @Transactional
     public ProjectSummary update(UUID id, String name, String notes, UUID disciplineId,
             LocalDate startDate, LocalDate targetDate) {
-        requireDiscipline(disciplineId);
+        disciplines.requireExists(disciplineId);
         requireValidSpan(startDate, targetDate);
         Project project = get(id);
         project.edit(name.strip(), clean(notes), disciplineId, startDate, targetDate);
@@ -113,11 +113,6 @@ public class ProjectService {
         return projects.findById(id).orElseThrow(() -> new ProjectNotFoundException(id));
     }
 
-    private void requireDiscipline(UUID disciplineId) {
-        if (disciplineId != null && !disciplines.exists(disciplineId)) {
-            throw new IllegalArgumentException("No discipline with id " + disciplineId);
-        }
-    }
 
     private static void requireValidSpan(LocalDate startDate, LocalDate targetDate) {
         if (startDate != null && targetDate != null && targetDate.isBefore(startDate)) {

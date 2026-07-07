@@ -51,6 +51,18 @@ public class DisciplineService {
         return disciplines.existsById(id);
     }
 
+    /**
+     * Validates an OPTIONAL discipline reference for FK-ing modules: a null id is
+     * allowed (no discipline), a non-existent id is rejected. One home for the
+     * check task/project/calendar all need.
+     */
+    @Transactional(readOnly = true)
+    public void requireExists(UUID id) {
+        if (id != null && !disciplines.existsById(id)) {
+            throw new IllegalArgumentException("No discipline with id " + id);
+        }
+    }
+
     private static DisciplineSummary summary(Discipline discipline) {
         return new DisciplineSummary(discipline.getId(), discipline.getName(), discipline.getColor());
     }

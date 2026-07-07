@@ -37,6 +37,15 @@ final class UiMessageStream {
                 });
         emitter.onCompletion(subscription::dispose);
         emitter.onTimeout(() -> {
+            // A long multi-tool turn ran past the emitter deadline. Don't leave the
+            // UI hanging on a half-written message: surface a protocol error frame
+            // (best-effort — the response may already be closing) then finish.
+            try {
+                encoder.error();
+                encoder.done();
+            } catch (RuntimeException ignored) {
+                // response half-committed; nothing more we can send
+            }
             subscription.dispose();
             emitter.complete();
         });

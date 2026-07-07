@@ -42,7 +42,7 @@ public class TaskService {
     @Transactional
     public TaskSummary create(String title, String notes, LocalDate dueDate, LocalTime dueTime,
             LocalDate plannedDate, UUID disciplineId) {
-        requireDiscipline(disciplineId);
+        disciplines.requireExists(disciplineId);
         Task task = new Task(UUID.randomUUID(), title.strip(),
                 notes == null || notes.isBlank() ? null : notes.strip(),
                 dueDate, dueTime, disciplineId);
@@ -54,7 +54,7 @@ public class TaskService {
     @Transactional
     public TaskSummary update(UUID id, String title, String notes, LocalDate dueDate, LocalTime dueTime,
             LocalDate plannedDate, UUID disciplineId) {
-        requireDiscipline(disciplineId);
+        disciplines.requireExists(disciplineId);
         Task task = tasks.findById(id).orElseThrow(() -> new TaskNotFoundException(id));
         task.edit(title.strip(), notes == null || notes.isBlank() ? null : notes.strip(),
                 dueDate, dueTime, plannedDate, disciplineId);
@@ -165,11 +165,6 @@ public class TaskService {
                 .stream().map(this::summary).toList();
     }
 
-    private void requireDiscipline(UUID disciplineId) {
-        if (disciplineId != null && !disciplines.exists(disciplineId)) {
-            throw new IllegalArgumentException("No discipline with id " + disciplineId);
-        }
-    }
 
     private static List<TaskSummary> concat(List<TaskSummary> a, List<TaskSummary> b) {
         return Stream.concat(a.stream(), b.stream()).toList();

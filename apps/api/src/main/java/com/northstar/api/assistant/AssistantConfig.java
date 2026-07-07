@@ -3,11 +3,9 @@ package com.northstar.api.assistant;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.client.advisor.toolsearch.ToolSearchToolCallingAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
-import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.tool.execution.ToolExecutionExceptionProcessor;
 import org.springframework.ai.tool.resolution.ToolCallbackResolver;
@@ -36,6 +34,9 @@ class AssistantConfig {
 
     static final String ASSISTANT_CHAT_CLIENT = "assistantChatClient";
 
+    /** Recent messages the model sees; the FULL transcript is kept regardless (see WindowedChatMemory). */
+    private static final int MODEL_WINDOW_MESSAGES = 30;
+
     /** Replaces the autoconfigured manager for the whole app; non-assistant calls pass through. */
     @Bean
     ToolCallingManager toolCallingManager(ToolCallbackResolver resolver,
@@ -52,10 +53,10 @@ class AssistantConfig {
 
     @Bean
     ChatMemory chatMemory(ChatMemoryRepository repository) {
-        return MessageWindowChatMemory.builder()
-                .chatMemoryRepository(repository)
-                .maxMessages(30)
-                .build();
+        // NOT MessageWindowChatMemory: that trims to the window and saveAll-REPLACES
+        // the rows, physically deleting older history that /history and /conversations
+        // read. WindowedChatMemory keeps the full transcript and only windows the prompt.
+        return new WindowedChatMemory(repository, MODEL_WINDOW_MESSAGES);
     }
 
     @Bean(ASSISTANT_CHAT_CLIENT)
@@ -69,12 +70,11 @@ class AssistantConfig {
                 .toolIndex(new LuceneToolIndex())
                 .build();
         return builder
+                // A SimpleLoggerAdvisor is already applied to every builder by
+                // AiConfig.loggingCustomizer — don't add a second, it double-logs.
                 .defaultAdvisors(
                         MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                        toolSearch,
-                        // Logs full request/response only when this logger is at DEBUG
-                        // (logging.level.org.springframework.ai.chat.client.advisor).
-                        new SimpleLoggerAdvisor())
+                        toolSearch)
                 .build();
     }
 }
