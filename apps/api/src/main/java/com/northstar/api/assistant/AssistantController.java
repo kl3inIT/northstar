@@ -105,10 +105,12 @@ class AssistantController {
     private final JdbcClient jdbc;
     private final AttachmentService attachments;
     private final MemoryTools longTermMemory;
+    private final ConversationTitleService titles;
 
     AssistantController(@Qualifier(AssistantConfig.ASSISTANT_CHAT_CLIENT) ChatClient chat,
             ChatMemory memory, ChatMemoryRepository memoryRepository, List<NorthstarTool> tools,
-            ObjectMapper json, JdbcClient jdbc, AttachmentService attachments, MemoryTools longTermMemory) {
+            ObjectMapper json, JdbcClient jdbc, AttachmentService attachments, MemoryTools longTermMemory,
+            ConversationTitleService titles) {
         this.chat = chat;
         this.memory = memory;
         this.memoryRepository = memoryRepository;
@@ -117,6 +119,7 @@ class AssistantController {
         this.jdbc = jdbc;
         this.attachments = attachments;
         this.longTermMemory = longTermMemory;
+        this.titles = titles;
     }
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -201,15 +204,19 @@ class AssistantController {
      */
     @GetMapping("/conversations")
     List<ConversationSummary> conversations() {
+        // Prefer the LLM-generated title (V17); fall back to the first user message
+        // for conversations not yet titled (titling is async and best-effort).
         return jdbc.sql("""
                 SELECT m.conversation_id,
-                       (SELECT u.content FROM spring_ai_chat_memory u
-                         WHERE u.conversation_id = m.conversation_id AND u.type = 'USER'
-                         ORDER BY u.sequence_id LIMIT 1) AS title,
+                       COALESCE(t.title,
+                         (SELECT u.content FROM spring_ai_chat_memory u
+                           WHERE u.conversation_id = m.conversation_id AND u.type = 'USER'
+                           ORDER BY u.sequence_id LIMIT 1)) AS title,
                        MAX(m."timestamp") AS last_at,
                        COUNT(*) FILTER (WHERE m.type IN ('USER', 'ASSISTANT')) AS messages
                   FROM spring_ai_chat_memory m
-                 GROUP BY m.conversation_id
+                  LEFT JOIN northstar_conversation_title t ON t.conversation_id = m.conversation_id
+                 GROUP BY m.conversation_id, t.title
                  ORDER BY last_at DESC
                 """)
                 .query((rs, _) -> new ConversationSummary(
@@ -254,7 +261,12 @@ class AssistantController {
                 .stream()
                 .content()
                 .<Part>map(token -> new Part.TextDelta(TEXT_PART_ID, token))
-                .doFinally(_ -> toolEvents.tryEmitComplete());
+                .doFinally(_ -> {
+                    toolEvents.tryEmitComplete();
+                    // The user message is persisted by now; title the conversation off
+                    // it once, in the background — the turn never waits on the LLM call.
+                    titles.ensureTitleAsync(conversationId);
+                });
 
         Flux<Part> text = Flux.concat(
                 Flux.just(new Part.TextStart(TEXT_PART_ID)),

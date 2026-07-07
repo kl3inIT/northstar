@@ -84,6 +84,15 @@ spring:
       # RFC 9457 ProblemDetail too — one error shape everywhere.
       enabled: true
 
+# Assistant conversation auto-titling (background, best-effort). Point `model` at a
+# cheaper tier (e.g. a mini/nano model) to cut titling cost — no code change; set
+# `enabled: false` to switch titling off (the list falls back to the first message).
+northstar:
+  assistant:
+    title:
+      enabled: true
+      model: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
+
 server:
   port: ${NORTHSTAR_API_PORT:8888}
 

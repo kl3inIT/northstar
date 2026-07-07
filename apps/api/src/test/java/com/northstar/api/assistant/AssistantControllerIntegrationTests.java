@@ -32,7 +32,10 @@ import reactor.core.publisher.Flux;
  * the JDBC-backed history roundtrip.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "spring.ai.openai.api-key=test-key")
+        properties = {"spring.ai.openai.api-key=test-key",
+                // Off so /conversations deterministically shows the first-message
+                // fallback; the titling path is driven synchronously below instead.
+                "northstar.assistant.title.enabled=false"})
 @Testcontainers
 class AssistantControllerIntegrationTests {
 
@@ -42,6 +45,9 @@ class AssistantControllerIntegrationTests {
 
     @MockitoBean
     ChatModel chatModel;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    ConversationTitleService titleService;
 
     @LocalServerPort
     int port;
@@ -96,5 +102,41 @@ class AssistantControllerIntegrationTests {
                         URI.create("http://localhost:" + port + "/api/assistant/conversations"))
                 .GET().build(), HttpResponse.BodyHandlers.ofString());
         assertThat(after.body()).doesNotContain("test-convo");
+    }
+
+    @Test
+    void autoTitleReplacesTheFirstMessageInTheList() throws Exception {
+        when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
+        ChatResponse reply = new ChatResponse(List.of(new Generation(
+                new AssistantMessage("IELTS writing plan"))));
+        when(chatModel.stream(any(Prompt.class))).thenReturn(Flux.just(reply));
+        when(chatModel.call(any(Prompt.class))).thenReturn(reply);
+
+        // A turn seeds the conversation; auto-titling is disabled, so the list still
+        // shows the raw first message until we run the titling path explicitly.
+        http.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/assistant/chat"))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString("""
+                        {"message":"help me plan IELTS writing","conversationId":"title-convo"}"""))
+                .build(), HttpResponse.BodyHandlers.ofString());
+
+        // Synchronous so there is no race with the assertions below.
+        titleService.ensureTitle("title-convo");
+
+        HttpResponse<String> conversations = http.send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/assistant/conversations"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        // COALESCE now prefers the generated title over the first user message.
+        assertThat(conversations.body())
+                .contains("title-convo")
+                .contains("IELTS writing plan")
+                .doesNotContain("help me plan IELTS writing");
+
+        // Idempotent: a second run keeps the first title, no duplicate row.
+        titleService.ensureTitle("title-convo");
+        HttpResponse<String> again = http.send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/assistant/conversations"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+        assertThat(again.body()).contains("IELTS writing plan");
     }
 }
