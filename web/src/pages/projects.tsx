@@ -47,6 +47,7 @@ import {
 } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { api } from '@/lib/api'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
 import { DISCIPLINE_HEX as HEX } from '@/lib/discipline-colors'
@@ -95,6 +96,7 @@ export function ProjectsPage() {
   const update = useUpdateProject()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [range, setRange] = useState<'monthly' | 'quarterly'>('monthly')
 
   // Group bars by discipline — the LDP spine is the Gantt's row grouping.
   const groups = useMemo(() => {
@@ -134,9 +136,21 @@ export function ProjectsPage() {
             Staged work under a discipline — drag a bar to reschedule it.
           </p>
         </div>
-        <Button onClick={() => setCreating(true)}>
-          <Plus className="size-4" /> New project
-        </Button>
+        <div className="flex items-center gap-2">
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={range}
+            onValueChange={(v) => v && setRange(v as 'monthly' | 'quarterly')}
+          >
+            <ToggleGroupItem value="monthly">Month</ToggleGroupItem>
+            <ToggleGroupItem value="quarterly">Quarter</ToggleGroupItem>
+          </ToggleGroup>
+          <Button onClick={() => setCreating(true)}>
+            <Plus className="size-4" /> New project
+          </Button>
+        </div>
       </div>
 
       {projects.length === 0 && !isLoading ? (
@@ -150,7 +164,7 @@ export function ProjectsPage() {
         </div>
       ) : (
         <div className="mt-6 min-h-0 flex-1 overflow-hidden rounded-xl border">
-          <GanttProvider range="monthly" zoom={100} className="h-full">
+          <GanttProvider range={range} zoom={100} className="h-full">
             {/* The 300px sidebar would leave a 390px phone a sliver of timeline —
                 the provider measures the sidebar's presence in the DOM, so it must
                 be unmounted (not display:none) on mobile. Names stay on the bars. */}

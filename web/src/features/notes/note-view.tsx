@@ -21,10 +21,10 @@ function formatDate(iso: string): string {
 export function NoteView() {
   const { slug } = useParams({ from: '/notes/$slug' })
   const { data: note, isLoading, isError } = useNote(slug)
-  // Edit-first, like Obsidian: opening a note lands in the editor; a Reading
-  // toggle swaps to the rendered view. Re-arm edit mode on every note switch.
-  const [editing, setEditing] = useState(true)
-  useEffect(() => setEditing(true), [slug])
+  // Reading-first: opening a note shows the rendered view; the Edit button opens
+  // the CodeMirror editor. Return to reading on every note switch.
+  const [editing, setEditing] = useState(false)
+  useEffect(() => setEditing(false), [slug])
 
   if (isLoading) {
     return (

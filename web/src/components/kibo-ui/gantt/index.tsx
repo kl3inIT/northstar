@@ -1207,12 +1207,21 @@ export const GanttProvider: FC<GanttProviderProps> = ({
   );
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollLeft =
-        scrollRef.current.scrollWidth / 2 - scrollRef.current.clientWidth / 2;
-      setScrollX(scrollRef.current.scrollLeft);
+    const el = scrollRef.current;
+    if (!el) {
+      return;
     }
-  }, [setScrollX]);
+    // Open near Today (~20% from the left) instead of centering the whole
+    // multi-year span — otherwise the view lands on empty past months with the
+    // bars pushed off the right edge. Proportional to the timeline's date span.
+    const start = new Date(timelineData[0].year, 0, 1).getTime();
+    const end = new Date(timelineData[timelineData.length - 1].year, 11, 31).getTime();
+    const fraction = (new Date().getTime() - start) / (end - start);
+    el.scrollLeft = Math.max(0, fraction * el.scrollWidth - el.clientWidth * 0.2);
+    setScrollX(el.scrollLeft);
+    // Re-run on range change (column widths differ); mount-once otherwise.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [range, setScrollX]);
 
   // Update sidebar width when DOM is ready
   useEffect(() => {
