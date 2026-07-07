@@ -61,11 +61,17 @@ class TaskController {
         return tasks.openByDiscipline(disciplineId);
     }
 
+    // A year view plus margin. The calendar page fetches tasks over the visible
+    // window widened 90 days backwards (overdue open tasks roll onto today), so
+    // year view asks for ~365+90 days — the cap must clear that or the whole
+    // calendar 400s. Events aren't back-widened, hence their tighter 400-day cap.
+    private static final long MAX_RANGE_DAYS = 500;
+
     @GetMapping("/range")
     List<TaskSummary> range(
             @RequestParam("from") LocalDate from,
             @RequestParam("to") LocalDate to) {
-        if (to.isBefore(from) || from.plusDays(400).isBefore(to)) {
+        if (to.isBefore(from) || from.plusDays(MAX_RANGE_DAYS).isBefore(to)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid range");
         }
         return tasks.range(from, to);
