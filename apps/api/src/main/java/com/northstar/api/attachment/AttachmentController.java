@@ -1,6 +1,5 @@
 package com.northstar.api.attachment;
 
-import com.northstar.core.attachment.AttachmentContent;
 import com.northstar.core.attachment.AttachmentService;
 import com.northstar.core.attachment.AttachmentView;
 import java.io.IOException;
@@ -59,16 +58,26 @@ class AttachmentController {
             throw new IllegalArgumentException("Could not read the uploaded file", e);
         }
         String claimed = file.getContentType() == null ? "" : file.getContentType();
-        String mime = claimed;
+        String sniffed = sniffImageType(bytes);
+        String mime;
         // Never trust the declared type for the image fast-path: an "image/png"
         // that is really SVG/HTML would otherwise render inline on our origin.
         // Storing the SNIFFED type also canonicalizes quirks like "image/jpg".
         if (claimed.toLowerCase(Locale.ROOT).startsWith("image/")) {
-            mime = sniffImageType(bytes);
-            if (mime == null) {
+            if (sniffed == null) {
                 throw new IllegalArgumentException(
                         "Unsupported image format — use PNG, JPEG, GIF or WebP");
             }
+            mime = sniffed;
+        } else if (sniffed != null) {
+            // The client sent no/other Content-Type (e.g. a clipboard paste) but
+            // the bytes ARE a known raster image: canonicalize to the real image
+            // type instead of pinning it to octet-stream, which — since rows are
+            // sha256-deduplicated — would render the same file as a broken image
+            // forever, even after a later, correctly-typed re-upload.
+            mime = sniffed;
+        } else {
+            mime = claimed;
         }
         return attachments.store(file.getOriginalFilename(), mime, bytes);
     }
@@ -94,14 +103,18 @@ class AttachmentController {
     @GetMapping("/{id}")
     ResponseEntity<byte[]> serve(@PathVariable UUID id,
             @RequestHeader(name = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
-        AttachmentContent content = attachments.load(id)
+        // Metadata-only lookup first: a conditional revalidation that ends in 304
+        // must not drag the whole (up-to-25MB) bytea out of Postgres and the heap.
+        AttachmentView meta = attachments.find(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "No file " + id));
-        AttachmentView meta = content.meta();
         String etag = "\"" + meta.sha256() + "\"";
         if (etag.equals(ifNoneMatch)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
         }
+        byte[] data = attachments.load(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "No file " + id))
+                .data();
         boolean inlineImage = INLINE_IMAGE_TYPES.contains(meta.mimeType().toLowerCase(Locale.ROOT));
         ContentDisposition disposition = (inlineImage ? ContentDisposition.inline()
                 : ContentDisposition.attachment())
@@ -117,6 +130,6 @@ class AttachmentController {
                 .contentType(inlineImage ? MediaType.parseMediaType(meta.mimeType())
                         : MediaType.APPLICATION_OCTET_STREAM)
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
-                .body(content.data());
+                .body(data);
     }
 }

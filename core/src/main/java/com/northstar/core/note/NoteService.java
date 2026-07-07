@@ -1,11 +1,13 @@
 package com.northstar.core.note;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -206,11 +208,27 @@ public class NoteService {
     }
 
     private NoteDetail detail(Note note) {
-        List<NoteRef> outgoing = links.findBySourceNoteId(note.getId()).stream()
-                .map(this::outgoingRef)
+        List<NoteLink> outgoingLinks = links.findBySourceNoteId(note.getId());
+        List<NoteLink> inboundLinks = links.findByTargetNoteId(note.getId());
+
+        // Batch every referenced note (outgoing targets + backlink sources) in one
+        // query instead of a findById per link (was N+1 on the note's whole graph).
+        Set<UUID> referenced = new HashSet<>();
+        outgoingLinks.forEach(link -> {
+            if (link.getTargetNoteId() != null) {
+                referenced.add(link.getTargetNoteId());
+            }
+        });
+        inboundLinks.forEach(link -> referenced.add(link.getSourceNoteId()));
+        Map<UUID, Note> byId = referenced.isEmpty() ? Map.of()
+                : notes.findAllById(referenced).stream()
+                        .collect(Collectors.toMap(Note::getId, Function.identity()));
+
+        List<NoteRef> outgoing = outgoingLinks.stream()
+                .map(link -> outgoingRef(link, byId))
                 .toList();
-        List<NoteRef> backlinks = links.findByTargetNoteId(note.getId()).stream()
-                .map(link -> notes.findById(link.getSourceNoteId()).orElse(null))
+        List<NoteRef> backlinks = inboundLinks.stream()
+                .map(link -> byId.get(link.getSourceNoteId()))
                 .filter(Objects::nonNull)
                 .map(src -> new NoteRef(src.getTitle(), src.getSlug(), NoteText.snippet(src.getContentMarkdown(), SNIPPET_REF), true))
                 .toList();
@@ -219,11 +237,13 @@ public class NoteService {
                 note.getCreatedAt(), note.getUpdatedAt(), note.getVersion(), outgoing, backlinks);
     }
 
-    private NoteRef outgoingRef(NoteLink link) {
+    private NoteRef outgoingRef(NoteLink link, Map<UUID, Note> byId) {
         if (link.getTargetNoteId() != null) {
-            return notes.findById(link.getTargetNoteId())
-                    .map(t -> new NoteRef(t.getTitle(), t.getSlug(), NoteText.snippet(t.getContentMarkdown(), SNIPPET_REF), true))
-                    .orElse(new NoteRef(link.getTargetTitle(), null, "", false));
+            Note target = byId.get(link.getTargetNoteId());
+            if (target != null) {
+                return new NoteRef(target.getTitle(), target.getSlug(),
+                        NoteText.snippet(target.getContentMarkdown(), SNIPPET_REF), true);
+            }
         }
         return new NoteRef(link.getTargetTitle(), null, "", false);
     }

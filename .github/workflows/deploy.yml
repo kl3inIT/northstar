@@ -86,9 +86,9 @@ jobs:
 
           echo "::group::Pull and recreate"
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-            --env-file .env pull api web worker
+            --env-file .env pull api web worker mcp
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-            --env-file .env up -d --no-build api web worker
+            --env-file .env up -d --no-build api web worker mcp
           echo "::endgroup::"
 
           echo "::group::Wait for api readiness"
@@ -99,6 +99,20 @@ jobs:
             if [[ $attempt -eq 60 ]]; then
               echo "::error::api failed readiness within 120s"
               docker compose -f docker/docker-compose.yml logs --tail=200 api web
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "::endgroup::"
+
+          echo "::group::Wait for mcp readiness"
+          for attempt in {1..60}; do
+            if docker exec northstar-mcp curl -fsS http://localhost:8081/actuator/health >/dev/null 2>&1; then
+              echo "mcp ready"; break
+            fi
+            if [[ $attempt -eq 60 ]]; then
+              echo "::error::mcp failed readiness within 120s"
+              docker compose -f docker/docker-compose.yml logs --tail=200 mcp
               exit 1
             fi
             sleep 2
@@ -130,14 +144,19 @@ jobs:
         env:
           BASE_URL: ${{ vars.NORTHSTAR_BASE_URL }}
         run: |
-          # Dual probe (zero-mail lesson): / proves TLS+web, /api/actuator/health
-          # proves the edge can still reach the RECREATED api container.
+          # Dual probe (zero-mail lesson): / proves TLS+web, and a real /api
+          # endpoint proves the edge reaches the RECREATED api AND it can serve
+          # a DB-backed request. Deliberately NOT /api/actuator/health — actuator
+          # is mapped at /actuator on the container, so through the edge's /api
+          # route it 404s even when healthy; that path can't tell "healthy" from
+          # "edge route broken". /api/disciplines/cards returns 200 + JSON list
+          # only when routing, the api, and Postgres are all up.
           smoke_ok() {
             local root api
             root=$(curl -o /dev/null -s -w '%{http_code}' "${BASE_URL}/" || echo 000)
-            api=$(curl -o /dev/null -s -w '%{http_code}' "${BASE_URL}/api/actuator/health" || echo 000)
+            api=$(curl -o /dev/null -s -w '%{http_code}' "${BASE_URL}/api/disciplines/cards" || echo 000)
             echo "root=${root} api=${api}"
-            [[ "$root" == "200" && "$api" != "502" && "$api" != "000" ]]
+            [[ "$root" == "200" && "$api" == "200" ]]
           }
           for attempt in {1..20}; do
             if smoke_ok; then echo "smoke OK"; exit 0; fi
@@ -158,18 +177,34 @@ jobs:
           prev_api=$(awk '/^northstar-api /{print $2}' .last-deploy.txt)
           prev_web=$(awk '/^northstar-web /{print $2}' .last-deploy.txt)
           prev_worker=$(awk '/^northstar-worker /{print $2}' .last-deploy.txt)
-          if [[ -z "${prev_api}${prev_web}" ]]; then
-            echo "::error::Snapshot holds no image IDs — manual intervention required."
+          prev_mcp=$(awk '/^northstar-mcp /{print $2}' .last-deploy.txt)
+          # Guard EACH request-path image individually: an empty var would resolve
+          # to compose's :latest default, which does not exist on the box under
+          # --no-build and fails the roll-back. api and web are both required.
+          missing=()
+          [[ -z "$prev_api" ]] && missing+=(api)
+          [[ -z "$prev_web" ]] && missing+=(web)
+          if (( ${#missing[@]} )); then
+            echo "::error::Snapshot missing previous image(s): ${missing[*]} — manual intervention required."
             exit 1
           fi
-          echo "::warning::Deploy failed — rolling back (api=${prev_api} web=${prev_web} worker=${prev_worker:-none})"
-          # First worker deploy has no previous image; roll api+web back and
-          # leave the new worker in place (it is additive, not on the request path).
-          NORTHSTAR_API_IMAGE="${prev_api}" \
-          NORTHSTAR_WEB_IMAGE="${prev_web}" \
-          NORTHSTAR_WORKER_IMAGE="${prev_worker:-ghcr.io/kl3init/northstar-worker:main}" \
-            docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-              --env-file .env up -d --no-build api web worker
+          # Roll api+web back to their snapshots. The worker is additive (not on
+          # the request path): recreate it only if we actually snapshotted it —
+          # never invent a :main/:latest ref — otherwise leave the new one in place.
+          rollback_services="api web"
+          export NORTHSTAR_API_IMAGE="$prev_api"
+          export NORTHSTAR_WEB_IMAGE="$prev_web"
+          if [[ -n "$prev_worker" ]]; then
+            export NORTHSTAR_WORKER_IMAGE="$prev_worker"
+            rollback_services="$rollback_services worker"
+          fi
+          if [[ -n "$prev_mcp" ]]; then
+            export NORTHSTAR_MCP_IMAGE="$prev_mcp"
+            rollback_services="$rollback_services mcp"
+          fi
+          echo "::warning::Deploy failed — rolling back (api=${prev_api} web=${prev_web} worker=${prev_worker:-keep-current} mcp=${prev_mcp:-keep-current})"
+          docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
+            --env-file .env up -d --no-build $rollback_services
           docker exec nginx-proxy-manager nginx -s reload >/dev/null 2>&1 || true
           for attempt in {1..60}; do
             if docker exec northstar-api curl -fsS http://localhost:8888/actuator/health >/dev/null 2>&1; then

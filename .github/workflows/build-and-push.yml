@@ -1,14 +1,22 @@
 # Build container images and push to GHCR.
 #
 # Single-developer simplification of zero-mail's pipeline: no semver release
-# train — every push to main publishes :main + :sha-<short> images, and the
-# deploy workflow rolls the VPS onto :main. Rollback safety comes from the
+# train — every green CI run on main publishes :main + :sha-<short> images, and
+# the deploy workflow rolls the VPS onto :main. Rollback safety comes from the
 # deploy job's image-ID snapshot (zero-mail's .last-deploy.txt pattern), not
 # from version tags.
+#
+# Gated on CI: this runs only after the "CI" workflow completes successfully on
+# main (workflow_run), so a red suite (Modulith verify, integration tests, web
+# build via gen:api drift) never produces images — and, since deploy triggers
+# off THIS workflow's success, never auto-deploys. build-and-push itself only
+# compiles (bootJar -x test); the test gate lives in CI upstream.
 name: Build and Push Images
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -24,6 +32,8 @@ jobs:
   build:
     name: Build ${{ matrix.component }}
     runs-on: ubuntu-latest
+    # Only build when CI passed (manual dispatch always proceeds).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -38,7 +48,11 @@ jobs:
             dockerfile: apps/worker/Dockerfile
 
     steps:
+      # workflow_run checks out the default branch tip by default; pin the exact
+      # commit CI validated so the :sha-<short> tag matches the tested code.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - uses: docker/setup-buildx-action@v3
 

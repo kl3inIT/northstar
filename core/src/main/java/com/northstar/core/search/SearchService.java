@@ -2,6 +2,7 @@ package com.northstar.core.search;
 
 import com.northstar.core.attachment.AttachmentContent;
 import com.northstar.core.attachment.AttachmentService;
+import com.northstar.core.attachment.AttachmentView;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteSummary;
@@ -36,6 +37,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
@@ -211,9 +213,11 @@ public class SearchService {
 
     /**
      * Embeds one uploaded file so search finds it: Tika-extracted text for
-     * documents, a vision caption for images. Attachments are immutable, so a
-     * file already in the index is skipped outright. Returns whether anything
-     * was embedded.
+     * documents, a vision caption for images. The bytes are immutable, but the
+     * content hash folds in {@link #INDEX_VERSION}: an already-indexed file is
+     * skipped only while its stored hash still matches, so bumping the version
+     * re-embeds every file on the next backfill. Returns whether anything was
+     * embedded.
      */
     public boolean indexAttachment(UUID attachmentId) {
         VectorStore store = vectorStore.getIfAvailable();
@@ -221,7 +225,15 @@ public class SearchService {
             log.debug("No vector store in this app — file {} left for the backfill", attachmentId);
             return false;
         }
-        if (indexedHash("attachmentId", attachmentId) != null) {
+        // Metadata-only lookup: compute the hash from sha256 without reading bytea,
+        // so an unchanged file costs one SQL round trip, not a Tika/vision run.
+        AttachmentView fileMeta = attachments.find(attachmentId).orElse(null);
+        if (fileMeta == null) {
+            return false;
+        }
+        String hash = contentHash(fileMeta.sha256());
+        if (hash.equals(indexedHash("attachmentId", attachmentId))) {
+            log.debug("File {} unchanged (hash match) — embedding skipped", attachmentId);
             return false;
         }
         AttachmentContent content = loadQuietly(attachmentId);
@@ -230,7 +242,6 @@ public class SearchService {
         }
         String filename = content.meta().filename();
         String mime = content.meta().mimeType().toLowerCase(Locale.ROOT);
-        String hash = contentHash(content.meta().sha256());
 
         List<Document> docs;
         if (mime.startsWith("image/")) {
@@ -264,6 +275,9 @@ public class SearchService {
                 docs = docs.subList(0, MAX_ATTACHMENT_CHUNKS);
             }
         }
+        // Clear any prior-format vectors before re-adding, so an INDEX_VERSION bump
+        // (or a re-caption) heals the file in place instead of duplicating chunks.
+        store.delete(filter("attachmentId", attachmentId));
         store.add(docs);
         log.debug("Embedded file {} as {} chunk(s)", filename, docs.size());
         return true;
@@ -292,7 +306,10 @@ public class SearchService {
         int pageNumber = 0;
         Page<NoteSummary> page;
         do {
-            page = notes.list(PageRequest.of(pageNumber++, BACKFILL_PAGE));
+            // Stable sort by id: without an ORDER BY, OFFSET paging can skip a live
+            // note between pages, whose id would then be treated as orphaned and its
+            // vectors deleted. A fixed id order never shifts existing rows.
+            page = notes.list(PageRequest.of(pageNumber++, BACKFILL_PAGE, Sort.by("id")));
             for (NoteSummary note : page) {
                 indexedNotes.remove(note.id().toString());
                 try {
@@ -309,14 +326,16 @@ public class SearchService {
         int embeddedFiles = 0;
         Set<String> indexedFiles = indexedIds("attachmentId");
         for (UUID attachmentId : attachments.listIds()) {
-            if (!indexedFiles.remove(attachmentId.toString())) {
-                try {
-                    if (indexAttachment(attachmentId)) {
-                        embeddedFiles++;
-                    }
-                } catch (Exception e) {
-                    log.warn("Backfill failed to embed file {} — will retry next run", attachmentId, e);
+            // Visit EVERY file (not just ones absent from the index): indexAttachment
+            // hash-checks internally, so this is cheap for unchanged files and lets
+            // an INDEX_VERSION bump re-embed already-indexed ones.
+            indexedFiles.remove(attachmentId.toString());
+            try {
+                if (indexAttachment(attachmentId)) {
+                    embeddedFiles++;
                 }
+            } catch (Exception e) {
+                log.warn("Backfill failed to embed file {} — will retry next run", attachmentId, e);
             }
         }
         VectorStore store = vectorStore.getIfAvailable();

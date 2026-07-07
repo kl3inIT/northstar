@@ -26,6 +26,11 @@ services:
     restart: unless-stopped
     env_file: ../.env
     environment:
+      # The app resolves the user's "today"/"this week" from the JVM's system
+      # zone (ToolSupport.zone(), the assistant's date injection, reviews). This
+      # is a single-user OS, so pin that zone to the user's — otherwise a UTC
+      # container files reviews and tasks on the wrong calendar day for UTC+7.
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
       NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
       NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
       NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -61,9 +66,15 @@ services:
       retries: 3
     logging: *default-logging
 
-  # MCP server for EXTERNAL clients (Claude, etc.) — off by default; start
-  # with `--profile mcp` once it is actually exposed (and give it its own
-  # auth at the edge first).
+  # MCP server for EXTERNAL clients (Claude Desktop / claude.ai / Claude Code /
+  # codex, etc.) — Streamable-HTTP at /mcp on :8081.
+  #
+  # DEPLOYED WITHOUT AUTH by the user's explicit choice (2026-07-07): it must
+  # work uniformly across every MCP client, and static bearer/OAuth don't. The
+  # tools grant full read/write/delete over all personal data, so anyone with
+  # the URL has that power. Mitigation in use is obscurity only — route it at a
+  # SECRET, unguessable NPM host/path (not the literal /mcp), keep the URL
+  # private, and add real auth (OAuth 2.1 resource server) before wider exposure.
   mcp:
     build:
       context: ..
@@ -71,9 +82,9 @@ services:
     image: ${NORTHSTAR_MCP_IMAGE:-northstar-mcp:latest}
     container_name: northstar-mcp
     restart: unless-stopped
-    profiles: ["mcp"]
     env_file: ../.env
     environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
       NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
       NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
       NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
@@ -102,6 +113,7 @@ services:
     restart: unless-stopped
     env_file: ../.env
     environment:
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
       NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
       NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
       NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}

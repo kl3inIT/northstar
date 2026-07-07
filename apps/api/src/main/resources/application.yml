@@ -25,6 +25,12 @@ spring:
     enabled: true
     # Migrations ship on the classpath from :core (core/src/main/resources/db/migration).
     locations: classpath:db/migration
+    # The shared zeromail-postgres is an EXTERNAL container — compose cannot
+    # depends_on it, so after a VPS reboot the api may start before the DB
+    # accepts connections. Retry the first connection (≈150s) instead of
+    # failing fast and crash-looping the site into 502s until the race is won.
+    connect-retries: 30
+    connect-retries-interval: 5s
   ai:
     openai:
       api-key: ${OPENAI_API_KEY}

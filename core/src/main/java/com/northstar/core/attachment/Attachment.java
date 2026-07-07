@@ -12,8 +12,10 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One stored file. Rows are immutable after upload (content-addressed by
- * sha256), so serving can send far-future cache headers keyed on the id.
+ * One stored file. Content is immutable after upload (content-addressed by
+ * sha256), so serving can send far-future cache headers keyed on the id. Only
+ * descriptive metadata may be corrected on a later dedup hit (see
+ * {@link #upgradeMime}); the bytes and hash never change.
  */
 @Entity
 @Table(name = "attachment")
@@ -66,6 +68,11 @@ public class Attachment extends BaseEntity {
 
     public String getMimeType() {
         return mimeType;
+    }
+
+    /** Corrects a generic stored mime once a better-typed re-upload of the same bytes arrives. */
+    void upgradeMime(String mimeType) {
+        this.mimeType = mimeType;
     }
 
     public long getSizeBytes() {

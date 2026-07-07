@@ -42,7 +42,7 @@ public class AttachmentService {
         String cleanMime = mimeType == null || mimeType.isBlank() ? "application/octet-stream" : mimeType.strip();
         String hash = sha256(data);
         return attachments.findBySha256(hash)
-                .map(this::view)
+                .map(existing -> view(healMime(existing, cleanMime)))
                 .orElseGet(() -> {
                     AttachmentView saved = view(attachments.save(
                             new Attachment(UUID.randomUUID(), cleanName, cleanMime, hash, data)));
@@ -72,7 +72,24 @@ public class AttachmentService {
 
     @Transactional(readOnly = true)
     public Optional<AttachmentView> find(UUID id) {
-        return attachments.findById(id).map(this::view);
+        // Projection query: metadata only, so an ETag/304 check never reads the bytea.
+        return attachments.findMetaById(id);
+    }
+
+    /**
+     * A dedup hit for the same bytes may arrive with a better mime than the row
+     * was first stored with — e.g. the first upload carried no Content-Type and
+     * was pinned to {@code application/octet-stream}, so its image rendered
+     * broken. Heal that generic type from a specific one; the content
+     * (sha256/bytes) stays immutable, only the descriptive mime is corrected.
+     */
+    private Attachment healMime(Attachment existing, String cleanMime) {
+        boolean canHeal = existing.getMimeType().equalsIgnoreCase("application/octet-stream")
+                && !cleanMime.equalsIgnoreCase("application/octet-stream");
+        if (canHeal) {
+            existing.upgradeMime(cleanMime);
+        }
+        return existing;
     }
 
     private AttachmentView view(Attachment a) {
