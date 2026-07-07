@@ -117,8 +117,10 @@ class AssistantController {
         }
         // Images ride into memory as markdown links to their stored file, so
         // /history re-renders them on reload (the bytes live in attachment, V16).
+        // Fixed alt text — an attacker-chosen filename must not be able to close
+        // the bracket and inject its own markdown/links into the transcript.
         String markers = images.stream()
-                .map(a -> "![%s](/api/files/%s)".formatted(a.meta().filename(), a.meta().id()))
+                .map(a -> "![image](/api/files/%s)".formatted(a.meta().id()))
                 .collect(Collectors.joining("\n"));
         String stored = message.isBlank() ? markers
                 : markers.isBlank() ? message : message + "\n\n" + markers;

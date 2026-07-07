@@ -4,7 +4,10 @@ import com.northstar.core.attachment.AttachmentContent;
 import com.northstar.core.attachment.AttachmentService;
 import com.northstar.core.attachment.AttachmentView;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
@@ -32,6 +35,14 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/files")
 class AttachmentController {
 
+    /**
+     * The ONLY types ever rendered inline, and they must prove it by magic
+     * bytes at upload. Everything else downloads as an attachment under a
+     * sandboxing CSP — an uploaded SVG/HTML must never execute on this origin.
+     */
+    private static final Set<String> INLINE_IMAGE_TYPES =
+            Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
+
     private final AttachmentService attachments;
 
     AttachmentController(AttachmentService attachments) {
@@ -47,7 +58,37 @@ class AttachmentController {
         } catch (IOException e) {
             throw new IllegalArgumentException("Could not read the uploaded file", e);
         }
-        return attachments.store(file.getOriginalFilename(), file.getContentType(), bytes);
+        String claimed = file.getContentType() == null ? "" : file.getContentType();
+        String mime = claimed;
+        // Never trust the declared type for the image fast-path: an "image/png"
+        // that is really SVG/HTML would otherwise render inline on our origin.
+        // Storing the SNIFFED type also canonicalizes quirks like "image/jpg".
+        if (claimed.toLowerCase(Locale.ROOT).startsWith("image/")) {
+            mime = sniffImageType(bytes);
+            if (mime == null) {
+                throw new IllegalArgumentException(
+                        "Unsupported image format — use PNG, JPEG, GIF or WebP");
+            }
+        }
+        return attachments.store(file.getOriginalFilename(), mime, bytes);
+    }
+
+    /** Magic-byte check for the inline allowlist; null = not a known raster image. */
+    private static String sniffImageType(byte[] b) {
+        if (b.length >= 8 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
+            return "image/png";
+        }
+        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) {
+            return "image/jpeg";
+        }
+        if (b.length >= 6 && b[0] == 'G' && b[1] == 'I' && b[2] == 'F' && b[3] == '8') {
+            return "image/gif";
+        }
+        if (b.length >= 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'
+                && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') {
+            return "image/webp";
+        }
+        return null;
     }
 
     @GetMapping("/{id}")
@@ -61,13 +102,21 @@ class AttachmentController {
         if (etag.equals(ifNoneMatch)) {
             return ResponseEntity.status(HttpStatus.NOT_MODIFIED).eTag(etag).build();
         }
+        boolean inlineImage = INLINE_IMAGE_TYPES.contains(meta.mimeType().toLowerCase(Locale.ROOT));
+        ContentDisposition disposition = (inlineImage ? ContentDisposition.inline()
+                : ContentDisposition.attachment())
+                .filename(meta.filename(), StandardCharsets.UTF_8)
+                .build();
         return ResponseEntity.ok()
                 .eTag(etag)
                 .cacheControl(CacheControl.maxAge(Duration.ofDays(365)).cachePrivate().immutable())
-                .contentType(MediaType.parseMediaType(meta.mimeType()))
-                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
-                        .filename(meta.filename())
-                        .build().toString())
+                // Belt and braces against stored XSS: the browser must not
+                // second-guess the type, and even a hostile body is inert.
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "sandbox; default-src 'none'")
+                .contentType(inlineImage ? MediaType.parseMediaType(meta.mimeType())
+                        : MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(content.data());
     }
 }
