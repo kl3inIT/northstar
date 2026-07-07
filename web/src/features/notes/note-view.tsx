@@ -19,10 +19,10 @@ function formatDate(iso: string): string {
 export function NoteView() {
   const { slug } = useParams({ from: '/notes/$slug' })
   const { data: note, isLoading, isError } = useNote(slug)
-  const [editing, setEditing] = useState(false)
-
-  // Leave edit mode whenever we switch to another note.
-  useEffect(() => setEditing(false), [slug])
+  // Edit-first, like Obsidian: opening a note lands in the editor; a Reading
+  // toggle swaps to the rendered view. Re-arm edit mode on every note switch.
+  const [editing, setEditing] = useState(true)
+  useEffect(() => setEditing(true), [slug])
 
   if (isLoading) {
     return (
@@ -42,7 +42,8 @@ export function NoteView() {
   }
 
   if (editing) {
-    return <NoteEditor note={note} onDone={() => setEditing(false)} />
+    // key by id so the editor's local state resets when switching notes.
+    return <NoteEditor key={note.id} note={note} onDone={() => setEditing(false)} />
   }
 
   const crumbs = note.folderPath ? note.folderPath.split('/') : []
@@ -50,6 +51,7 @@ export function NoteView() {
   return (
     <div className="flex min-w-0 flex-1">
       <article className="min-w-0 flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
+       <div className="mx-auto w-full max-w-3xl">
         {/* Mobile is single-pane (the list pane is hidden) — offer a way back. */}
         <Button asChild size="sm" variant="ghost" className="-ml-2 mb-3 md:hidden">
           <Link to="/notes">
@@ -78,6 +80,7 @@ export function NoteView() {
         </div>
         <Separator className="my-6" />
         <MarkdownBody content={note.contentMarkdown} links={note.outgoingLinks} />
+       </div>
       </article>
       <aside className="hidden w-80 shrink-0 overflow-auto border-l p-5 lg:block">
         <RightPanel note={note} />

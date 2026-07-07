@@ -1,15 +1,14 @@
 import { useNavigate } from '@tanstack/react-router'
-import { Loader2, Save, X } from 'lucide-react'
+import { Eye, Loader2, Save } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { MarkdownBody } from '@/components/markdown-body'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { fileUrl, uploadFile } from '@/lib/files-api'
-import { useUpdateNote } from '@/lib/notes-api'
+import { useNoteIndex, useUpdateNote } from '@/lib/notes-api'
 import type { NoteDetail } from '@/lib/notes-types'
+import { NoteCmEditor, type NoteCmEditorHandle } from './cm/note-cm-editor'
 
 function tagsToText(tags: string[]): string {
   return tags.join(', ')
@@ -23,18 +22,22 @@ function textToTags(text: string): string[] {
 }
 
 /**
- * Source editor for a note (title · folder · tags · markdown). Saves through
- * {@code PUT /api/notes/{id}}; when the title change moves the slug we navigate to
- * the new URL. A live preview mirrors what the read view will render.
+ * Source editor for a note (title · folder · tags · markdown). The body is a
+ * CodeMirror "decorated source" editor (see {@link ./cm/note-cm-editor}) —
+ * Markdown stays the literal buffer, styled in place, so saves round-trip
+ * losslessly. Saves through {@code PUT /api/notes/{id}}; when the title change
+ * moves the slug we navigate to the new URL.
  */
 export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => void }) {
   const [title, setTitle] = useState(note.title)
   const [folderPath, setFolderPath] = useState(note.folderPath)
   const [tagsText, setTagsText] = useState(tagsToText(note.tags))
   const [content, setContent] = useState(note.contentMarkdown)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const editorRef = useRef<NoteCmEditorHandle>(null)
   const navigate = useNavigate()
   const update = useUpdateNote()
+  const { data: index } = useNoteIndex()
+  const titles = (index ?? []).map((n) => n.title)
 
   /**
    * Paste or drop files → upload to the attachment vault, insert at the caret:
@@ -59,12 +62,19 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
             : `[${meta.filename}](${fileUrl(meta.id)})`
         }),
       )
-      const el = textareaRef.current
-      const at = el?.selectionStart ?? content.length
-      const inserted = markdown.join('\n')
-      setContent((prev) => `${prev.slice(0, at)}${inserted}${prev.slice(at)}`)
+      editorRef.current?.insertAtCursor(markdown.join('\n'))
     } catch {
       toast.error('Upload failed — try again.')
+    }
+  }
+
+  /** Cmd/Ctrl+click on a [[wiki link]] → open the target note if it exists. */
+  function openWikiLink(linkTitle: string) {
+    const target = (index ?? []).find((n) => n.title.toLowerCase() === linkTitle.toLowerCase())
+    if (target) {
+      navigate({ to: '/notes/$slug', params: { slug: target.slug } })
+    } else {
+      toast.info(`“${linkTitle}” does not exist yet.`)
     }
   }
 
@@ -85,7 +95,7 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
       },
       {
         onSuccess: (next) => {
-          onDone()
+          toast.success('Saved')
           if (next.slug !== note.slug) navigate({ to: '/notes/$slug', params: { slug: next.slug } })
         },
       },
@@ -101,7 +111,8 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
 
   return (
     <div className="flex min-w-0 flex-1 flex-col" onKeyDown={onKeyDown}>
-      <header className="space-y-3 border-b px-10 py-5">
+      <header className="border-b px-4 py-5 md:px-10">
+       <div className="mx-auto w-full max-w-3xl space-y-3">
         <Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -135,7 +146,7 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" onClick={onDone} disabled={update.isPending}>
-              <X className="size-4" /> Cancel
+              <Eye className="size-4" /> Reading
             </Button>
             <Button size="sm" onClick={save} disabled={!canSave}>
               {update.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Save
@@ -145,36 +156,24 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
         {update.isError && (
           <p className="text-sm text-destructive">
             {(update.error as { status?: number } | null)?.status === 409
-              ? 'This note was edited elsewhere — close the editor and reopen it to get the latest version.'
+              ? 'This note was edited elsewhere — switch to Reading and back to get the latest version.'
               : 'Save failed. Check the title and try again.'}
           </p>
         )}
+       </div>
       </header>
-      <div className="grid min-h-0 flex-1 grid-cols-2 divide-x">
-        <Textarea
-          ref={textareaRef}
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 text-sm leading-relaxed md:px-10 md:py-8">
+       <div className="mx-auto w-full max-w-3xl">
+        <NoteCmEditor
+          ref={editorRef}
           value={content}
-          onChange={(e) => setContent(e.target.value)}
-          onPaste={(e) => {
-            const files = [...e.clipboardData.files]
-            if (files.length > 0) {
-              e.preventDefault()
-              insertFiles(files)
-            }
-          }}
-          onDrop={(e) => {
-            const files = [...e.dataTransfer.files]
-            if (files.length > 0) {
-              e.preventDefault()
-              insertFiles(files)
-            }
-          }}
+          onChange={setContent}
+          onFiles={insertFiles}
+          noteTitles={titles}
+          onOpenWikiLink={openWikiLink}
           placeholder="Write in Markdown. Link notes with [[Title]]. Paste or drop images and files (PDF, DOCX…) to attach them."
-          className="min-h-0 resize-none rounded-none border-0 px-4 py-6 md:px-10 md:py-8 font-mono text-sm leading-relaxed shadow-none focus-visible:ring-0"
         />
-        <div className="min-h-0 overflow-auto px-4 py-6 md:px-10 md:py-8">
-          <MarkdownBody content={content} links={note.outgoingLinks} />
-        </div>
+       </div>
       </div>
     </div>
   )

@@ -45,7 +45,11 @@ function StatusRow({ note, active }: { note: NoteSummary; active: boolean }) {
         active && 'bg-accent',
       )}
     >
-      <Link to="/notes/$slug" params={{ slug: note.slug }} className="block min-w-0">
+      <Link
+        to="/notes/$slug"
+        params={{ slug: note.slug }}
+        className="block min-w-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      >
         <p className="truncate text-sm font-medium">{note.title}</p>
         {note.snippet && <p className="line-clamp-2 text-xs text-muted-foreground">{note.snippet}</p>}
       </Link>

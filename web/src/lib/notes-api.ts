@@ -71,6 +71,15 @@ export function useNotesByStatus(status: NoteStatus) {
   return useQuery({ queryKey: ['notes', status], queryFn: () => listNotes(status) })
 }
 
+/** All notes (every status), title + slug — for `[[` autocomplete and click-nav in the editor. */
+export function useNoteIndex() {
+  return useQuery({
+    queryKey: ['notes', 'index'],
+    queryFn: () => listNotes(),
+    staleTime: 60_000,
+  })
+}
+
 /** Badge count for the staging review queue (sidebar + tab) — total only, not the rows. */
 export function useStagingCount() {
   return useQuery({
