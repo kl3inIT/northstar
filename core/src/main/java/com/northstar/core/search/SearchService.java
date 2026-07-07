@@ -6,9 +6,8 @@ import com.northstar.core.attachment.AttachmentView;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteSummary;
+import com.northstar.core.shared.Hashing;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,7 +18,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.HexFormat;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -485,13 +483,9 @@ public class SearchService {
     }
 
     private static String contentHash(String content) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest((INDEX_VERSION + "\n" + content).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("JVM without SHA-256", e); // spec-mandated, unreachable
-        }
+        // Fold in INDEX_VERSION so a chunking/caption-format change invalidates
+        // every stored hash and forces a re-embed on the next backfill.
+        return Hashing.sha256Hex(INDEX_VERSION + "\n" + content);
     }
 
     private static double rrf(int rank) {

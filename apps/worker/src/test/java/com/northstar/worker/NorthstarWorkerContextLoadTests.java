@@ -15,7 +15,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * test enables Flyway (migrations travel on {@code :core}'s classpath) to bring the
  * empty Testcontainers database up to the same schema before validation runs.
  */
-@SpringBootTest(properties = "spring.flyway.enabled=true")
+@SpringBootTest(properties = {
+        "spring.flyway.enabled=true",
+        // The worker now wires OpenAI (indexing/captions); the starter needs a key
+        // to build its beans, but nothing calls OpenAI during a context-load test.
+        "spring.ai.openai.api-key=test-key"})
 @Testcontainers
 class NorthstarWorkerContextLoadTests {
 

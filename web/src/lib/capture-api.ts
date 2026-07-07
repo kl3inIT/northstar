@@ -19,6 +19,13 @@ function local(date: string, time: string): Date {
   return new Date(`${date}T${time}:00`)
 }
 
+/** The LLM names a discipline; resolve it to an id by exact name, else undefined (drop). */
+async function resolveDisciplineId(name?: string | null): Promise<string | undefined> {
+  if (!name) return undefined
+  const disciplines = await listDisciplines().catch(() => [])
+  return disciplines.find((d) => d.name === name)?.id
+}
+
 export async function deleteNote(id: string): Promise<void> {
   const { error } = await api.DELETE('/api/notes/{id}', { params: { path: { id } } })
   if (error) throw error
@@ -39,12 +46,7 @@ export async function capture(text: string, kind?: CaptureKind): Promise<Capture
 
   if (draft.kind === 'TASK' && draft.task) {
     const t = draft.task
-    // The LLM names a discipline; resolve it to an id (exact name, else drop).
-    let disciplineId: string | undefined
-    if (t.disciplineName) {
-      const disciplines = await listDisciplines().catch(() => [])
-      disciplineId = disciplines.find((d) => d.name === t.disciplineName)?.id
-    }
+    const disciplineId = await resolveDisciplineId(t.disciplineName)
     // Strict structured output can hand back "" instead of null — drop empties
     // so TaskRequest's LocalDate/LocalTime parsing never sees them.
     const created = await createTask({
@@ -65,11 +67,7 @@ export async function capture(text: string, kind?: CaptureKind): Promise<Capture
 
   if (draft.kind === 'EVENT' && draft.event) {
     const ev = draft.event
-    let disciplineId: string | undefined
-    if (ev.disciplineName) {
-      const disciplines = await listDisciplines().catch(() => [])
-      disciplineId = disciplines.find((d) => d.name === ev.disciplineName)?.id
-    }
+    const disciplineId = await resolveDisciplineId(ev.disciplineName)
     const date = ev.date || new Date().toISOString().slice(0, 10)
     // Same local-time convention as the calendar dialogs: all-day = 00:00→23:59,
     // a timed event with no stated end gets a 1-hour default.

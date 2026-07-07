@@ -14,6 +14,7 @@ import {
 } from '@/components/kibo-ui/kanban'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
 import { DISCIPLINE_DOT as DOT } from '@/lib/discipline-colors'
+import { iso } from '@/lib/dates'
 import {
   useRangeTasks,
   useSetTaskDone,
@@ -23,10 +24,6 @@ import {
   type Task,
 } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
-
-function iso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 function addDays(isoDate: string, days: number): string {
   const d = new Date(isoDate + 'T00:00:00')

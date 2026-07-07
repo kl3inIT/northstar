@@ -50,6 +50,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { api } from '@/lib/api'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
 import { DISCIPLINE_HEX as HEX } from '@/lib/discipline-colors'
+import { iso } from '@/lib/dates'
 import {
   useAddMilestone,
   useCreateProject,
@@ -66,10 +67,6 @@ import {
 } from '@/lib/projects-api'
 import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
-
-function iso(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 
 /** A bar needs a span: fall back to createdAt → +30 days until real dates are set. */
 function featureOf(p: Project, disciplines: Discipline[]): GanttFeature {

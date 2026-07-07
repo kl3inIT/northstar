@@ -40,6 +40,8 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { MicButton } from '@/components/mic-button'
+import { api } from '@/lib/api'
+import type { components } from '@/lib/api.gen'
 import { fileUrl, uploadFile } from '@/lib/files-api'
 import { useStagingCount } from '@/lib/notes-api'
 import { useTodayTasks } from '@/lib/tasks-api'
@@ -107,32 +109,23 @@ const PILL_INPUT =
   '[&_[data-slot=input-group]]:bg-muted/60 [&_[data-slot=input-group]]:shadow-none ' +
   '[&_[data-slot=input-group]]:!ring-0'
 
-interface ConversationSummary {
-  id: string
-  title: string
-  lastAt: string
-  messages: number
-}
-
-interface HistoryMessage {
-  role: 'user' | 'assistant'
-  text: string
-}
+// The server always populates every field; the generated schema marks them
+// optional (no `required` in the contract), so assert them present here.
+type ConversationSummary = Required<components['schemas']['ConversationSummary']>
 
 async function fetchConversations(): Promise<ConversationSummary[]> {
-  const res = await fetch('/api/assistant/conversations')
-  if (!res.ok) return []
-  return (await res.json()) as ConversationSummary[]
+  const { data } = await api.GET('/api/assistant/conversations')
+  return (data ?? []) as ConversationSummary[]
 }
 
 async function fetchHistory(conversationId: string): Promise<UIMessage[]> {
-  const res = await fetch(`/api/assistant/history?conversationId=${conversationId}`)
-  if (!res.ok) return []
-  const messages = (await res.json()) as HistoryMessage[]
-  return messages.map((m, i) => ({
+  const { data } = await api.GET('/api/assistant/history', {
+    params: { query: { conversationId } },
+  })
+  return (data ?? []).map((m, i) => ({
     id: `history-${i}`,
-    role: m.role,
-    parts: [{ type: 'text', text: m.text }],
+    role: (m.role ?? 'assistant') as 'user' | 'assistant',
+    parts: [{ type: 'text', text: m.text ?? '' }],
   }))
 }
 
@@ -199,7 +192,7 @@ export function AssistantPage() {
   }, [isPending, conversations])
 
   function remove(id: string) {
-    fetch(`/api/assistant/conversations/${id}`, { method: 'DELETE' })
+    api.DELETE('/api/assistant/conversations/{id}', { params: { path: { id } } })
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['assistant-conversations'] })
         queryClient.removeQueries({ queryKey: ['assistant-history', id] })

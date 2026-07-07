@@ -1,8 +1,6 @@
 package com.northstar.core.attachment;
 
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
+import com.northstar.core.shared.Hashing;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -40,7 +38,7 @@ public class AttachmentService {
         }
         String cleanName = safeFilename(filename);
         String cleanMime = mimeType == null || mimeType.isBlank() ? "application/octet-stream" : mimeType.strip();
-        String hash = sha256(data);
+        String hash = Hashing.sha256Hex(data);
         return attachments.findBySha256(hash)
                 .map(existing -> view(healMime(existing, cleanMime)))
                 .orElseGet(() -> {
@@ -105,13 +103,5 @@ public class AttachmentService {
             name = name.substring(cut + 1);
         }
         return name.isBlank() ? "file" : name;
-    }
-
-    private static String sha256(byte[] data) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("JVM without SHA-256", e); // spec-mandated, unreachable
-        }
     }
 }

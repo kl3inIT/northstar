@@ -27,6 +27,9 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
     /** Every note in one exact folder — small, curated folders (assistant memory). */
     List<Note> findByFolderPathOrderByTitleAsc(String folderPath);
 
+    /** One note by exact folder + title (case-insensitive) — the assistant's flat memory store. */
+    Optional<Note> findFirstByFolderPathAndTitleIgnoreCase(String folderPath, String title);
+
     /** Notes carrying ANY of the tags, one working state excluded. */
     @Query("""
             SELECT DISTINCT n FROM Note n JOIN n.tags t

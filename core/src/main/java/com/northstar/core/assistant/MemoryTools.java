@@ -1,5 +1,6 @@
 package com.northstar.core.assistant;
 
+import com.northstar.core.note.NoteBody;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteStatus;
@@ -130,7 +131,9 @@ public class MemoryTools implements NorthstarTool {
      * what it remembers without spending a tool call.
      */
     public String promptSection() {
-        String index = byName(INDEX_NAME).map(NoteDetail::contentMarkdown)
+        // Direct folder+title body lookup — one indexed query. Runs every chat
+        // turn, so avoid byName()'s full-folder scan + NoteDetail link graph.
+        String index = notes.folderNoteBody(MEMORY_FOLDER, INDEX_NAME)
                 .filter(body -> !body.isBlank())
                 .orElse("(no memories saved yet)");
         return SYSTEM_PROMPT + "\n\n<memory-index>\n" + index + "\n</memory-index>";
@@ -353,14 +356,13 @@ public class MemoryTools implements NorthstarTool {
 
     private String listStore() {
         StringBuilder sb = new StringBuilder("Contents of /:\n\n");
-        List<NoteSummary> entries = notes.listByFolder(MEMORY_FOLDER);
+        // One query for (title, body) — no findById + link-graph load per note.
+        List<NoteBody> entries = notes.listFolderBodies(MEMORY_FOLDER);
         if (entries.isEmpty()) {
             return sb.append("  (empty — no memories saved yet)\n").toString();
         }
-        for (var entry : entries) {
-            int size = notes.findById(entry.id())
-                    .map(d -> d.contentMarkdown().getBytes(StandardCharsets.UTF_8).length)
-                    .orElse(0);
+        for (NoteBody entry : entries) {
+            int size = entry.markdown().getBytes(StandardCharsets.UTF_8).length;
             sb.append("  ").append(entry.title()).append(".md (").append(size).append(" bytes)\n");
         }
         return sb.toString();

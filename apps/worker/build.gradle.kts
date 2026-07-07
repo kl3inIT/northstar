@@ -6,11 +6,16 @@ dependencies {
     implementation(project(":core"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
+    // The worker owns search indexing (SearchIndexingWorker): OpenAI for the
+    // vision captions + embeddings, PgVectorStore for the vectors it writes.
+    // This is the heavy LLM/Tika work kept off the api's request threads.
+    implementation(libs.spring.ai.starter.openai)
+    implementation(libs.spring.ai.starter.pgvector)
+
     runtimeOnly("org.postgresql:postgresql")
 
     // Added later:
     // - ShedLock, to stop @Scheduled jobs running twice across instances
-    // - Spring AI, for embedding generation and memory compaction jobs
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-testcontainers")

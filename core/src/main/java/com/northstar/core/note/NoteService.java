@@ -149,6 +149,25 @@ public class NoteService {
     }
 
     /**
+     * (title, full body) for every note in a folder — one query, no link graph.
+     * For the assistant's flat memory store, which needs whole bodies but none of
+     * the backlink resolution {@link #detail} does.
+     */
+    @Transactional(readOnly = true)
+    public List<NoteBody> listFolderBodies(String folderPath) {
+        return notes.findByFolderPathOrderByTitleAsc(NoteText.normalizeFolderPath(folderPath))
+                .stream().map(n -> new NoteBody(n.getTitle(), n.getContentMarkdown())).toList();
+    }
+
+    /** One note's full body by exact folder + title (case-insensitive); no link graph. */
+    @Transactional(readOnly = true)
+    public Optional<String> folderNoteBody(String folderPath, String title) {
+        return notes.findFirstByFolderPathAndTitleIgnoreCase(
+                        NoteText.normalizeFolderPath(folderPath), title.strip())
+                .map(Note::getContentMarkdown);
+    }
+
+    /**
      * Notes carrying ANY of the tags, archived excluded — the MFI bridge to the
      * LDP spine: a note "belongs" to a discipline by carrying one of the
      * discipline name's words as a tag (e.g. "English · IELTS" → english, ielts).

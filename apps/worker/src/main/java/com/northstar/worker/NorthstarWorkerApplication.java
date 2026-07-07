@@ -7,11 +7,13 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Background worker. Runs scheduled jobs (deadline reminders, SRS recompute,
- * streaks, Obsidian export, alignment prompts) and consumes Modulith domain
- * events for heavier async work (embeddings, memory compaction, entity
- * extraction). Kept separate from the api so LLM-bound jobs never block request
- * threads. Reuses {@code :core}; does not run migrations.
+ * Background worker. Its job today is search indexing (SearchIndexingWorker):
+ * embedding notes/files and captioning images — LLM/Tika-heavy work kept off the
+ * api's request threads. It polls on a schedule rather than consuming events,
+ * because Modulith's event registry delivers in-process only (a write in the api
+ * never reaches this process); {@code SearchService.reindexStale()} is
+ * hash-idempotent so polling is cheap. Later: deadline reminders, SRS recompute,
+ * streaks, memory compaction. Reuses {@code :core}; does not run migrations.
  */
 @EnableScheduling
 @SpringBootApplication(scanBasePackages = {"com.northstar.worker", "com.northstar.core"})
