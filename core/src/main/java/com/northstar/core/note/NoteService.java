@@ -1,7 +1,6 @@
 package com.northstar.core.note;
 
 import com.northstar.core.project.ProjectService;
-import jakarta.persistence.EntityManager;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -42,15 +41,13 @@ public class NoteService {
     private final NoteLinkRepository links;
     private final ProjectService projects;
     private final ApplicationEventPublisher events;
-    private final EntityManager entityManager;
 
     NoteService(NoteRepository notes, NoteLinkRepository links, ProjectService projects,
-                ApplicationEventPublisher events, EntityManager entityManager) {
+                ApplicationEventPublisher events) {
         this.notes = notes;
         this.links = links;
         this.projects = projects;
         this.events = events;
-        this.entityManager = entityManager;
     }
 
     /** Hand-written note: born a trusted {@link NoteStatus#RESOURCE}. */
@@ -73,7 +70,7 @@ public class NoteService {
         requireProject(projectId);
         Note note = new Note(UUID.randomUUID(), title.strip(), uniqueSlug(title),
                 NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags), status, projectId);
-        flushAndRefresh(note);
+        notes.saveAndFlush(note);
         syncOutgoingLinks(note);
         resolveInboundLinks(note);
         events.publishEvent(new NoteSaved(note.getId()));
@@ -85,7 +82,7 @@ public class NoteService {
     public NoteDetail setStatus(UUID id, NoteStatus status) {
         Note note = notes.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
         note.moveTo(status);
-        flushAndRefresh(note);
+        notes.saveAndFlush(note);
         events.publishEvent(new NoteSaved(note.getId()));
         return detail(note);
     }
@@ -121,7 +118,7 @@ public class NoteService {
                 NoteText.normalizeTags(tags), projectId);
         syncOutgoingLinks(note);
         // Flush now so @LastModifiedDate/@Version are current in the response.
-        flushAndRefresh(note);
+        notes.saveAndFlush(note);
         events.publishEvent(new NoteSaved(note.getId()));
         return detail(note);
     }
@@ -319,8 +316,4 @@ public class NoteService {
         }
     }
 
-    private void flushAndRefresh(Note note) {
-        notes.saveAndFlush(note);
-        entityManager.refresh(note);
-    }
 }

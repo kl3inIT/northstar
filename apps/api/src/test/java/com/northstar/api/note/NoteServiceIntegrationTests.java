@@ -125,8 +125,9 @@ class NoteServiceIntegrationTests {
         assertThat(notes.listByProject(alpha.id())).extracting(NoteSummary::id).contains(created.id());
         assertThat(notes.listByProject(beta.id())).extracting(NoteSummary::id).doesNotContain(created.id());
 
-        NoteDetail moved = notes.update(created.id(), created.title(), created.folderPath(),
-                created.contentMarkdown(), created.tags(), created.version(), beta.id());
+        NoteDetail current = notes.getBySlug(created.slug()).orElseThrow();
+        NoteDetail moved = notes.update(current.id(), current.title(), current.folderPath(),
+                current.contentMarkdown(), current.tags(), current.version(), beta.id());
         assertThat(moved.projectId()).isEqualTo(beta.id());
         assertThat(notes.listByProject(alpha.id())).extracting(NoteSummary::id).doesNotContain(created.id());
         assertThat(notes.listByProject(beta.id())).extracting(NoteSummary::id).contains(created.id());
