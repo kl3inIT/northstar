@@ -1,5 +1,18 @@
 import { Link, useParams } from '@tanstack/react-router'
-import { Archive, Check, ChevronLeft, Clock, FileText, Info, Link2, List, Pencil, Undo2 } from 'lucide-react'
+import {
+  Archive,
+  Check,
+  ChevronLeft,
+  Clock,
+  FileText,
+  Info,
+  Link2,
+  List,
+  PanelRightClose,
+  PanelRightOpen,
+  Pencil,
+  Undo2,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { MarkdownBody } from '@/components/markdown-body'
@@ -14,6 +27,8 @@ import { useNote, useSetNoteStatus } from '@/lib/notes-api'
 import type { NoteDetail, NoteRef } from '@/lib/notes-types'
 import { NoteEditor } from './note-editor'
 
+const NOTE_SIDEBAR_KEY = 'note-right-sidebar-open'
+
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
@@ -24,6 +39,9 @@ export function NoteView() {
   // Reading-first: opening a note shows the rendered view; the Edit button opens
   // the CodeMirror editor. Return to reading on every note switch.
   const [editing, setEditing] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => localStorage.getItem(NOTE_SIDEBAR_KEY) !== '0',
+  )
   useEffect(() => setEditing(false), [slug])
 
   if (isLoading) {
@@ -50,6 +68,12 @@ export function NoteView() {
 
   const crumbs = note.folderPath ? note.folderPath.split('/') : []
   const stats = textStats(note.contentMarkdown)
+  const toggleSidebar = () => {
+    setSidebarOpen((open) => {
+      localStorage.setItem(NOTE_SIDEBAR_KEY, open ? '0' : '1')
+      return !open
+    })
+  }
 
   return (
     <div className="flex min-w-0 flex-1">
@@ -69,9 +93,21 @@ export function NoteView() {
             )}
             <h1 className="text-3xl font-bold tracking-tight">{note.title}</h1>
           </div>
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            <Pencil className="size-4" /> Edit
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="hidden text-muted-foreground lg:inline-flex"
+              aria-label={sidebarOpen ? 'Hide note sidebar' : 'Show note sidebar'}
+              title={sidebarOpen ? 'Hide note sidebar' : 'Show note sidebar'}
+              onClick={toggleSidebar}
+            >
+              {sidebarOpen ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+              <Pencil className="size-4" /> Edit
+            </Button>
+          </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5">
@@ -90,9 +126,11 @@ export function NoteView() {
         <MarkdownBody content={note.contentMarkdown} links={note.outgoingLinks} />
        </div>
       </article>
-      <aside className="hidden w-80 shrink-0 overflow-auto border-l p-5 lg:block">
-        <RightPanel note={note} />
-      </aside>
+      {sidebarOpen && (
+        <aside className="hidden w-80 shrink-0 overflow-auto border-l p-5 lg:block">
+          <RightPanel note={note} />
+        </aside>
+      )}
     </div>
   )
 }
