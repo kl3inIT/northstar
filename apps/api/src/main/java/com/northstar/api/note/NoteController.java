@@ -36,7 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/notes")
 class NoteController {
 
-    private static final int MAX_PAGE_SIZE = 500;
+    private static final int MAX_PAGE_SIZE = 5_000;
 
     private final NoteService notes;
 

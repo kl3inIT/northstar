@@ -1,8 +1,18 @@
 import { Outlet, useNavigate, useParams } from '@tanstack/react-router'
 import { FolderTree as FolderTreeIcon, Plus, Search, X } from 'lucide-react'
+import type { DragEvent } from 'react'
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -28,6 +38,8 @@ export function NotesLayout() {
   const [mode, setMode] = useState<SidebarMode>('files')
   const [filter, setFilter] = useState('')
   const [query, setQuery] = useState('')
+  const [newDialogOpen, setNewDialogOpen] = useState(false)
+  const [newTitle, setNewTitle] = useState('')
   const { data: notes = [], isLoading } = useNotes('')
   const { data: stagingCount = 0 } = useStagingCount()
   const params = useParams({ strict: false }) as { slug?: string }
@@ -48,12 +60,18 @@ export function NotesLayout() {
   )
   const tree = useMemo(() => buildFolderTree(visible), [visible])
 
-  function onNew() {
-    const title = window.prompt('New note title')?.trim()
+  function submitNewNote() {
+    const title = newTitle.trim()
     if (!title) return
     createNote.mutate(
       { title, folderPath: '', contentMarkdown: '', tags: [] },
-      { onSuccess: (note) => navigate({ to: '/notes/$slug', params: { slug: note.slug } }) },
+      {
+        onSuccess: (note) => {
+          setNewDialogOpen(false)
+          setNewTitle('')
+          navigate({ to: '/notes/$slug', params: { slug: note.slug } })
+        },
+      },
     )
   }
 
@@ -64,16 +82,26 @@ export function NotesLayout() {
   // Mobile is single-pane: the list until a note is picked, then the note
   // full-width (NoteView renders a back-to-list button under md).
   const hasNote = Boolean(params.slug)
+  const blockSidebarFileDrop = (event: DragEvent<HTMLElement>) => {
+    if (!Array.from(event.dataTransfer.types).includes('Files')) return
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.type === 'drop') {
+      toast.info('Open a note in Edit mode to attach files.')
+    }
+  }
 
   return (
-    <div className="flex min-w-0 flex-1">
+    <div className="flex min-h-0 min-w-0 flex-1">
       <aside
+        onDragOver={blockSidebarFileDrop}
+        onDrop={blockSidebarFileDrop}
         className={cn(
-          'w-full shrink-0 flex-col border-r md:flex md:w-72',
+          'min-h-0 w-full shrink-0 flex-col overflow-hidden border-r md:flex md:w-72',
           hasNote ? 'hidden' : 'flex',
         )}
       >
-        <div className="space-y-2 p-3">
+        <div className="shrink-0 space-y-2 p-3">
           <Tabs value={tab} onValueChange={(v) => setTab(v as StatusTab)}>
             <TabsList className="w-full">
               <TabsTrigger value="staging" className="flex-1 gap-1.5">
@@ -109,7 +137,12 @@ export function NotesLayout() {
                     <Search className="size-4" />
                   </ToggleGroupItem>
                 </ToggleGroup>
-                <Button size="sm" variant="outline" onClick={onNew} disabled={createNote.isPending}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setNewDialogOpen(true)}
+                  disabled={createNote.isPending}
+                >
                   <Plus className="size-4" /> New
                 </Button>
               </div>
@@ -135,30 +168,77 @@ export function NotesLayout() {
             </>
           )}
         </div>
-        {/* Radix wraps viewport children in a display:table div that sizes to
-            content — force it to block so the rows honor the pane width and
-            `truncate`/`line-clamp` work instead of overflowing off the right. */}
-        <ScrollArea className="flex-1 px-2 pb-2 [&_[data-slot=scroll-area-viewport]>div]:!block">
-          {tab === 'staging' ? (
-            <StatusList status="STAGING" activeSlug={params.slug} />
-          ) : tab === 'archive' ? (
-            <StatusList status="ARCHIVED" activeSlug={params.slug} />
-          ) : isFiles ? (
-            isLoading ? (
+        {tab === 'resources' && isFiles ? (
+          <div className="min-h-0 flex-1 px-2 pb-2">
+            {isLoading ? (
               <p className="px-3 py-2 text-sm text-muted-foreground">Loading…</p>
             ) : (
               <FolderTree tree={tree} activeSlug={params.slug} />
-            )
-          ) : (
-            <SearchPanel query={query} activeSlug={params.slug} />
-          )}
-        </ScrollArea>
+            )}
+          </div>
+        ) : (
+          /* Radix wraps viewport children in a display:table div that sizes to
+             content — force it to block so rows honor the pane width. */
+          <ScrollArea className="min-h-0 flex-1 overflow-hidden px-2 pb-2 [&_[data-slot=scroll-area-viewport]>div]:!block">
+            {tab === 'staging' ? (
+              <StatusList status="STAGING" activeSlug={params.slug} />
+            ) : tab === 'archive' ? (
+              <StatusList status="ARCHIVED" activeSlug={params.slug} />
+            ) : (
+              <SearchPanel query={query} activeSlug={params.slug} />
+            )}
+          </ScrollArea>
+        )}
         {tab === 'resources' && isFiles && needle && !isLoading && (
-          <p className="border-t px-3 py-2 text-xs text-muted-foreground">
+          <p className="shrink-0 border-t px-3 py-2 text-xs text-muted-foreground">
             {visible.length} of {notes.length} notes
           </p>
         )}
       </aside>
+      <Dialog
+        open={newDialogOpen}
+        onOpenChange={(open) => {
+          setNewDialogOpen(open)
+          if (!open) setNewTitle('')
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Note</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault()
+              submitNewNote()
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="new-note-title">Title</Label>
+              <Input
+                id="new-note-title"
+                autoFocus
+                value={newTitle}
+                onChange={(event) => setNewTitle(event.target.value)}
+                placeholder="Note title"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setNewDialogOpen(false)}
+                disabled={createNote.isPending}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={createNote.isPending || !newTitle.trim()}>
+                Create
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <div className={cn('min-w-0 flex-1 md:flex', hasNote ? 'flex' : 'hidden')}>
         <Outlet />
       </div>

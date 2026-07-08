@@ -4,11 +4,13 @@ import type { NoteDetail, NoteInput, NoteStatus, NoteSummary, NoteUpdate } from 
 
 /**
  * First page of notes, newest-first; {@code status} narrows to one MFI
- * working-state tab (Staging / Resources / Archive). 500 covers a personal KB.
+ * working-state tab (Staging / Resources / Archive). Bounded high enough for
+ * the virtualized personal KB tree; API pagination/search remains the next
+ * scale boundary.
  */
 export async function listNotes(status?: NoteStatus): Promise<NoteSummary[]> {
   const { data, error } = await api.GET('/api/notes', {
-    params: { query: { page: 0, size: 500, status } },
+    params: { query: { page: 0, size: 5000, status } },
   })
   if (error) throw error
   return (data?.content ?? []) as NoteSummary[]
@@ -51,6 +53,21 @@ export async function updateNote(id: string, body: NoteUpdate): Promise<NoteDeta
   const { data, error } = await api.PUT('/api/notes/{id}', { params: { path: { id } }, body })
   if (error) throw error
   return data as NoteDetail
+}
+
+export async function moveNoteToFolder(
+  note: Pick<NoteSummary, 'id' | 'slug'>,
+  folderPath: string,
+): Promise<NoteDetail> {
+  const current = await getNote(note.slug)
+  return updateNote(note.id, {
+    title: current.title,
+    folderPath,
+    contentMarkdown: current.contentMarkdown,
+    tags: current.tags,
+    projectId: current.projectId,
+    version: current.version,
+  })
 }
 
 /** Staging verdict ("→ Resources" / "Archive") or a restore. */
@@ -135,6 +152,19 @@ export function useUpdateNote() {
       queryClient.setQueryData(['note', note.slug], note)
       queryClient.invalidateQueries({ queryKey: ['notes'] })
       queryClient.invalidateQueries({ queryKey: ['note', note.slug] })
+      queryClient.invalidateQueries({ queryKey: ['project-notes'] })
+    },
+  })
+}
+
+export function useMoveNoteToFolder() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ note, folderPath }: { note: Pick<NoteSummary, 'id' | 'slug'>; folderPath: string }) =>
+      moveNoteToFolder(note, folderPath),
+    onSuccess: (note) => {
+      queryClient.setQueryData(['note', note.slug], note)
+      queryClient.invalidateQueries({ queryKey: ['notes'] })
       queryClient.invalidateQueries({ queryKey: ['project-notes'] })
     },
   })

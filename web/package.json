@@ -48,6 +48,7 @@
     "openapi-fetch": "^0.17.0",
     "radix-ui": "^1.6.1",
     "react": "^19.2.7",
+    "react-arborist": "^3.13.2",
     "react-day-picker": "^10.0.1",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
