@@ -69,7 +69,7 @@ export function MarkdownBody({
   const renderedContent = withoutDuplicateFirstHeading(content, suppressFirstHeading)
 
   return (
-    <div className="text-[0.95rem] leading-7 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_:is(h1,h2,h3,h4)]:scroll-mt-4 [&_[data-streamdown='code-block-actions']]:absolute [&_[data-streamdown='code-block-actions']]:top-2 [&_[data-streamdown='code-block-actions']]:right-2 [&_[data-streamdown='code-block-actions']]:-mt-0 [&_[data-streamdown='code-block-actions']]:h-7 [&_[data-streamdown='code-block']]:relative [&_[data-streamdown='code-block']]:gap-1.5 [&_[data-streamdown='code-block']]:p-2 [&_[data-streamdown='code-block-body']]:p-3 [&_[data-streamdown='code-block-header']]:h-7">
+    <div className="northstar-markdown text-[0.95rem] leading-7 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_:is(h1,h2,h3,h4)]:scroll-mt-4">
       <Streamdown
         plugins={plugins}
         parseIncompleteMarkdown={false}
