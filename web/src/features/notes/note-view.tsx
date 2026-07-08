@@ -4,6 +4,7 @@ import {
   Check,
   ChevronLeft,
   Clock,
+  Copy,
   FileText,
   Info,
   Link2,
@@ -78,6 +79,14 @@ export function NoteView() {
       return !open
     })
   }
+  const copyNote = async () => {
+    try {
+      await navigator.clipboard.writeText(note.contentMarkdown)
+      toast.success('Copied note markdown')
+    } catch {
+      toast.error('Could not copy note')
+    }
+  }
 
   return (
     <div className="flex min-w-0 flex-1">
@@ -107,6 +116,16 @@ export function NoteView() {
               onClick={toggleSidebar}
             >
               {sidebarOpen ? <PanelRightClose className="size-4" /> : <PanelRightOpen className="size-4" />}
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              aria-label="Copy full note"
+              title="Copy full note"
+              onClick={copyNote}
+            >
+              <Copy className="size-4" />
             </Button>
             <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
               <Pencil className="size-4" /> Edit

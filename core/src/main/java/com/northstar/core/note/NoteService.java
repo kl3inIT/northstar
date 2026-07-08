@@ -70,7 +70,7 @@ public class NoteService {
         requireProject(projectId);
         Note note = new Note(UUID.randomUUID(), title.strip(), uniqueSlug(title),
                 NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags), status, projectId);
-        notes.save(note);
+        notes.saveAndFlush(note);
         syncOutgoingLinks(note);
         resolveInboundLinks(note);
         events.publishEvent(new NoteSaved(note.getId()));
