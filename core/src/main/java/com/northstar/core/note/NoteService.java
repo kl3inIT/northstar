@@ -1,5 +1,6 @@
 package com.northstar.core.note;
 
+import com.northstar.core.project.ProjectService;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -38,11 +39,14 @@ public class NoteService {
 
     private final NoteRepository notes;
     private final NoteLinkRepository links;
+    private final ProjectService projects;
     private final ApplicationEventPublisher events;
 
-    NoteService(NoteRepository notes, NoteLinkRepository links, ApplicationEventPublisher events) {
+    NoteService(NoteRepository notes, NoteLinkRepository links, ProjectService projects,
+                ApplicationEventPublisher events) {
         this.notes = notes;
         this.links = links;
+        this.projects = projects;
         this.events = events;
     }
 
@@ -56,8 +60,16 @@ public class NoteService {
     @Transactional
     public NoteDetail create(String title, String folderPath, String markdown, Collection<String> tags,
                              NoteStatus status) {
+        return create(title, folderPath, markdown, tags, status, null);
+    }
+
+    /** Machine-drafted callers (capture, MCP) pass {@link NoteStatus#STAGING} — the review queue. */
+    @Transactional
+    public NoteDetail create(String title, String folderPath, String markdown, Collection<String> tags,
+                             NoteStatus status, UUID projectId) {
+        requireProject(projectId);
         Note note = new Note(UUID.randomUUID(), title.strip(), uniqueSlug(title),
-                NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags), status);
+                NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags), status, projectId);
         notes.save(note);
         syncOutgoingLinks(note);
         resolveInboundLinks(note);
@@ -84,12 +96,26 @@ public class NoteService {
     public NoteDetail update(UUID id, String title, String folderPath, String markdown,
                              Collection<String> tags, Long expectedVersion) {
         Note note = notes.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
+        return updateExisting(note, title, folderPath, markdown, tags, expectedVersion, note.getProjectId());
+    }
+
+    @Transactional
+    public NoteDetail update(UUID id, String title, String folderPath, String markdown,
+                             Collection<String> tags, Long expectedVersion, UUID projectId) {
+        Note note = notes.findById(id).orElseThrow(() -> new NoteNotFoundException(id));
+        return updateExisting(note, title, folderPath, markdown, tags, expectedVersion, projectId);
+    }
+
+    private NoteDetail updateExisting(Note note, String title, String folderPath, String markdown,
+                                      Collection<String> tags, Long expectedVersion, UUID projectId) {
         if (expectedVersion != null && note.getVersion() != expectedVersion) {
             throw new OptimisticLockingFailureException(
-                    "Note " + id + " was modified concurrently (expected version " + expectedVersion
+                    "Note " + note.getId() + " was modified concurrently (expected version " + expectedVersion
                             + ", is " + note.getVersion() + ")");
         }
-        note.edit(title.strip(), NoteText.normalizeFolderPath(folderPath), markdown, NoteText.normalizeTags(tags));
+        requireProject(projectId);
+        note.edit(title.strip(), NoteText.normalizeFolderPath(folderPath), markdown,
+                NoteText.normalizeTags(tags), projectId);
         syncOutgoingLinks(note);
         // Flush now so @LastModifiedDate/@Version are current in the response.
         notes.saveAndFlush(note);
@@ -146,6 +172,13 @@ public class NoteService {
     public List<NoteSummary> listByFolder(String folderPath) {
         return notes.findByFolderPathOrderByTitleAsc(NoteText.normalizeFolderPath(folderPath))
                 .stream().map(this::summary).toList();
+    }
+
+    /** Notes filed under one project for the project cockpit's context rail. */
+    @Transactional(readOnly = true)
+    public List<NoteSummary> listByProject(UUID projectId) {
+        return notes.findByProjectIdOrderByUpdatedAtDesc(projectId).stream()
+                .map(this::summary).toList();
     }
 
     /**
@@ -253,7 +286,7 @@ public class NoteService {
                 .toList();
         return new NoteDetail(note.getId(), note.getTitle(), note.getSlug(), note.getFolderPath(),
                 note.getContentMarkdown(), List.copyOf(note.getTags()), note.getStatus(),
-                note.getCreatedAt(), note.getUpdatedAt(), note.getVersion(), outgoing, backlinks);
+                note.getProjectId(), note.getCreatedAt(), note.getUpdatedAt(), note.getVersion(), outgoing, backlinks);
     }
 
     private NoteRef outgoingRef(NoteLink link, Map<UUID, Note> byId) {
@@ -273,6 +306,13 @@ public class NoteService {
 
     private NoteSummary summary(Note note, String snippet) {
         return new NoteSummary(note.getId(), note.getTitle(), note.getSlug(), note.getFolderPath(),
-                snippet, List.copyOf(note.getTags()), note.getStatus(), note.getCreatedAt(), note.getUpdatedAt());
+                snippet, List.copyOf(note.getTags()), note.getStatus(), note.getProjectId(),
+                note.getCreatedAt(), note.getUpdatedAt());
+    }
+
+    private void requireProject(UUID projectId) {
+        if (projectId != null && !projects.exists(projectId)) {
+            throw new IllegalArgumentException("No project with id " + projectId);
+        }
     }
 }

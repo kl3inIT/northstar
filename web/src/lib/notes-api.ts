@@ -29,6 +29,12 @@ export async function searchNotes(query: string): Promise<NoteSummary[]> {
   return (data ?? []) as NoteSummary[]
 }
 
+export async function listProjectNotes(projectId: string): Promise<NoteSummary[]> {
+  const res = await fetch(`/api/notes/by-project?projectId=${encodeURIComponent(projectId)}`)
+  if (!res.ok) throw new Error(`Project notes request failed: ${res.status}`)
+  return (await res.json()) as NoteSummary[]
+}
+
 export async function getNote(slug: string): Promise<NoteDetail> {
   const { data, error } = await api.GET('/api/notes/{slug}', { params: { path: { slug } } })
   if (error) throw error
@@ -113,7 +119,10 @@ export function useCreateNote() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: createNote,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notes'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notes'] })
+      queryClient.invalidateQueries({ queryKey: ['project-notes'] })
+    },
   })
 }
 
@@ -126,6 +135,15 @@ export function useUpdateNote() {
       queryClient.setQueryData(['note', note.slug], note)
       queryClient.invalidateQueries({ queryKey: ['notes'] })
       queryClient.invalidateQueries({ queryKey: ['note', note.slug] })
+      queryClient.invalidateQueries({ queryKey: ['project-notes'] })
     },
+  })
+}
+
+export function useProjectNotes(projectId: string | null | undefined) {
+  return useQuery({
+    queryKey: ['project-notes', projectId],
+    enabled: Boolean(projectId),
+    queryFn: () => listProjectNotes(projectId as string),
   })
 }

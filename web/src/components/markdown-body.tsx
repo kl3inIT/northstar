@@ -18,6 +18,24 @@ function linkifyWiki(markdown: string): string {
   })
 }
 
+function normalizeHeading(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+function withoutDuplicateFirstHeading(markdown: string, title?: string): string {
+  if (!title) return markdown
+  const lines = markdown.replace(/^\uFEFF/, '').split(/\r?\n/)
+  const firstContent = lines.findIndex((line) => line.trim().length > 0)
+  if (firstContent < 0) return markdown
+  const match = lines[firstContent].match(/^#\s+(.+?)\s*#*\s*$/)
+  if (!match || normalizeHeading(match[1]) !== normalizeHeading(title)) return markdown
+  lines.splice(firstContent, 1)
+  if (lines[firstContent]?.trim() === '') {
+    lines.splice(firstContent, 1)
+  }
+  return lines.join('\n')
+}
+
 // Reuse the same rich-markdown engine as the assistant so notes get syntax-
 // highlighted code, KaTeX math and Mermaid diagrams for free.
 const plugins = { cjk, code, math, mermaid }
@@ -38,8 +56,17 @@ const safeUrl = (url: string): string => {
   return ''
 }
 
-export function MarkdownBody({ content, links }: { content: string; links: NoteRef[] }) {
+export function MarkdownBody({
+  content,
+  links,
+  suppressFirstHeading,
+}: {
+  content: string
+  links: NoteRef[]
+  suppressFirstHeading?: string
+}) {
   const byTitle = new Map(links.map((link) => [link.title.toLowerCase(), link]))
+  const renderedContent = withoutDuplicateFirstHeading(content, suppressFirstHeading)
 
   return (
     <div className="text-[0.95rem] leading-7 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_:is(h1,h2,h3,h4)]:scroll-mt-4">
@@ -82,7 +109,7 @@ export function MarkdownBody({ content, links }: { content: string; links: NoteR
           },
         }}
       >
-        {linkifyWiki(content)}
+        {linkifyWiki(renderedContent)}
       </Streamdown>
     </div>
   )

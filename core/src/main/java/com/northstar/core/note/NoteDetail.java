@@ -19,6 +19,7 @@ public record NoteDetail(
         @NotNull String contentMarkdown,
         @NotNull List<String> tags,
         @NotNull NoteStatus status,
+        UUID projectId,
         @NotNull Instant createdAt,
         @NotNull Instant updatedAt,
         long version,

@@ -25,6 +25,8 @@ import { noteOutline } from '@/lib/note-outline'
 import { textStats } from '@/lib/text-stats'
 import { useNote, useSetNoteStatus } from '@/lib/notes-api'
 import type { NoteDetail, NoteRef } from '@/lib/notes-types'
+import { useProjects, type Project } from '@/lib/projects-api'
+import { cn } from '@/lib/utils'
 import { NoteEditor } from './note-editor'
 
 const NOTE_SIDEBAR_KEY = 'note-right-sidebar-open'
@@ -36,6 +38,7 @@ function formatDate(iso: string): string {
 export function NoteView() {
   const { slug } = useParams({ from: '/notes/$slug' })
   const { data: note, isLoading, isError } = useNote(slug)
+  const { data: projects = [] } = useProjects()
   // Reading-first: opening a note shows the rendered view; the Edit button opens
   // the CodeMirror editor. Return to reading on every note switch.
   const [editing, setEditing] = useState(false)
@@ -68,6 +71,7 @@ export function NoteView() {
 
   const crumbs = note.folderPath ? note.folderPath.split('/') : []
   const stats = textStats(note.contentMarkdown)
+  const project = note.projectId ? projects.find((p) => p.id === note.projectId) : undefined
   const toggleSidebar = () => {
     setSidebarOpen((open) => {
       localStorage.setItem(NOTE_SIDEBAR_KEY, open ? '0' : '1')
@@ -78,7 +82,7 @@ export function NoteView() {
   return (
     <div className="flex min-w-0 flex-1">
       <article className="min-w-0 flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
-       <div className="mx-auto w-full max-w-3xl">
+       <div className={cn('mx-auto w-full', sidebarOpen ? 'max-w-5xl' : 'max-w-none')}>
         {/* Mobile is single-pane (the list pane is hidden) — offer a way back. */}
         <Button asChild size="sm" variant="ghost" className="-ml-2 mb-3 md:hidden">
           <Link to="/notes">
@@ -123,12 +127,16 @@ export function NoteView() {
           ))}
         </div>
         <Separator className="my-6" />
-        <MarkdownBody content={note.contentMarkdown} links={note.outgoingLinks} />
+        <MarkdownBody
+          content={note.contentMarkdown}
+          links={note.outgoingLinks}
+          suppressFirstHeading={note.title}
+        />
        </div>
       </article>
       {sidebarOpen && (
         <aside className="hidden w-80 shrink-0 overflow-auto border-l p-5 lg:block">
-          <RightPanel note={note} />
+          <RightPanel note={note} project={project} />
         </aside>
       )}
     </div>
@@ -191,7 +199,7 @@ function StatusBanner({ note }: { note: NoteDetail }) {
   )
 }
 
-function RightPanel({ note }: { note: NoteDetail }) {
+function RightPanel({ note, project }: { note: NoteDetail; project?: Project }) {
   const outline = noteOutline(note.contentMarkdown)
   return (
     <div className="space-y-6">
@@ -249,6 +257,24 @@ function RightPanel({ note }: { note: NoteDetail }) {
             </dd>
           </div>
           <Row label="Folder" value={note.folderPath || 'Root'} />
+          <div className="flex items-start justify-between gap-3">
+            <dt className="text-muted-foreground">Project</dt>
+            <dd className="min-w-0 text-right">
+              {project ? (
+                <Link
+                  to="/projects/$id"
+                  params={{ id: project.id }}
+                  className="text-primary hover:underline"
+                >
+                  {project.name}
+                </Link>
+              ) : note.projectId ? (
+                <span className="text-muted-foreground">Unknown project</span>
+              ) : (
+                <span className="text-muted-foreground">None</span>
+              )}
+            </dd>
+          </div>
         </dl>
       </section>
     </div>

@@ -9,6 +9,9 @@ Northstar's planning spine is Life -> Disciplines -> Projects.
   when no projects, tasks, or calendar events are still linked to them.
 - A project is a staged piece of work under a discipline.
 - Project progress is derived from milestones.
+- A project can own linked notes through each note's optional primary
+  `projectId`. These notes preserve project context such as briefs, decisions,
+  research, drafts, and retrospectives.
 - Tasks are small todo items with status, due date/time, an optional planned
   "do" date, optional project, and optional discipline. A task can be filed
   under a project at creation time or moved between projects later.
@@ -26,10 +29,12 @@ Northstar's planning spine is Life -> Disciplines -> Projects.
 - Create projects for multi-step outcomes inside a discipline.
 - Create tasks for concrete next actions.
 - Create calendar events when time is reserved, not merely when work exists.
-- Create notes for durable knowledge, rationale, learning, and context.
+- Create notes for durable knowledge, rationale, learning, and context; attach
+  a note to a project when that project is its main execution context.
 - Before deleting a discipline, move or delete linked projects, tasks, and
   calendar events. Notes are not deleted by discipline removal; discipline-note
   membership is tag-derived.
+- Deleting a project detaches linked notes instead of deleting them.
 
 ## Source Modules
 
@@ -44,3 +49,4 @@ Northstar's planning spine is Life -> Disciplines -> Projects.
 
 - [0003 - One Domain, Three Deployables](../../decisions/0003-one-domain-three-deployables.md)
 - [0004 - Project Board Projects the Binary Task Model](../../decisions/0004-project-board-projects-binary-task-model.md)
+- [0005 - Notes Have One Primary Project](../../decisions/0005-notes-have-one-primary-project.md)

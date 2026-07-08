@@ -39,6 +39,9 @@ public class Note extends BaseEntity {
     @Column(name = "content_markdown", nullable = false, columnDefinition = "text")
     private String contentMarkdown = "";
 
+    @Column(name = "project_id")
+    private UUID projectId;
+
     @ElementCollection
     @CollectionTable(name = "note_tag", joinColumns = @JoinColumn(name = "note_id"))
     @Column(name = "tag")
@@ -56,6 +59,11 @@ public class Note extends BaseEntity {
 
     public Note(UUID id, String title, String slug, String folderPath,
                 String contentMarkdown, Set<String> tags, NoteStatus status) {
+        this(id, title, slug, folderPath, contentMarkdown, tags, status, null);
+    }
+
+    public Note(UUID id, String title, String slug, String folderPath,
+                String contentMarkdown, Set<String> tags, NoteStatus status, UUID projectId) {
         super(id);
         this.title = title;
         this.slug = slug;
@@ -63,6 +71,7 @@ public class Note extends BaseEntity {
         this.contentMarkdown = contentMarkdown == null ? "" : contentMarkdown;
         this.tags = tags == null ? new LinkedHashSet<>() : new LinkedHashSet<>(tags);
         this.status = status == null ? NoteStatus.RESOURCE : status;
+        this.projectId = projectId;
     }
 
     public String getTitle() {
@@ -89,15 +98,20 @@ public class Note extends BaseEntity {
         return status;
     }
 
+    public UUID getProjectId() {
+        return projectId;
+    }
+
     /** Staging review verdict, or a restore: move the note to another working state. */
     public void moveTo(NoteStatus status) {
         this.status = status;
     }
 
-    public void edit(String title, String folderPath, String contentMarkdown, Set<String> tags) {
+    public void edit(String title, String folderPath, String contentMarkdown, Set<String> tags, UUID projectId) {
         this.title = title;
         this.folderPath = folderPath == null ? "" : folderPath;
         this.contentMarkdown = contentMarkdown == null ? "" : contentMarkdown;
+        this.projectId = projectId;
         this.tags.clear();
         if (tags != null) {
             this.tags.addAll(tags);

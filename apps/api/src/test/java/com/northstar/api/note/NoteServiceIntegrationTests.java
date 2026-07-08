@@ -1,13 +1,17 @@
 package com.northstar.api.note;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteRef;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteStatus;
 import com.northstar.core.note.NoteSummary;
+import com.northstar.core.project.ProjectService;
+import com.northstar.core.project.ProjectSummary;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +38,9 @@ class NoteServiceIntegrationTests {
 
     @Autowired
     NoteService notes;
+
+    @Autowired
+    ProjectService projects;
 
     @Test
     void wikiLinkCreatesBacklinkBothWays() {
@@ -104,5 +111,50 @@ class NoteServiceIntegrationTests {
         NoteSummary hit = notes.search("descriptors").stream()
                 .filter(n -> n.title().equals("Band descriptors")).findFirst().orElseThrow();
         assertThat(hit.snippet()).contains("<mark>descriptors</mark>");
+    }
+
+    @Test
+    void noteCanAttachMoveAndDetachFromProject() {
+        ProjectSummary alpha = projects.create("Alpha Project", "first", null, null, null);
+        ProjectSummary beta = projects.create("Beta Project", "second", null, null, null);
+
+        NoteDetail created = notes.create("Project context note", "Projects/Alpha",
+                "Durable project context.", List.of("project"), NoteStatus.RESOURCE, alpha.id());
+
+        assertThat(created.projectId()).isEqualTo(alpha.id());
+        assertThat(notes.listByProject(alpha.id())).extracting(NoteSummary::id).contains(created.id());
+        assertThat(notes.listByProject(beta.id())).extracting(NoteSummary::id).doesNotContain(created.id());
+
+        NoteDetail moved = notes.update(created.id(), created.title(), created.folderPath(),
+                created.contentMarkdown(), created.tags(), created.version(), beta.id());
+        assertThat(moved.projectId()).isEqualTo(beta.id());
+        assertThat(notes.listByProject(alpha.id())).extracting(NoteSummary::id).doesNotContain(created.id());
+        assertThat(notes.listByProject(beta.id())).extracting(NoteSummary::id).contains(created.id());
+
+        // Old service overloads used by memory/tool callers preserve the current project.
+        NoteDetail renamed = notes.update(moved.id(), "Renamed project context", moved.folderPath(),
+                moved.contentMarkdown(), moved.tags(), moved.version());
+        assertThat(renamed.projectId()).isEqualTo(beta.id());
+
+        NoteDetail detached = notes.update(renamed.id(), renamed.title(), renamed.folderPath(),
+                renamed.contentMarkdown(), renamed.tags(), renamed.version(), null);
+        assertThat(detached.projectId()).isNull();
+        assertThat(notes.listByProject(beta.id())).extracting(NoteSummary::id).doesNotContain(created.id());
+    }
+
+    @Test
+    void noteRejectsUnknownProject() {
+        UUID missing = UUID.randomUUID();
+
+        assertThatThrownBy(() -> notes.create("Bad project note", "",
+                "Body", List.of(), NoteStatus.RESOURCE, missing))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No project with id");
+
+        NoteDetail note = notes.create("Valid standalone note", "", "Body", List.of());
+        assertThatThrownBy(() -> notes.update(note.id(), note.title(), note.folderPath(),
+                note.contentMarkdown(), note.tags(), note.version(), missing))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("No project with id");
     }
 }

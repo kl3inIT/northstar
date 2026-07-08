@@ -60,6 +60,11 @@ class NoteController {
         return notes.search(q);
     }
 
+    @GetMapping("/by-project")
+    List<NoteSummary> byProject(@RequestParam("projectId") UUID projectId) {
+        return notes.listByProject(projectId);
+    }
+
     @GetMapping("/{slug}")
     NoteDetail get(@PathVariable String slug) {
         return notes.getBySlug(slug).orElseThrow(() -> new NoteNotFoundException("Note not found: " + slug));
@@ -69,7 +74,7 @@ class NoteController {
     @ResponseStatus(HttpStatus.CREATED)
     NoteDetail create(@Valid @RequestBody CreateNoteRequest request) {
         return notes.create(request.title(), request.folderPath(), request.contentMarkdown(), request.tags(),
-                request.status() == null ? NoteStatus.RESOURCE : request.status());
+                request.status() == null ? NoteStatus.RESOURCE : request.status(), request.projectId());
     }
 
     /** Staging verdict ("→ Resources" / "Archive") or a restore. */
@@ -81,7 +86,7 @@ class NoteController {
     @PutMapping("/{id}")
     NoteDetail update(@PathVariable UUID id, @Valid @RequestBody UpdateNoteRequest request) {
         return notes.update(id, request.title(), request.folderPath(),
-                request.contentMarkdown(), request.tags(), request.version());
+                request.contentMarkdown(), request.tags(), request.version(), request.projectId());
     }
 
     @DeleteMapping("/{id}")

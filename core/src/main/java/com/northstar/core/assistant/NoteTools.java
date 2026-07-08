@@ -7,6 +7,7 @@ import com.northstar.core.search.SearchResult;
 import com.northstar.core.search.SearchService;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.ai.tool.annotation.Tool;
@@ -47,7 +48,8 @@ class NoteTools implements NorthstarTool {
             knowledge, STAGING = back to review, ARCHIVED = soft-delete, restorable — when \
             the user asks to delete a note, archive it, never lose the text). Use for \
             corrections and rewrites; to add to the end without retyping the body, use \
-            append_to_note. Only pass the fields to change.""";
+            append_to_note. projectId files the note under one primary project; pass 'none' \
+            to detach. Only pass the fields to change.""";
 
     private static final String APPEND_TO_NOTE = """
             Add Markdown to the END of an existing note, keeping everything already there \
@@ -106,7 +108,10 @@ class NoteTools implements NorthstarTool {
                     required = false) List<String> tags,
             @ToolParam(description = "New working state (RESOURCE = approved, STAGING = back to review, ARCHIVED = soft-delete); pass '' or omit to keep", required = false)
             @McpToolParam(description = "New working state (RESOURCE = approved, STAGING = back to review, ARCHIVED = soft-delete); pass '' or omit to keep",
-                    required = false) String status) {
+                    required = false) String status,
+            @ToolParam(description = "Project UUID to file this note under; omit to keep, 'none' to detach", required = false)
+            @McpToolParam(description = "Project UUID to file this note under; omit to keep, 'none' to detach",
+                    required = false) String projectId) {
         NoteDetail current = bySlug(slug);
         NoteDetail updated = notes.update(current.id(),
                 title == null || title.isBlank() ? current.title() : title,
@@ -114,7 +119,8 @@ class NoteTools implements NorthstarTool {
                 contentMarkdown == null || contentMarkdown.isBlank()
                         ? current.contentMarkdown() : contentMarkdown,
                 tags == null || tags.isEmpty() ? current.tags() : tags,
-                null);
+                null,
+                ToolSupport.resolve(projectId, current.projectId(), UUID::fromString));
         // Blank-tolerant, like the sibling string args: an MCP client that always
         // populates optionals may send status "" (the published "pass '' to keep"
         // contract) — binding that to a raw enum would fail the whole tool call.
@@ -174,8 +180,13 @@ class NoteTools implements NorthstarTool {
             @McpToolParam(description = "Note body in Markdown", required = true) String contentMarkdown,
             @ToolParam(description = "1-4 lowercase tags, reusing the user's existing tags where possible", required = false)
             @McpToolParam(description = "1-4 lowercase tags, reusing the user's existing tags where possible",
-                    required = false) List<String> tags) {
+                    required = false) List<String> tags,
+            @ToolParam(description = "Project UUID to file this note under; omit for none", required = false)
+            @McpToolParam(description = "Project UUID to file this note under; omit for none",
+                    required = false) String projectId) {
         // Machine-drafted → STAGING: the user reviews it in the Notes staging tab.
-        return notes.create(title, folderPath, contentMarkdown, tags, NoteStatus.STAGING);
+        return notes.create(title, folderPath, contentMarkdown, tags, NoteStatus.STAGING,
+                projectId == null || projectId.isBlank() || projectId.strip().equalsIgnoreCase("none")
+                        ? null : UUID.fromString(projectId.strip()));
     }
 }

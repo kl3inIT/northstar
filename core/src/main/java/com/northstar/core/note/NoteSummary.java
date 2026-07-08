@@ -18,6 +18,7 @@ public record NoteSummary(
         @NotNull String snippet,
         @NotNull List<String> tags,
         @NotNull NoteStatus status,
+        UUID projectId,
         @NotNull Instant createdAt,
         @NotNull Instant updatedAt) {
 }

@@ -27,6 +27,9 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
     /** Every note in one exact folder — small, curated folders (assistant memory). */
     List<Note> findByFolderPathOrderByTitleAsc(String folderPath);
 
+    /** Notes filed under one project, newest first for the project cockpit. */
+    List<Note> findByProjectIdOrderByUpdatedAtDesc(UUID projectId);
+
     /** One note by exact folder + title (case-insensitive) — the assistant's flat memory store. */
     Optional<Note> findFirstByFolderPathAndTitleIgnoreCase(String folderPath, String title);
 

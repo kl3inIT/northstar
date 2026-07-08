@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { ArrowLeft, Link2, Plus, Star, Trash2, X } from 'lucide-react'
+import { ArrowLeft, FileText, Link2, Plus, Star, Trash2, X } from 'lucide-react'
 import { KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import {
   GanttFeatureItem,
@@ -61,6 +61,8 @@ import {
   useSetTaskDone,
   useSetTaskPlanned,
 } from '@/lib/tasks-api'
+import { useCreateNote, useProjectNotes } from '@/lib/notes-api'
+import type { NoteSummary } from '@/lib/notes-types'
 import {
   useAddMilestone,
   useCreateProject,
@@ -330,8 +332,9 @@ function ProjectDetail({ project, discipline }: { project: Project; discipline?:
         <div className="flex min-h-0 flex-1 flex-col">
           <ProjectBoard project={project} />
         </div>
-        <aside className="shrink-0 overflow-y-auto lg:w-64">
+        <aside className="shrink-0 space-y-6 overflow-y-auto lg:w-72">
           <MilestonesPanel project={project} />
+          <ProjectNotesPanel project={project} />
         </aside>
       </div>
 
@@ -585,6 +588,79 @@ function ProjectBoardCard({
         )}
       </div>
     </div>
+  )
+}
+
+function ProjectNotesPanel({ project }: { project: Project }) {
+  const { data: notes = [], isLoading } = useProjectNotes(project.id)
+  const createNote = useCreateNote()
+  const navigate = useNavigate()
+
+  function newNote() {
+    const title = window.prompt('New project note title')?.trim()
+    if (!title) return
+    createNote.mutate(
+      {
+        title,
+        folderPath: `Projects/${project.name}`,
+        contentMarkdown: '',
+        tags: [],
+        projectId: project.id,
+      },
+      { onSuccess: (note) => navigate({ to: '/notes/$slug', params: { slug: note.slug } }) },
+    )
+  }
+
+  return (
+    <section>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold text-muted-foreground">Notes</h3>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="size-7"
+          aria-label="New project note"
+          title="New project note"
+          onClick={newNote}
+          disabled={createNote.isPending}
+        >
+          <Plus className="size-3.5" />
+        </Button>
+      </div>
+      {isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading notes...</p>
+      ) : notes.length === 0 ? (
+        <p className="text-sm italic text-muted-foreground">
+          No linked notes yet.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {notes.map((note) => (
+            <ProjectNoteCard key={note.id} note={note} />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function ProjectNoteCard({ note }: { note: NoteSummary }) {
+  return (
+    <Link
+      to="/notes/$slug"
+      params={{ slug: note.slug }}
+      className="block rounded-md border p-3 transition-colors hover:bg-accent"
+    >
+      <div className="flex items-start gap-2">
+        <FileText className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{note.title}</p>
+          {note.snippet && (
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{note.snippet}</p>
+          )}
+        </div>
+      </div>
+    </Link>
   )
 }
 

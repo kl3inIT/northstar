@@ -17,16 +17,17 @@ type Present<T> = T extends readonly (infer U)[]
 // A wiki-link target: slug is genuinely null when the linked note does not exist yet.
 export type NoteRef = Omit<Present<Schemas['NoteRef']>, 'slug'> & { slug: string | null }
 
-export type NoteSummary = Present<Schemas['NoteSummary']>
+export type NoteSummary = Omit<Present<Schemas['NoteSummary']>, 'projectId'> & { projectId: string | null }
 
 /** MFI working state: STAGING (chờ duyệt) → RESOURCE (kho) / ARCHIVED (lưu trữ). */
 export type NoteStatus = NoteSummary['status']
 
-export type NoteDetail = Omit<Present<Schemas['NoteDetail']>, 'outgoingLinks' | 'backlinks'> & {
+export type NoteDetail = Omit<Present<Schemas['NoteDetail']>, 'outgoingLinks' | 'backlinks' | 'projectId'> & {
+  projectId: string | null
   outgoingLinks: NoteRef[]
   backlinks: NoteRef[]
 }
 
-export type NoteInput = Schemas['CreateNoteRequest']
+export type NoteInput = Schemas['CreateNoteRequest'] & { projectId?: string | null }
 
-export type NoteUpdate = Schemas['UpdateNoteRequest']
+export type NoteUpdate = Schemas['UpdateNoteRequest'] & { projectId?: string | null }

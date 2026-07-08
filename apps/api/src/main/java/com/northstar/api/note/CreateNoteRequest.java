@@ -4,6 +4,7 @@ import com.northstar.core.note.NoteStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Body for POST /api/notes. {@code contentMarkdown} may be empty and {@code tags}
@@ -16,5 +17,6 @@ record CreateNoteRequest(
         @Size(max = 1024) String folderPath,
         String contentMarkdown,
         List<@NotBlank @Size(max = 64) String> tags,
+        UUID projectId,
         NoteStatus status) {
 }

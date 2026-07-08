@@ -5,9 +5,17 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { fileUrl, uploadFile } from '@/lib/files-api'
 import { useNoteIndex, useUpdateNote } from '@/lib/notes-api'
 import type { NoteDetail } from '@/lib/notes-types'
+import { useProjects } from '@/lib/projects-api'
 import { textStats } from '@/lib/text-stats'
 import { NoteCmEditor, type NoteCmEditorHandle } from './cm/note-cm-editor'
 
@@ -33,11 +41,13 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
   const [title, setTitle] = useState(note.title)
   const [folderPath, setFolderPath] = useState(note.folderPath)
   const [tagsText, setTagsText] = useState(tagsToText(note.tags))
+  const [projectId, setProjectId] = useState<string | null>(note.projectId)
   const [content, setContent] = useState(note.contentMarkdown)
   const editorRef = useRef<NoteCmEditorHandle>(null)
   const navigate = useNavigate()
   const update = useUpdateNote()
   const { data: index } = useNoteIndex()
+  const { data: projects = [] } = useProjects()
   const titles = (index ?? []).map((n) => n.title)
   const stats = textStats(content)
 
@@ -92,6 +102,7 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
           folderPath,
           contentMarkdown: content,
           tags: textToTags(tagsText),
+          projectId,
           version: note.version,
         },
       },
@@ -114,7 +125,7 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
   return (
     <div className="flex min-w-0 flex-1 flex-col" onKeyDown={onKeyDown}>
       <header className="border-b px-4 py-5 md:px-10">
-       <div className="mx-auto w-full max-w-3xl space-y-3">
+       <div className="mx-auto w-full max-w-5xl space-y-3">
         <Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -145,6 +156,27 @@ export function NoteEditor({ note, onDone }: { note: NoteDetail; onDone: () => v
               placeholder="writing, cohesion"
               className="h-8"
             />
+          </div>
+          <div className="grid w-64 gap-1.5">
+            <Label className="text-xs text-muted-foreground">
+              Project
+            </Label>
+            <Select
+              value={projectId ?? 'none'}
+              onValueChange={(value) => setProjectId(value === 'none' ? null : value)}
+            >
+              <SelectTrigger className="h-8 w-full">
+                <SelectValue placeholder="No project" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No project</SelectItem>
+                {projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center gap-2">
             <Button size="sm" variant="ghost" onClick={onDone} disabled={update.isPending}>
