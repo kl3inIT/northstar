@@ -1,6 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useParams } from '@tanstack/react-router'
 import { toast } from 'sonner'
-import { CheckSquare, Link2, Plus, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Link2, Plus, Star, Trash2, X } from 'lucide-react'
+import { KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import {
   GanttFeatureItem,
   GanttFeatureList,
@@ -14,6 +16,14 @@ import {
   GanttToday,
   type GanttFeature,
 } from '@/components/kibo-ui/gantt'
+import {
+  KanbanBoard,
+  KanbanCard,
+  KanbanCards,
+  KanbanHeader,
+  KanbanProvider,
+  type DragEndEvent,
+} from '@/components/kibo-ui/kanban'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -38,20 +48,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { api } from '@/lib/api'
+import type { components } from '@/lib/api.gen'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
 import { DISCIPLINE_HEX as HEX } from '@/lib/discipline-colors'
 import { iso } from '@/lib/dates'
+import {
+  useCreateTask,
+  useSetTaskDone,
+  useSetTaskPlanned,
+} from '@/lib/tasks-api'
 import {
   useAddMilestone,
   useCreateProject,
@@ -66,8 +75,10 @@ import {
   type Project,
   type ProjectInput,
 } from '@/lib/projects-api'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
+
+type ProjTask = components['schemas']['TaskSummary']
 
 /** A bar needs a span: fall back to createdAt → +30 days until real dates are set. */
 function featureOf(p: Project, disciplines: Discipline[]): GanttFeature {
@@ -93,10 +104,12 @@ export function ProjectsPage() {
   const { data: projects = [], isLoading } = useProjects()
   const { data: disciplines = [] } = useDisciplines()
   const isMobile = useIsMobile()
+  const navigate = useNavigate()
   const update = useUpdateProject()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [range, setRange] = useState<'monthly' | 'quarterly'>('monthly')
+
+  const openProject = (id: string) => navigate({ to: '/projects/$id', params: { id } })
 
   // Group bars by discipline — the LDP spine is the Gantt's row grouping.
   const groups = useMemo(() => {
@@ -109,8 +122,6 @@ export function ProjectsPage() {
     }
     return [...byDiscipline.values()]
   }, [projects, disciplines])
-
-  const selected = projects.find((p) => p.id === selectedId) ?? null
 
   function handleMove(id: string, startAt: Date, endAt: Date | null) {
     const p = projects.find((x) => x.id === id)
@@ -133,7 +144,7 @@ export function ProjectsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Staged work under a discipline — drag a bar to reschedule it.
+            Staged work under a discipline — drag a bar to reschedule, click to open its board.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -173,7 +184,7 @@ export function ProjectsPage() {
                 {groups.map((g) => (
                   <GanttSidebarGroup key={g.name} name={g.name}>
                     {g.features.map((f) => (
-                      <GanttSidebarItem key={f.id} feature={f} onSelectItem={setSelectedId} />
+                      <GanttSidebarItem key={f.id} feature={f} onSelectItem={openProject} />
                     ))}
                   </GanttSidebarGroup>
                 ))}
@@ -189,7 +200,7 @@ export function ProjectsPage() {
                         <button
                           type="button"
                           className="flex-1 truncate text-left text-xs"
-                          onClick={() => setSelectedId(f.id)}
+                          onClick={() => openProject(f.id)}
                         >
                           {f.name}
                         </button>
@@ -205,27 +216,385 @@ export function ProjectsPage() {
       )}
 
       {creating && <ProjectDialog open onClose={() => setCreating(false)} />}
-      {selected && (
-        <ProjectSheet project={selected} onClose={() => setSelectedId(null)} />
+    </div>
+  )
+}
+
+/**
+ * Full-page project cockpit (route /projects/$id): a header with progress, a
+ * milestones rail, and — the main event — a task board. Opened from the Gantt.
+ */
+export function ProjectDetailPage() {
+  const { id } = useParams({ from: '/projects/$id' })
+  const { data: projects = [], isLoading } = useProjects()
+  const { data: disciplines = [] } = useDisciplines()
+  const project = projects.find((p) => p.id === id)
+
+  if (isLoading) {
+    return (
+      <div className="flex w-full flex-1 items-center justify-center text-sm text-muted-foreground">
+        Loading…
+      </div>
+    )
+  }
+  if (!project) {
+    return (
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-3 text-center">
+        <p className="text-sm text-muted-foreground">This project no longer exists.</p>
+        <Button asChild size="sm" variant="outline">
+          <Link to="/projects">
+            <ArrowLeft className="size-4" /> Back to projects
+          </Link>
+        </Button>
+      </div>
+    )
+  }
+
+  const discipline = disciplines.find((d) => d.id === project.disciplineId)
+  return <ProjectDetail project={project} discipline={discipline} />
+}
+
+function ProjectDetail({ project, discipline }: { project: Project; discipline?: Discipline }) {
+  const navigate = useNavigate()
+  const setDone = useSetProjectDone()
+  const remove = useDeleteProject()
+  const [editing, setEditing] = useState(false)
+  const progress = project.progressPercent ?? 0
+
+  function deleteProject() {
+    remove
+      .mutateAsync(project.id)
+      .then(() => {
+        toast.success(`Deleted “${project.name}”`)
+        navigate({ to: '/projects' })
+      })
+      .catch(() => toast.error('Delete failed — try again.'))
+  }
+
+  return (
+    <div className="flex w-full flex-1 flex-col overflow-hidden px-4 py-6 md:px-10 md:py-8">
+      <Link
+        to="/projects"
+        className="mb-3 inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        <ArrowLeft className="size-4" /> Projects
+      </Link>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold tracking-tight">{project.name}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {discipline ? discipline.name : 'No discipline'}
+            {project.startDate && ` · ${project.startDate}`}
+            {project.targetDate && ` → ${project.targetDate}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            Completed
+            <Switch
+              checked={project.status === 'DONE'}
+              onCheckedChange={(done) => setDone.mutate({ id: project.id, done })}
+            />
+          </label>
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground hover:text-destructive"
+            onClick={deleteProject}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center gap-3">
+        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+          <div
+            className="h-full rounded-full bg-primary transition-all"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <span className="shrink-0 text-sm font-medium">{progress}%</span>
+      </div>
+
+      {project.notes && (
+        <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{project.notes}</p>
+      )}
+
+      {/* Board (main) + milestones rail. Rail drops below the board on mobile. */}
+      <div className="mt-6 flex min-h-0 flex-1 flex-col gap-6 overflow-hidden lg:flex-row">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ProjectBoard project={project} />
+        </div>
+        <aside className="shrink-0 overflow-y-auto lg:w-64">
+          <MilestonesPanel project={project} />
+        </aside>
+      </div>
+
+      {editing && <ProjectDialog open onClose={() => setEditing(false)} existing={project} />}
+    </div>
+  )
+}
+
+const BOARD_COLUMNS = [
+  { id: 'backlog', name: 'Backlog' },
+  { id: 'planned', name: 'Planned' },
+  { id: 'done', name: 'Done' },
+] as const
+type ColumnId = (typeof BOARD_COLUMNS)[number]['id']
+
+/** Which column a task lands in: DONE → done, has a "do" day → planned, else backlog. */
+function columnOf(t: ProjTask): ColumnId {
+  if (t.status === 'DONE') return 'done'
+  return t.plannedDate ? 'planned' : 'backlog'
+}
+
+type BoardItem = { id: string; name: string; column: string; task: ProjTask }
+
+/**
+ * The project's task board. Columns are NOT task status (tasks stay binary
+ * OPEN/DONE) — they read the plannedDate "star": no star = Backlog, starred =
+ * Planned, ticked = Done. Dropping a card just sets/clears that star (or ticks
+ * it), so the board never invents a third status.
+ */
+function ProjectBoard({ project }: { project: Project }) {
+  const { data: tasks = [] } = useProjectTasks(project.id)
+  const setDone = useSetTaskDone()
+  const setPlanned = useSetTaskPlanned()
+  const createTask = useCreateTask()
+  const setTaskProject = useSetTaskProject()
+  const queryClient = useQueryClient()
+  const today = iso(new Date())
+  const [newTitle, setNewTitle] = useState('')
+
+  const serverItems: BoardItem[] = useMemo(
+    () => tasks.map((t) => ({ id: t.id ?? '', name: t.title ?? '', column: columnOf(t), task: t })),
+    [tasks],
+  )
+  // Kibo's onDragOver mutates item.column in place, so the board works on
+  // CLONES; origins live in a primitive map that mutation cannot touch.
+  const originById = useMemo(() => new Map(serverItems.map((i) => [i.id, i.column])), [serverItems])
+  const [items, setItems] = useState<BoardItem[]>(() => serverItems.map((i) => ({ ...i })))
+  useEffect(() => setItems(serverItems.map((i) => ({ ...i }))), [serverItems])
+
+  // Distance constraint keeps the checkbox/star clickable inside a draggable card.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor),
+  )
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['project-tasks', project.id] })
+    queryClient.invalidateQueries({ queryKey: ['projects'] })
+  }
+
+  const commitMove = async (task: ProjTask, target: ColumnId) => {
+    const id = task.id as string
+    try {
+      if (target === 'done') {
+        await setDone.mutateAsync({ id, done: true })
+      } else {
+        if (task.status === 'DONE') await setDone.mutateAsync({ id, done: false })
+        if (target === 'planned' && !task.plannedDate) {
+          await setPlanned.mutateAsync({ id, plannedDate: today })
+        } else if (target === 'backlog' && task.plannedDate) {
+          await setPlanned.mutateAsync({ id, plannedDate: null })
+        }
+      }
+      refresh()
+    } catch {
+      toast.error("Couldn't save — try again")
+      setItems(serverItems.map((i) => ({ ...i })))
+    }
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const item = items.find((i) => i.id === event.active.id)
+    if (!item) return
+    const target = item.column as ColumnId
+    if (target === originById.get(item.id)) return
+    void commitMove(item.task, target)
+  }
+
+  async function addTask() {
+    const title = newTitle.trim()
+    if (!title) return
+    setNewTitle('')
+    try {
+      const created = await createTask.mutateAsync({
+        title,
+        disciplineId: project.disciplineId ?? undefined,
+      })
+      await setTaskProject.mutateAsync({ taskId: created.id, projectId: project.id })
+      refresh()
+    } catch {
+      toast.error('Adding the task failed — try again.')
+      setNewTitle(title)
+    }
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-3 flex items-center gap-2">
+        <Input
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.currentTarget.value)}
+          placeholder="Add a task to this project…"
+          className="h-8 max-w-sm"
+          onKeyDown={(e) => e.key === 'Enter' && addTask()}
+        />
+        <Button size="sm" variant="outline" onClick={addTask} disabled={!newTitle.trim()}>
+          <Plus className="size-4" /> New task
+        </Button>
+        <LinkTaskPopover project={project} linkedIds={items.map((i) => i.id)} />
+      </div>
+
+      {items.length === 0 ? (
+        <p className="text-sm italic text-muted-foreground">
+          No tasks yet — add one above, or link an existing open task.
+        </p>
+      ) : (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <KanbanProvider
+            columns={BOARD_COLUMNS.map((c) => ({ ...c }))}
+            data={items}
+            onDataChange={setItems}
+            onDragEnd={handleDragEnd}
+            sensors={sensors}
+            className="grid-flow-row grid-cols-1 md:grid-cols-3"
+          >
+            {(column) => (
+              <KanbanBoard id={column.id} key={column.id}>
+                <KanbanHeader>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        column.id === 'done' ? 'text-muted-foreground' : '',
+                      )}
+                    >
+                      {column.name as string}
+                    </span>
+                    <span className="rounded-full bg-muted px-1.5 text-xs font-normal text-muted-foreground">
+                      {items.filter((i) => i.column === column.id).length}
+                    </span>
+                  </div>
+                </KanbanHeader>
+                <KanbanCards id={column.id}>
+                  {(item: BoardItem) => (
+                    <KanbanCard key={item.id} {...item}>
+                      <ProjectBoardCard task={item.task} today={today} projectId={project.id} />
+                    </KanbanCard>
+                  )}
+                </KanbanCards>
+              </KanbanBoard>
+            )}
+          </KanbanProvider>
+        </div>
       )}
     </div>
   )
 }
 
-/** Side panel: milestones checklist, linked tasks, status — the project's cockpit. */
-function ProjectSheet({ project, onClose }: { project: Project; onClose: () => void }) {
-  const { data: disciplines = [] } = useDisciplines()
-  const { data: tasks = [] } = useProjectTasks(project.id)
-  const setDone = useSetProjectDone()
-  const remove = useDeleteProject()
+/** Board card: tick = OPEN/DONE, star = the Planned "do" day, X = detach from project. */
+function ProjectBoardCard({
+  task,
+  today,
+  projectId,
+}: {
+  task: ProjTask
+  today: string
+  projectId: string
+}) {
+  const setDone = useSetTaskDone()
+  const setPlanned = useSetTaskPlanned()
+  const setTaskProject = useSetTaskProject()
+  const queryClient = useQueryClient()
+  const id = task.id as string
+  const done = task.status === 'DONE'
+  const starred = !!task.plannedDate
+
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['project-tasks', projectId] })
+
+  return (
+    <div className="group flex items-start gap-2.5">
+      <Checkbox
+        checked={done}
+        onCheckedChange={() =>
+          setDone.mutate({ id, done: !done }, { onSuccess: refresh })
+        }
+        aria-label={task.title ?? ''}
+        className="mt-0.5 rounded-full"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-1.5">
+          <p
+            className={cn(
+              'line-clamp-2 flex-1 text-sm leading-snug',
+              done && 'text-muted-foreground line-through',
+            )}
+          >
+            {task.title}
+          </p>
+          {!done && (
+            <button
+              type="button"
+              aria-label={starred ? 'Remove from Planned' : 'Plan this'}
+              title={starred ? 'Move to Backlog' : 'Plan it (set a do-day)'}
+              onClick={(e) => {
+                e.stopPropagation()
+                setPlanned.mutate(
+                  { id, plannedDate: starred ? null : today },
+                  { onSuccess: refresh },
+                )
+              }}
+              className="mt-0.5 shrink-0"
+            >
+              <Star
+                className={cn(
+                  'size-4',
+                  starred
+                    ? 'fill-amber-400 text-amber-400'
+                    : 'text-muted-foreground/50 hover:text-amber-400',
+                )}
+              />
+            </button>
+          )}
+          <button
+            type="button"
+            aria-label="Detach from project"
+            title="Detach from project"
+            onClick={(e) => {
+              e.stopPropagation()
+              setTaskProject.mutate({ taskId: id, projectId: null })
+            }}
+            className="mt-0.5 shrink-0 opacity-0 group-hover:opacity-100"
+          >
+            <X className="size-3.5 text-muted-foreground hover:text-destructive" />
+          </button>
+        </div>
+        {task.dueDate && (
+          <div className="mt-1.5 text-xs text-muted-foreground">
+            {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('vi-VN', {
+              day: 'numeric',
+              month: 'numeric',
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** The milestones checklist rail — add a stage, tick it done, or remove it. */
+function MilestonesPanel({ project }: { project: Project }) {
   const addMilestone = useAddMilestone()
   const toggleMilestone = useToggleMilestone()
   const removeMilestone = useRemoveMilestone()
-  const setTaskProject = useSetTaskProject()
-  const [editing, setEditing] = useState(false)
   const [milestoneName, setMilestoneName] = useState('')
-  const discipline = disciplines.find((d) => d.id === project.disciplineId)
-  const progress = project.progressPercent ?? 0
 
   function addStage() {
     const name = milestoneName.trim()
@@ -236,169 +605,54 @@ function ProjectSheet({ project, onClose }: { project: Project; onClose: () => v
       .catch(() => toast.error('Adding the milestone failed.'))
   }
 
-  function deleteProject() {
-    remove
-      .mutateAsync(project.id)
-      .then(() => {
-        toast.success(`Deleted “${project.name}”`)
-        onClose()
-      })
-      .catch(() => toast.error('Delete failed — try again.'))
-  }
-
   return (
-    <Sheet open onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="flex w-full flex-col gap-0 overflow-y-auto sm:max-w-md">
-        <SheetHeader>
-          <SheetTitle className="pr-8">{project.name}</SheetTitle>
-          <SheetDescription>
-            {discipline ? discipline.name : 'No discipline'}
-            {project.startDate && ` · ${project.startDate}`}
-            {project.targetDate && ` → ${project.targetDate}`}
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="flex flex-col gap-6 px-4 pb-6">
-          <div>
-            <div className="mb-1.5 flex items-center justify-between text-sm">
-              <span className="font-medium">{progress}% done</span>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                Completed
-                <Switch
-                  checked={project.status === 'DONE'}
-                  onCheckedChange={(done) =>
-                    setDone.mutate({ id: project.id, done })
-                  }
-                />
-              </label>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary transition-all"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-
-          {project.notes && (
-            <p className="whitespace-pre-wrap text-sm text-muted-foreground">{project.notes}</p>
-          )}
-
-          <section>
-            <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Milestones</h3>
-            <div className="space-y-1">
-              {(project.milestones ?? []).map((m) => (
-                <div key={m.id} className="group flex items-center gap-2.5 py-1">
-                  <Checkbox
-                    checked={!!m.doneAt}
-                    onCheckedChange={() =>
-                      toggleMilestone.mutate({ projectId: project.id, milestoneId: m.id })
-                    }
-                  />
-                  <span
-                    className={cn(
-                      'min-w-0 flex-1 truncate text-sm',
-                      m.doneAt && 'text-muted-foreground line-through',
-                    )}
-                  >
-                    {m.name}
-                  </span>
-                  {m.dueDate && (
-                    <span className="shrink-0 text-xs text-muted-foreground">{m.dueDate}</span>
-                  )}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6 opacity-0 group-hover:opacity-100"
-                    aria-label="Remove milestone"
-                    onClick={() =>
-                      removeMilestone.mutate({ projectId: project.id, milestoneId: m.id })
-                    }
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <div className="mt-2 flex gap-2">
-              <Input
-                value={milestoneName}
-                onChange={(e) => setMilestoneName(e.currentTarget.value)}
-                placeholder="Add a stage…"
-                className="h-8"
-                onKeyDown={(e) => e.key === 'Enter' && addStage()}
-              />
-              <Button size="sm" variant="outline" onClick={addStage} disabled={!milestoneName.trim()}>
-                Add
-              </Button>
-            </div>
-          </section>
-
-          <section>
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-muted-foreground">Tasks</h3>
-              <LinkTaskPopover project={project} linkedIds={tasks.map((t) => t.id)} />
-            </div>
-            <div className="divide-y">
-              {tasks.length === 0 && (
-                <p className="py-2 text-sm italic text-muted-foreground">
-                  No tasks attached yet.
-                </p>
+    <section>
+      <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Milestones</h3>
+      <div className="space-y-1">
+        {(project.milestones ?? []).map((m) => (
+          <div key={m.id} className="group flex items-center gap-2.5 py-1">
+            <Checkbox
+              checked={!!m.doneAt}
+              onCheckedChange={() =>
+                toggleMilestone.mutate({ projectId: project.id, milestoneId: m.id })
+              }
+            />
+            <span
+              className={cn(
+                'min-w-0 flex-1 truncate text-sm',
+                m.doneAt && 'text-muted-foreground line-through',
               )}
-              {tasks.map((t) => (
-                <div key={t.id} className="group flex items-center gap-2.5 py-2">
-                  <CheckSquare
-                    className={cn(
-                      'size-3.5 shrink-0',
-                      t.status === 'DONE' ? 'text-green-600' : 'text-muted-foreground',
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      'min-w-0 flex-1 truncate text-sm',
-                      t.status === 'DONE' && 'text-muted-foreground line-through',
-                    )}
-                  >
-                    {t.title}
-                  </span>
-                  {t.dueDate && (
-                    <span className="shrink-0 text-xs text-muted-foreground">{t.dueDate}</span>
-                  )}
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="size-6 opacity-0 group-hover:opacity-100"
-                    aria-label="Detach task"
-                    title="Detach from project"
-                    onClick={() => setTaskProject.mutate({ taskId: t.id, projectId: null })}
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <div className="mt-auto flex items-center justify-between border-t pt-4">
-            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-              Edit project
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-muted-foreground hover:text-destructive"
-              onClick={deleteProject}
             >
-              <Trash2 className="size-4" /> Delete
+              {m.name}
+            </span>
+            {m.dueDate && (
+              <span className="shrink-0 text-xs text-muted-foreground">{m.dueDate}</span>
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-6 opacity-0 group-hover:opacity-100"
+              aria-label="Remove milestone"
+              onClick={() => removeMilestone.mutate({ projectId: project.id, milestoneId: m.id })}
+            >
+              <X className="size-3.5" />
             </Button>
           </div>
-        </div>
-
-        {editing && (
-          <ProjectDialog open onClose={() => setEditing(false)} existing={project} />
-        )}
-      </SheetContent>
-    </Sheet>
+        ))}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <Input
+          value={milestoneName}
+          onChange={(e) => setMilestoneName(e.currentTarget.value)}
+          placeholder="Add a stage…"
+          className="h-8"
+          onKeyDown={(e) => e.key === 'Enter' && addStage()}
+        />
+        <Button size="sm" variant="outline" onClick={addStage} disabled={!milestoneName.trim()}>
+          Add
+        </Button>
+      </div>
+    </section>
   )
 }
 
@@ -422,7 +676,7 @@ function LinkTaskPopover({ project, linkedIds }: { project: Project; linkedIds: 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button size="sm" variant="ghost" className="h-7 text-xs">
+        <Button size="sm" variant="ghost" className="h-8 text-xs">
           <Link2 className="size-3.5" /> Link task
         </Button>
       </PopoverTrigger>
