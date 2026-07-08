@@ -161,3 +161,10 @@
 .northstar-markdown [data-streamdown='code-block-body'] {
   padding: 0.75rem;
 }
+
+.project-notes-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}

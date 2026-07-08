@@ -803,12 +803,13 @@ export const GanttFeatureDragHelper: FC<GanttFeatureDragHelperProps> = ({
   );
 };
 
-export type GanttFeatureItemCardProps = Pick<GanttFeature, "id"> & {
+export type GanttFeatureItemCardProps = Pick<GanttFeature, "id" | "status"> & {
   children?: ReactNode;
 };
 
 export const GanttFeatureItemCard: FC<GanttFeatureItemCardProps> = ({
   id,
+  status,
   children,
 }) => {
   const [, setDragging] = useGanttDragging();
@@ -818,7 +819,10 @@ export const GanttFeatureItemCard: FC<GanttFeatureItemCardProps> = ({
   useEffect(() => setDragging(isPressed), [isPressed, setDragging]);
 
   return (
-    <Card className="h-full w-full rounded-md bg-background p-2 text-xs shadow-sm">
+    <Card
+      className="h-full w-full rounded-md p-2 text-xs text-white shadow-sm"
+      style={{ backgroundColor: status.color, borderColor: status.color }}
+    >
       <div
         className={cn(
           "flex h-full w-full items-center justify-between gap-2 text-left",
@@ -955,7 +959,7 @@ export const GanttFeatureItem: FC<GanttFeatureItemProps> = ({
           onDragStart={handleItemDragStart}
           sensors={[mouseSensor]}
         >
-          <GanttFeatureItemCard id={feature.id}>
+          <GanttFeatureItemCard id={feature.id} status={feature.status}>
             {children ?? (
               <p className="flex-1 truncate text-xs">{feature.name}</p>
             )}

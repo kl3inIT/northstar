@@ -20,6 +20,11 @@ Current MCP tool areas:
 - Disciplines: `list_disciplines`, `create_discipline`.
 - Review: `draft_review`.
 
+Agents should follow the Northstar usage guideline for note authoring:
+Markdown is the note source format, existing notes are searched before creating
+new ones, project-specific notes are filed with `projectId`, and Mermaid is
+preferred for flows, lifecycles, architecture, dependency graphs, and decisions.
+
 The MCP app uses streamable HTTP at `/mcp` and reads the same PostgreSQL schema
 as the API.
 

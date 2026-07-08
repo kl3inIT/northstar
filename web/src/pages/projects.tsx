@@ -54,7 +54,6 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { api } from '@/lib/api'
 import type { components } from '@/lib/api.gen'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
-import { DISCIPLINE_HEX as HEX } from '@/lib/discipline-colors'
 import { iso } from '@/lib/dates'
 import {
   useCreateTask,
@@ -82,9 +81,29 @@ import { cn } from '@/lib/utils'
 
 type ProjTask = components['schemas']['TaskSummary']
 
+const PROJECT_GANTT_COLORS = [
+  '#2563eb',
+  '#16a34a',
+  '#dc2626',
+  '#ca8a04',
+  '#9333ea',
+  '#ea580c',
+  '#0891b2',
+  '#be123c',
+  '#4f46e5',
+  '#0f766e',
+] as const
+
+function projectColor(id: string): string {
+  let hash = 0
+  for (const char of id) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  }
+  return PROJECT_GANTT_COLORS[hash % PROJECT_GANTT_COLORS.length]
+}
+
 /** A bar needs a span: fall back to createdAt → +30 days until real dates are set. */
-function featureOf(p: Project, disciplines: Discipline[]): GanttFeature {
-  const discipline = disciplines.find((d) => d.id === p.disciplineId)
+function featureOf(p: Project): GanttFeature {
   const start = p.startDate ? new Date(p.startDate + 'T00:00:00') : new Date(p.createdAt)
   const end = p.targetDate
     ? new Date(p.targetDate + 'T00:00:00')
@@ -97,7 +116,7 @@ function featureOf(p: Project, disciplines: Discipline[]): GanttFeature {
     status: {
       id: p.status,
       name: p.status,
-      color: p.status === 'DONE' ? '#a3a3a3' : HEX[discipline?.color ?? 'GRAY'],
+      color: p.status === 'DONE' ? '#737373' : projectColor(p.id),
     },
   }
 }
@@ -120,7 +139,7 @@ export function ProjectsPage() {
       const d = disciplines.find((x) => x.id === p.disciplineId)
       const key = d?.name ?? 'No discipline'
       if (!byDiscipline.has(key)) byDiscipline.set(key, { name: key, features: [] })
-      byDiscipline.get(key)!.features.push(featureOf(p, disciplines))
+      byDiscipline.get(key)!.features.push(featureOf(p))
     }
     return [...byDiscipline.values()]
   }, [projects, disciplines])
@@ -324,7 +343,9 @@ function ProjectDetail({ project, discipline }: { project: Project; discipline?:
       </div>
 
       {project.notes && (
-        <p className="mt-3 whitespace-pre-wrap text-sm text-muted-foreground">{project.notes}</p>
+        <p className="project-notes-preview mt-3 max-w-4xl whitespace-pre-line text-sm text-muted-foreground">
+          {project.notes}
+        </p>
       )}
 
       {/* Board (main) + milestones rail. Rail drops below the board on mobile. */}

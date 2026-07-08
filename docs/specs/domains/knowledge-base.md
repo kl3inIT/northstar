@@ -6,6 +6,9 @@
 - Markdown is the portable note representation.
 - Wiki-style links such as `[[IELTS Speaking]]` are part of the note model.
 - Link resolution and backlinks are derived from note content.
+- The reading view renders fenced Mermaid blocks as diagrams, so notes can carry
+  process flows, architecture maps, lifecycle diagrams, dependency graphs, and
+  decision flows without a separate diagram field.
 - Notes support folders, tags, and working status.
 - Notes can be attached to zero or one primary project. This project link is the
   note's execution context; wiki links/backlinks remain the many-to-many

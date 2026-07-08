@@ -65,6 +65,34 @@ When using Northstar through an agent:
 - Normalize times to `HH:mm`.
 - Do not delete tasks/events/projects unless the user clearly asks.
 
+### Note Authoring
+
+Agents can create and edit notes directly through MCP because note bodies are
+plain Markdown. Treat Markdown as the source of truth for note content.
+
+- Search first; create a new note only when the topic does not already exist.
+- Prefer `append_to_note` for additive context and `update_note` only when the
+  whole note should be rewritten or moved.
+- Attach `projectId` when a note belongs to one project. Keep project
+  descriptions short and put durable detail in the note.
+- Use `[[Exact Note Title]]` wiki links only when the relationship is real.
+- Use one to four lowercase tags.
+- Avoid duplicating the title as the first `# Heading` unless the Markdown needs
+  to be export-ready.
+- Prefer Mermaid for process flows, lifecycle maps, architecture diagrams,
+  dependency graphs, and decision flows. Use bullets only when the structure is
+  simpler than a diagram.
+
+Example:
+
+```mermaid
+flowchart TD
+  Life --> Discipline
+  Discipline --> Project
+  Project --> Task
+  Project --> Note
+```
+
 ## First Setup Checklist
 
 Create a small initial structure:
