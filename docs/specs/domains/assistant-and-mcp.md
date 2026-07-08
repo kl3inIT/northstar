@@ -10,7 +10,9 @@ Current MCP tool areas:
 - Knowledge: `search_knowledge`, `get_note`, `create_note`, `append_to_note`,
   `update_note`.
 - Tasks: `today_tasks`, `upcoming_tasks`, `find_tasks`, `create_task`,
-  `update_task`, `set_task_done`, `delete_task`.
+  `update_task`, `set_task_done`, `delete_task`. Both `create_task` and
+  `update_task` take an optional project to file the task under (create files it
+  in one step; update moves it, mirroring the dedicated project-assignment path).
 - Calendar: `upcoming_events`, `create_event`, `update_event`, `delete_event`,
   `cancel_occurrence`, `find_free_slots`.
 - Projects: `list_projects`, `project_status`, `create_project`,

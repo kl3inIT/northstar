@@ -11,3 +11,5 @@ Reusable testing mechanics live in
 | Recurrence rule logic | Automated | `core/src/test/java/com/northstar/core/calendar/RecurrenceRuleTests.java` |
 | Discipline/project UI flows | Partial | UI supports discipline create/edit/delete, but still needs browser coverage for these screens. |
 | Project milestone edge cases | Gap | Needs focused service/API tests as project behavior grows. |
+| Create task filed under a project | Gap | `TaskService.create` overload + `TaskRequest.projectId` + `create_task` tool param are unverified; needs an API/tool test asserting the new task carries `projectId` and rejects an unknown project. |
+| Project detail board (Backlog/Planned/Done) | Gap | Column derivation from `(status, plannedDate)` and drag→setPlanned/setDone are UI-only; needs browser coverage. |
