@@ -42,11 +42,24 @@ public class TaskService {
     @Transactional
     public TaskSummary create(String title, String notes, LocalDate dueDate, LocalTime dueTime,
             LocalDate plannedDate, UUID disciplineId) {
+        return create(title, notes, dueDate, dueTime, plannedDate, disciplineId, null);
+    }
+
+    /** Create a task, optionally filed under a project in the same call (null = none). */
+    @Transactional
+    public TaskSummary create(String title, String notes, LocalDate dueDate, LocalTime dueTime,
+            LocalDate plannedDate, UUID disciplineId, UUID projectId) {
         disciplines.requireExists(disciplineId);
+        if (projectId != null && !projects.exists(projectId)) {
+            throw new IllegalArgumentException("No project with id " + projectId);
+        }
         Task task = new Task(UUID.randomUUID(), title.strip(),
                 notes == null || notes.isBlank() ? null : notes.strip(),
                 dueDate, dueTime, disciplineId);
         task.planFor(plannedDate);
+        if (projectId != null) {
+            task.assignToProject(projectId);
+        }
         tasks.save(task);
         return summary(task);
     }

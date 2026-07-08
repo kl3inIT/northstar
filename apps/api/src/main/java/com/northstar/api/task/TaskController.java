@@ -81,7 +81,7 @@ class TaskController {
     @ResponseStatus(HttpStatus.CREATED)
     TaskSummary create(@Valid @RequestBody TaskRequest request) {
         return tasks.create(request.title(), request.notes(), request.dueDate(), request.dueTime(),
-                request.plannedDate(), request.disciplineId());
+                request.plannedDate(), request.disciplineId(), request.projectId());
     }
 
     @PutMapping("/{id}")

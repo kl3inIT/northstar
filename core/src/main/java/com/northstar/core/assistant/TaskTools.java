@@ -41,7 +41,8 @@ class TaskTools implements NorthstarTool {
 
     private static final String CREATE_TASK = """
             Create a task/reminder for the user (e.g. 'remind me to submit the essay \
-            tomorrow'). Resolve relative dates yourself before calling.""";
+            tomorrow'). Resolve relative dates yourself before calling. Pass projectId \
+            to file the new task under a project in the same step.""";
 
     private static final String UPDATE_TASK = """
             Edit an existing task: retitle, reschedule the deadline, change notes, plan a \
@@ -120,9 +121,13 @@ class TaskTools implements NorthstarTool {
                     required = false) String taskNotes,
             @ToolParam(description = "Discipline name the task belongs to (see list_disciplines), e.g. 'IELTS'; omit for none", required = false)
             @McpToolParam(description = "Discipline name the task belongs to (see list_disciplines), e.g. 'IELTS'; omit for none",
-                    required = false) String disciplineName) {
+                    required = false) String disciplineName,
+            @ToolParam(description = "Project UUID (from list_projects) to file the task under; omit for none", required = false)
+            @McpToolParam(description = "Project UUID (from list_projects) to file the task under; omit for none",
+                    required = false) String projectId) {
         return tasks.create(title, taskNotes, parseDate("dueDate", dueDate), parseTime("dueTime", dueTime),
-                disciplineIdByName(disciplines, disciplineName));
+                null, disciplineIdByName(disciplines, disciplineName),
+                projectId == null || projectId.isBlank() ? null : UUID.fromString(projectId.strip()));
     }
 
     @Tool(name = "update_task", description = UPDATE_TASK)

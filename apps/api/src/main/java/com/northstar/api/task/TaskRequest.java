@@ -9,6 +9,8 @@ import java.util.UUID;
 /**
  * Create/update payload for a task. Title size mirrors the V4 column width;
  * {@code plannedDate} is the do-vs-due "do" day (independent of the deadline).
+ * {@code projectId} files the task under a project on create; update ignores it
+ * (moving a task between projects is the dedicated PATCH /{id}/project).
  */
 record TaskRequest(
         @NotBlank @Size(max = 512) String title,
@@ -16,5 +18,6 @@ record TaskRequest(
         LocalDate dueDate,
         LocalTime dueTime,
         LocalDate plannedDate,
-        UUID disciplineId) {
+        UUID disciplineId,
+        UUID projectId) {
 }

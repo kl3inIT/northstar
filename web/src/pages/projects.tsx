@@ -366,7 +366,6 @@ function ProjectBoard({ project }: { project: Project }) {
   const setDone = useSetTaskDone()
   const setPlanned = useSetTaskPlanned()
   const createTask = useCreateTask()
-  const setTaskProject = useSetTaskProject()
   const queryClient = useQueryClient()
   const today = iso(new Date())
   const [newTitle, setNewTitle] = useState('')
@@ -425,11 +424,11 @@ function ProjectBoard({ project }: { project: Project }) {
     if (!title) return
     setNewTitle('')
     try {
-      const created = await createTask.mutateAsync({
+      await createTask.mutateAsync({
         title,
         disciplineId: project.disciplineId ?? undefined,
+        projectId: project.id,
       })
-      await setTaskProject.mutateAsync({ taskId: created.id, projectId: project.id })
       refresh()
     } catch {
       toast.error('Adding the task failed — try again.')
