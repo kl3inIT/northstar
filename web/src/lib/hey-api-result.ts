@@ -1,3 +1,5 @@
+import './hey-api-config'
+
 type ApiResult<T> = {
   data?: T
   error?: unknown

@@ -28,16 +28,17 @@
   contract and is intentionally gitignored.
 - Hey API generates DTO types, the fetch client, and SDK functions. Keep
   endpoint DTO and SDK imports pointed at `@/lib/hey-api`.
-- Generated requests use `web/src/lib/hey-api-runtime.ts`, which supplies the
-  app's CSRF/session-aware `apiFetch` implementation to `@hey-api/client-fetch`.
+- Generated requests use Hey's generated Fetch API client. Configure that client
+  in `web/src/lib/hey-api-config.ts` with `client.setConfig()` so requests go
+  through the app's CSRF/session-aware `apiFetch` implementation.
 - Normal JSON CRUD endpoints should use the generated SDK functions plus
   `web/src/lib/hey-api-result.ts` for `{ data, error }` unwrapping. Keep direct
   `apiFetch` only for protocol-specific flows such as AI SDK chat streaming or
   other endpoints that intentionally need raw `Response` handling.
-- Hey API configuration lives in `web/openapi-ts.config.mjs`. `pnpm gen:api`
-  runs that config through a pinned Hey API CLI via `pnpm dlx`; do not replace it
-  with the local executable until Hey API supports the TypeScript 7 compiler API
-  shape used by this project.
+- `pnpm gen:api` uses the pinned Hey API CLI directly with explicit plugins:
+  `@hey-api/typescript`, `@hey-api/client-fetch`, and `@hey-api/sdk`. Do not
+  replace it with a config-file invocation until Hey API's 0.99.x config loader
+  is verified against this project's TypeScript 7 toolchain in CI.
 
 ## Frontend
 
