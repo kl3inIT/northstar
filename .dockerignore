@@ -1,16 +1,33 @@
-# Keep the build context lean — both Dockerfiles use the repo root as context.
+# Keep the build context lean. All Dockerfiles use the repo root as context,
+# so ignore local tooling, generated output, and secrets aggressively while
+# keeping source assets such as web/public/*.png available to the web image.
 .git
 .github
+.agents
+.claude
+.codex
 .gradle
 .idea
+.run
+.tmp
+.vscode
 .playwright-mcp
+tmp
+node_modules
+**/node_modules
 **/build
-build-logic/.gradle
-web/node_modules
+**/.gradle
+**/dist
+**/.vite
+coverage
+**/coverage
+playwright-report
+test-results
+**/test-results
 web/dist
+web/src/lib/hey-api
 docs
 mobile
-*.png
 *.log
 .env
 .env.*
