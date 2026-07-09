@@ -145,18 +145,19 @@ jobs:
           BASE_URL: ${{ vars.NORTHSTAR_BASE_URL }}
         run: |
           # Dual probe (zero-mail lesson): / proves TLS+web, and a real /api
-          # endpoint proves the edge reaches the RECREATED api AND it can serve
-          # a DB-backed request. Deliberately NOT /api/actuator/health — actuator
+          # endpoint proves the edge reaches the RECREATED api. Deliberately NOT
+          # /api/actuator/health — actuator
           # is mapped at /actuator on the container, so through the edge's /api
           # route it 404s even when healthy; that path can't tell "healthy" from
-          # "edge route broken". /api/disciplines/cards returns 200 + JSON list
-          # only when routing, the api, and Postgres are all up.
+          # "edge route broken". /api/disciplines/cards returns 200 when auth is
+          # disabled, or 401 after the single-user login gate is enabled. Either
+          # response proves the edge reached the recreated api instead of 502ing.
           smoke_ok() {
             local root api
             root=$(curl -o /dev/null -s -w '%{http_code}' "${BASE_URL}/" || echo 000)
             api=$(curl -o /dev/null -s -w '%{http_code}' "${BASE_URL}/api/disciplines/cards" || echo 000)
             echo "root=${root} api=${api}"
-            [[ "$root" == "200" && "$api" == "200" ]]
+            [[ "$root" == "200" ]] && [[ "$api" == "200" || "$api" == "401" ]]
           }
           for attempt in {1..20}; do
             if smoke_ok; then echo "smoke OK"; exit 0; fi
