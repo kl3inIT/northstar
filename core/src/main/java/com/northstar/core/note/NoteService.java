@@ -219,10 +219,15 @@ public class NoteService {
 
     @Transactional(readOnly = true)
     public List<NoteSummary> search(String query) {
+        return search(query, 50);
+    }
+
+    @Transactional(readOnly = true)
+    public List<NoteSummary> search(String query, int limit) {
         if (query == null || query.isBlank()) {
             return List.of();
         }
-        List<NoteRepository.SearchHit> hits = notes.search(query.strip());
+        List<NoteRepository.SearchHit> hits = notes.search(query.strip(), Math.max(1, limit));
         Map<UUID, Note> byId = notes.findAllById(hits.stream().map(NoteRepository.SearchHit::getId).toList())
                 .stream().collect(Collectors.toMap(Note::getId, Function.identity()));
         // Keep the rank order from the hits; snippet is the highlighted matched fragment.

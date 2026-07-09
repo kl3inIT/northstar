@@ -1,5 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronRight, FileText, Folder } from 'lucide-react'
+import { ChevronRight, FilePlus2, FileText, Folder, FolderPlus, MoreHorizontal, Upload } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   Tree,
@@ -10,6 +10,14 @@ import {
   type TreeApi,
 } from 'react-arborist'
 import { toast } from 'sonner'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { TreeFolder } from '@/lib/folder-tree'
 import { useMoveNoteToFolder } from '@/lib/notes-api'
 import type { NoteSummary } from '@/lib/notes-types'
@@ -40,10 +48,16 @@ export function FolderTree({
   tree,
   activeSlug,
   dragDisabled = false,
+  onCreateNote,
+  onCreateFolder,
+  onUploadFiles,
 }: {
   tree: TreeFolder
   activeSlug?: string
   dragDisabled?: boolean
+  onCreateNote?: (folderPath: string) => void
+  onCreateFolder?: (parentPath: string) => void
+  onUploadFiles?: (folderPath: string) => void
 }) {
   const navigate = useNavigate()
   const moveNote = useMoveNoteToFolder()
@@ -105,6 +119,15 @@ export function FolderTree({
     !dragNodes.every((node) => node.data.kind === 'note') ||
     (!parentNode.isRoot && parentNode.data.kind !== 'folder')
 
+  const renderNode = (props: NodeRendererProps<ArboristNode>) => (
+    <TreeNode
+      {...props}
+      onCreateNote={onCreateNote}
+      onCreateFolder={onCreateFolder}
+      onUploadFiles={onUploadFiles}
+    />
+  )
+
   return (
     <div ref={containerRef} className="h-full min-h-0 text-sm">
       {size.height > 0 && size.width > 0 && (
@@ -132,23 +155,35 @@ export function FolderTree({
           aria-label="Notes folder tree"
           className="outline-none"
         >
-          {TreeNode}
+          {renderNode}
         </Tree>
       )}
     </div>
   )
 }
 
-function TreeNode({ node, style, dragHandle }: NodeRendererProps<ArboristNode>) {
+function TreeNode({
+  node,
+  style,
+  dragHandle,
+  onCreateNote,
+  onCreateFolder,
+  onUploadFiles,
+}: NodeRendererProps<ArboristNode> & {
+  onCreateNote?: (folderPath: string) => void
+  onCreateFolder?: (parentPath: string) => void
+  onUploadFiles?: (folderPath: string) => void
+}) {
   const data = node.data
   const isFolder = data.kind === 'folder'
+  const canMutateFolder = isFolder && Boolean(onCreateNote || onCreateFolder || onUploadFiles)
 
   return (
     <div
       ref={dragHandle}
       style={style}
       className={cn(
-        'flex h-full min-w-0 items-center gap-1.5 rounded-md pr-2',
+        'group/tree-row flex h-full min-w-0 items-center gap-1.5 rounded-md pr-1',
         isFolder ? 'font-medium' : 'cursor-grab active:cursor-grabbing',
         node.isSelected && 'bg-primary/10 font-medium text-primary',
         node.willReceiveDrop && 'bg-primary/15 ring-1 ring-primary/30',
@@ -186,6 +221,46 @@ function TreeNode({ node, style, dragHandle }: NodeRendererProps<ArboristNode>) 
 
       {isFolder && (
         <span className="shrink-0 text-[11px] font-normal text-muted-foreground">{data.count}</span>
+      )}
+
+      {canMutateFolder && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              aria-label={`Folder actions for ${data.path}`}
+              title="Folder actions"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+              className="grid size-6 shrink-0 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring group-hover/tree-row:opacity-100"
+            >
+              <MoreHorizontal className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel className="truncate text-xs text-muted-foreground">
+              {data.path}
+            </DropdownMenuLabel>
+            {onCreateNote && (
+              <DropdownMenuItem onSelect={() => onCreateNote(data.path)}>
+                <FilePlus2 className="size-4" /> New note
+              </DropdownMenuItem>
+            )}
+            {onCreateFolder && (
+              <DropdownMenuItem onSelect={() => onCreateFolder(data.path)}>
+                <FolderPlus className="size-4" /> New folder
+              </DropdownMenuItem>
+            )}
+            {onUploadFiles && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => onUploadFiles(data.path)}>
+                  <Upload className="size-4" /> Upload files
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
     </div>
   )

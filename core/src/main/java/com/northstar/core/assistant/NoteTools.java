@@ -40,7 +40,8 @@ class NoteTools implements NorthstarTool {
             Save new knowledge into the user's knowledge base as a Markdown note. Use when \
             the user learns something worth keeping or asks to note something down. Keep a \
             short capture short; reference related existing notes inline as [[Exact Title]] \
-            only when clearly related.""";
+            only when clearly related. Omit status for STAGING review, or pass RESOURCE \
+            when the user explicitly wants approved reusable knowledge.""";
 
     private static final String UPDATE_NOTE = """
             Edit an existing note: retitle, move to another folder, retag, REPLACE the \
@@ -181,11 +182,17 @@ class NoteTools implements NorthstarTool {
             @ToolParam(description = "1-4 lowercase tags, reusing the user's existing tags where possible", required = false)
             @McpToolParam(description = "1-4 lowercase tags, reusing the user's existing tags where possible",
                     required = false) List<String> tags,
+            @ToolParam(description = "Working state for the new note: STAGING = review first, RESOURCE = approved knowledge, ARCHIVED = soft-delete. Omit for STAGING.", required = false)
+            @McpToolParam(description = "Working state for the new note: STAGING = review first, RESOURCE = approved knowledge, ARCHIVED = soft-delete. Omit for STAGING.",
+                    required = false) String status,
             @ToolParam(description = "Project UUID to file this note under; omit for none", required = false)
             @McpToolParam(description = "Project UUID to file this note under; omit for none",
                     required = false) String projectId) {
-        // Machine-drafted → STAGING: the user reviews it in the Notes staging tab.
-        return notes.create(title, folderPath, contentMarkdown, tags, NoteStatus.STAGING,
+        // Machine-drafted remains STAGING by default, but callers can promote
+        // durable playbook/reference material to RESOURCE in the same tool call.
+        NoteStatus newStatus = parseStatus(status);
+        return notes.create(title, folderPath, contentMarkdown, tags,
+                newStatus == null ? NoteStatus.STAGING : newStatus,
                 projectId == null || projectId.isBlank() || projectId.strip().equalsIgnoreCase("none")
                         ? null : UUID.fromString(projectId.strip()));
     }

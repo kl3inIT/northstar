@@ -81,6 +81,19 @@ class NoteServiceIntegrationTests {
     }
 
     @Test
+    void keywordSearchHandlesVietnameseAndTitleTypos() {
+        notes.create("Kho dữ liệu chuyên ngành", "Career/DTH",
+                "Các lệnh registry và image push cho môi trường OpenShift sandbox.", List.of("devops"));
+        notes.create("OpenShift sandbox account", "Career/DTH",
+                "Registry credentials and image push commands.", List.of("devops"));
+
+        assertThat(notes.search("dữ liệu")).extracting(NoteSummary::title)
+                .contains("Kho dữ liệu chuyên ngành");
+        assertThat(notes.search("OpenShfit sandbox")).extracting(NoteSummary::title)
+                .contains("OpenShift sandbox account");
+    }
+
+    @Test
     void mfiLifecycleStagingListsAndArchiveHidesFromSearch() {
         // Hand-written → RESOURCE; machine-drafted → STAGING (the review queue).
         NoteDetail handWritten = notes.create("HSK grammar particles", "Chinese", "了 vs 过 usage.", List.of());

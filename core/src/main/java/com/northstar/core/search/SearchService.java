@@ -6,6 +6,7 @@ import com.northstar.core.attachment.AttachmentView;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteSummary;
+import com.northstar.core.note.NoteStatus;
 import com.northstar.core.shared.Hashing;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -65,11 +66,12 @@ public class SearchService {
     private static final Logger log = LoggerFactory.getLogger(SearchService.class);
 
     /** Part of every contentHash — bump when the chunking/caption format changes. */
-    private static final int INDEX_VERSION = 2;
+    private static final int INDEX_VERSION = 3;
 
-    private static final int SEMANTIC_TOP_K = 10;
-    /** Standard RRF dampening constant (Cormack et al.): score = Σ 1/(K + rank). */
-    private static final int RRF_K = 60;
+    /** Candidate window per retriever before RRF's final cut; mirrors production RRF rank windows. */
+    private static final int RANK_WINDOW = 50;
+    /** Fetch more chunks than sources because one note/file can own several high-ranking chunks. */
+    private static final int SEMANTIC_CHUNK_WINDOW = 150;
     private static final int SNIPPET_CHARS = 200;
     private static final int BACKFILL_PAGE = 100;
     /** Embedding-cost ceiling per uploaded file (~64 × 800 tokens). */
@@ -109,21 +111,21 @@ public class SearchService {
         }
         Map<String, Hit> fused = new LinkedHashMap<>();
 
-        List<NoteSummary> keyword = notes.search(query.strip());
+        List<NoteSummary> keyword = notes.search(query.strip(), RANK_WINDOW);
         for (int rank = 0; rank < keyword.size(); rank++) {
             NoteSummary note = keyword.get(rank);
             Hit hit = new Hit(SearchResult.SOURCE_NOTE, note.title(), note.slug(),
-                    "/notes/" + note.slug(), note.snippet(), rrf(rank));
+                    "/notes/" + note.slug(), note.snippet(), rank, SearchRanking.rrf(rank));
             fused.merge(hit.url, hit, Hit::plus);
         }
 
         VectorStore store = vectorStore.getIfAvailable();
         if (store != null) {
             List<Document> chunks = store.similaritySearch(
-                    SearchRequest.builder().query(query.strip()).topK(SEMANTIC_TOP_K).build());
+                    SearchRequest.builder().query(query.strip()).topK(SEMANTIC_CHUNK_WINDOW).build());
             int rank = 0;
             for (Document chunk : chunks) {
-                Hit hit = semanticHit(chunk, rrf(rank));
+                Hit hit = semanticHit(chunk, rank, SearchRanking.rrf(rank));
                 Hit existing = fused.get(hit.url);
                 if (existing != null && existing.semanticCounted) {
                     continue; // several chunks of one source: only its best rank counts
@@ -131,26 +133,29 @@ public class SearchService {
                 hit.semanticCounted = true;
                 fused.merge(hit.url, hit, Hit::plus);
                 rank++;
+                if (rank >= RANK_WINDOW) {
+                    break;
+                }
             }
         }
 
         return fused.values().stream()
-                .sorted((a, b) -> Double.compare(b.score, a.score))
+                .sorted(SearchService::compareHits)
                 .limit(limit)
                 .map(h -> new SearchResult(h.source, h.title, h.slug, h.url, h.snippet))
                 .toList();
     }
 
-    private static Hit semanticHit(Document chunk, double score) {
+    private static Hit semanticHit(Document chunk, int rank, double score) {
         Map<String, Object> metadata = chunk.getMetadata();
         String title = String.valueOf(metadata.get("title"));
         if (metadata.get("noteId") != null) {
             String slug = String.valueOf(metadata.get("slug"));
             return new Hit(SearchResult.SOURCE_NOTE, title, slug, "/notes/" + slug,
-                    snippet(chunk.getText()), score);
+                    snippet(chunk.getText()), rank, score);
         }
         return new Hit(SearchResult.SOURCE_FILE, title, null,
-                "/api/files/" + metadata.get("attachmentId"), snippet(chunk.getText()), score);
+                "/api/files/" + metadata.get("attachmentId"), snippet(chunk.getText()), rank, score);
     }
 
     /**
@@ -169,10 +174,14 @@ public class SearchService {
             remove(noteId);
             return false;
         }
+        if (note.status() == NoteStatus.ARCHIVED) {
+            remove(noteId);
+            return false;
+        }
         String body = note.contentMarkdown() == null || note.contentMarkdown().isBlank()
                 ? note.title()
                 : note.contentMarkdown();
-        String hash = contentHash(note.title() + "\n" + body);
+        String hash = contentHash(note.status() + "\n" + note.title() + "\n" + body);
         if (hash.equals(indexedHash("noteId", noteId))) {
             log.debug("Note {} unchanged (hash match) — embedding skipped", note.slug());
             return false;
@@ -445,6 +454,7 @@ public class SearchService {
                 "noteId", note.id().toString(),
                 "slug", note.slug(),
                 "title", note.title(),
+                "status", note.status().name(),
                 "chunk", chunk,
                 "contentHash", hash);
     }
@@ -488,8 +498,20 @@ public class SearchService {
         return Hashing.sha256Hex(INDEX_VERSION + "\n" + content);
     }
 
-    private static double rrf(int rank) {
-        return 1.0 / (RRF_K + rank + 1);
+    private static int compareHits(Hit left, Hit right) {
+        int score = Double.compare(right.score, left.score);
+        if (score != 0) {
+            return score;
+        }
+        int sources = Integer.compare(right.sourceCount, left.sourceCount);
+        if (sources != 0) {
+            return sources;
+        }
+        int rank = Integer.compare(left.bestRank, right.bestRank);
+        if (rank != 0) {
+            return rank;
+        }
+        return left.url.compareTo(right.url);
     }
 
     private static String snippet(String chunkText) {
@@ -506,15 +528,18 @@ public class SearchService {
         private final String url;
         private final String snippet;
         private boolean semanticCounted;
+        private int sourceCount = 1;
+        private int bestRank;
         private double score;
 
         private Hit(String source, String title, @Nullable String slug, String url,
-                String snippet, double score) {
+                String snippet, int rank, double score) {
             this.source = source;
             this.title = title;
             this.slug = slug;
             this.url = url;
             this.snippet = snippet;
+            this.bestRank = rank;
             this.score = score;
         }
 
@@ -522,6 +547,8 @@ public class SearchService {
         private Hit plus(Hit other) {
             this.score += other.score;
             this.semanticCounted |= other.semanticCounted;
+            this.sourceCount++;
+            this.bestRank = Math.min(this.bestRank, other.bestRank);
             return this;
         }
     }

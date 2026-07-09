@@ -52,6 +52,7 @@ class McpServerIntegrationTests {
         assertThat(tools).contains("search_knowledge", "get_note", "create_note",
                 "today_tasks", "upcoming_tasks", "create_task", "set_task_done",
                 "upcoming_events", "create_event", "find_free_slots");
+        assertThat(tools).contains("\"status\"");
         // MCP behavior hints ride along so clients can gate confirmation UX.
         assertThat(tools).contains("\"readOnlyHint\":true", "\"destructiveHint\":false");
 
@@ -65,6 +66,17 @@ class McpServerIntegrationTests {
                 {"jsonrpc":"2.0","id":4,"method":"tools/call","params":{
                   "name":"today_tasks","arguments":{}}}""").body();
         assertThat(today).contains("MCP roundtrip probe");
+
+        String note = post(session, """
+                {"jsonrpc":"2.0","id":5,"method":"tools/call","params":{
+                  "name":"create_note","arguments":{
+                    "title":"MCP approved note probe",
+                    "folderPath":"Systems/AI Harness",
+                    "contentMarkdown":"Approved note from MCP.",
+                    "tags":["mcp","probe"],
+                    "status":"RESOURCE"}}}""").body();
+        assertThat(note).contains("MCP approved note probe", "\\\"status\\\":\\\"RESOURCE\\\"")
+                .doesNotContain("\"isError\":true");
     }
 
     @Test

@@ -30,6 +30,9 @@ Agents should follow the Northstar usage guideline for note authoring:
 Markdown is the note source format, existing notes are searched before creating
 new ones, project-specific notes are filed with `projectId`, and Mermaid is
 preferred for flows, lifecycles, architecture, dependency graphs, and decisions.
+`create_note` defaults new MCP-authored notes to `STAGING` for review, but it
+accepts an optional `status` argument so trusted reference/playbook notes can be
+created directly as `RESOURCE` when the user explicitly asks for that.
 
 The MCP app uses streamable HTTP at `/mcp` and reads the same PostgreSQL schema
 as the API.

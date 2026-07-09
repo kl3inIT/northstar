@@ -53,17 +53,23 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
      * quoted phrases, {@code -exclude}) so the search box needs no query DSL.
      * {@code ts_headline} returns the matched fragment with {@code <mark>} markers
      * for the UI to highlight; the client renders it as text (never innerHTML).
+     * The title trigram fallback catches typos and exact named things that
+     * full-text tokenization misses.
      */
     @Query(value = """
+            WITH query AS (
+                SELECT websearch_to_tsquery('simple', :query) AS tsq
+            )
             SELECT n.id AS id,
-                   ts_headline('english', n.content_markdown, websearch_to_tsquery('english', :query),
-                               'StartSel=<mark>, StopSel=</mark>, MaxWords=25, MinWords=10') AS headline
-            FROM note n
-            WHERE n.search_tsv @@ websearch_to_tsquery('english', :query)
+                   ts_headline('simple', n.content_markdown, query.tsq,
+                                'StartSel=<mark>, StopSel=</mark>, MaxWords=25, MinWords=10') AS headline
+            FROM note n, query
+            WHERE (n.search_tsv @@ query.tsq OR n.title % :query)
               AND n.status <> 'ARCHIVED'
-            ORDER BY ts_rank(n.search_tsv, websearch_to_tsquery('english', :query)) DESC,
+            ORDER BY ts_rank(n.search_tsv, query.tsq) DESC,
+                     similarity(n.title, :query) DESC,
                      n.updated_at DESC
-            LIMIT 50
+            LIMIT :limit
             """, nativeQuery = true)
-    List<SearchHit> search(@Param("query") String query);
+    List<SearchHit> search(@Param("query") String query, @Param("limit") int limit);
 }
