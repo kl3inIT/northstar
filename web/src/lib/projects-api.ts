@@ -1,6 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from './api'
-import type { MilestoneSummary, ProjectSummary, TaskSummary } from './hey-api'
+import {
+  addProjectMilestone,
+  createProject,
+  deleteProject,
+  listProjects as listProjectsRequest,
+  listTasksByProject,
+  removeProjectMilestone,
+  setProjectStatus,
+  setTaskProject,
+  toggleProjectMilestone,
+  updateProject,
+} from './hey-api'
+import { dataOrThrow, voidOrThrow } from './hey-api-result'
+import type { MilestoneSummary, ProjectSummary } from './hey-api'
 
 export type Project = ProjectSummary
 export type Milestone = MilestoneSummary
@@ -14,9 +26,7 @@ export interface ProjectInput {
 }
 
 async function listProjects(): Promise<Project[]> {
-  const { data, error } = await api.GET('/api/projects')
-  if (error) throw error
-  return data ?? []
+  return dataOrThrow(await listProjectsRequest())
 }
 
 export function useProjects() {
@@ -36,9 +46,7 @@ export function useCreateProject() {
   const invalidate = useInvalidateProjects()
   return useMutation({
     mutationFn: async (body: ProjectInput) => {
-      const { data, error } = await api.POST('/api/projects', { body })
-      if (error) throw error
-      return data as Project
+      return dataOrThrow(await createProject({ body }))
     },
     onSuccess: invalidate,
   })
@@ -48,12 +56,10 @@ export function useUpdateProject() {
   const invalidate = useInvalidateProjects()
   return useMutation({
     mutationFn: async ({ id, ...body }: ProjectInput & { id: string }) => {
-      const { data, error } = await api.PUT('/api/projects/{id}', {
-        params: { path: { id } },
+      return dataOrThrow(await updateProject({
+        path: { id },
         body,
-      })
-      if (error) throw error
-      return data as Project
+      }))
     },
     onSuccess: invalidate,
   })
@@ -63,12 +69,10 @@ export function useSetProjectDone() {
   const invalidate = useInvalidateProjects()
   return useMutation({
     mutationFn: async ({ id, done }: { id: string; done: boolean }) => {
-      const { data, error } = await api.PATCH('/api/projects/{id}/status', {
-        params: { path: { id } },
+      return dataOrThrow(await setProjectStatus({
+        path: { id },
         body: { done },
-      })
-      if (error) throw error
-      return data as Project
+      }))
     },
     onSuccess: invalidate,
   })
@@ -78,8 +82,7 @@ export function useDeleteProject() {
   const invalidate = useInvalidateProjects()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await api.DELETE('/api/projects/{id}', { params: { path: { id } } })
-      if (error) throw error
+      voidOrThrow(await deleteProject({ path: { id } }))
     },
     onSuccess: invalidate,
   })
@@ -89,12 +92,10 @@ export function useAddMilestone() {
   const invalidate = useInvalidateProjects()
   return useMutation({
     mutationFn: async ({ projectId, name, dueDate }: { projectId: string; name: string; dueDate?: string }) => {
-      const { data, error } = await api.POST('/api/projects/{id}/milestones', {
-        params: { path: { id: projectId } },
+      return dataOrThrow(await addProjectMilestone({
+        path: { id: projectId },
         body: { name, dueDate },
-      })
-      if (error) throw error
-      return data as Project
+      }))
     },
     onSuccess: invalidate,
   })
@@ -104,11 +105,7 @@ export function useToggleMilestone() {
   const invalidate = useInvalidateProjects()
   return useMutation({
     mutationFn: async ({ projectId, milestoneId }: { projectId: string; milestoneId: string }) => {
-      const { data, error } = await api.PATCH('/api/projects/{id}/milestones/{milestoneId}/toggle', {
-        params: { path: { id: projectId, milestoneId } },
-      })
-      if (error) throw error
-      return data as Project
+      return dataOrThrow(await toggleProjectMilestone({ path: { id: projectId, milestoneId } }))
     },
     onSuccess: invalidate,
   })
@@ -118,11 +115,7 @@ export function useRemoveMilestone() {
   const invalidate = useInvalidateProjects()
   return useMutation({
     mutationFn: async ({ projectId, milestoneId }: { projectId: string; milestoneId: string }) => {
-      const { data, error } = await api.DELETE('/api/projects/{id}/milestones/{milestoneId}', {
-        params: { path: { id: projectId, milestoneId } },
-      })
-      if (error) throw error
-      return data as Project
+      return dataOrThrow(await removeProjectMilestone({ path: { id: projectId, milestoneId } }))
     },
     onSuccess: invalidate,
   })
@@ -134,11 +127,7 @@ export function useProjectTasks(projectId: string | null) {
     queryKey: ['project-tasks', projectId],
     enabled: !!projectId,
     queryFn: async () => {
-      const { data, error } = await api.GET<TaskSummary[]>('/api/tasks/by-project', {
-        params: { query: { projectId: projectId as string } },
-      })
-      if (error) throw error
-      return data ?? []
+      return dataOrThrow(await listTasksByProject({ query: { projectId: projectId as string } }))
     },
   })
 }
@@ -148,12 +137,10 @@ export function useSetTaskProject() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async ({ taskId, projectId }: { taskId: string; projectId: string | null }) => {
-      const { data, error } = await api.PATCH('/api/tasks/{id}/project', {
-        params: { path: { id: taskId } },
+      return dataOrThrow(await setTaskProject({
+        path: { id: taskId },
         body: { projectId: projectId ?? undefined },
-      })
-      if (error) throw error
-      return data
+      }))
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project-tasks'] })

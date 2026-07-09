@@ -7,6 +7,7 @@ import com.northstar.core.attachment.AttachmentService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
+import io.swagger.v3.oas.annotations.Operation;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -124,6 +125,7 @@ class AssistantController {
     }
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @Operation(operationId = "streamAssistantChat")
     SseEmitter chat(@Valid @RequestBody ChatRequest request, HttpServletResponse response) {
         response.setHeader(UI_MESSAGE_STREAM_HEADER, "v1");
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform");
@@ -190,6 +192,7 @@ class AssistantController {
 
     /** Stored transcript plus persisted tool parts for rehydrating the UI on load. */
     @GetMapping("/history")
+    @Operation(operationId = "listAssistantHistory")
     List<HistoryMessage> history(@RequestParam(required = false) String conversationId) {
         // The FULL transcript, straight from JDBC — not memory.get(), which returns
         // only the model's recent window (WindowedChatMemory). Tool workflow lives in
@@ -275,6 +278,7 @@ class AssistantController {
      * listing, and this is a read model of Spring AI's own schema, not domain.
      */
     @GetMapping("/conversations")
+    @Operation(operationId = "listAssistantConversations")
     List<ConversationSummary> conversations() {
         // Prefer the LLM-generated title (V17); fall back to the first user message
         // for conversations not yet titled (titling is async and best-effort).
@@ -301,6 +305,7 @@ class AssistantController {
 
     @DeleteMapping("/conversations/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "deleteAssistantConversation")
     void deleteConversation(@PathVariable String id) {
         jdbc.sql("DELETE FROM northstar_assistant_tool_trace WHERE conversation_id = ?")
                 .param(id)

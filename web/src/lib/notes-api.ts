@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from './api'
-import { apiFetch } from './http'
+import {
+  createNote as createNoteRequest,
+  getNote as getNoteRequest,
+  listNotes as listNotesRequest,
+  listNotesByProject,
+  searchNotes as searchNotesRequest,
+  setNoteStatus as setNoteStatusRequest,
+  updateNote as updateNoteRequest,
+} from './hey-api'
+import { dataOrThrow } from './hey-api-result'
 import type { NoteDetail, NoteInput, NoteStatus, NoteSummary, NoteUpdate } from './notes-types'
 
 /**
@@ -10,50 +18,34 @@ import type { NoteDetail, NoteInput, NoteStatus, NoteSummary, NoteUpdate } from 
  * scale boundary.
  */
 export async function listNotes(status?: NoteStatus): Promise<NoteSummary[]> {
-  const { data, error } = await api.GET('/api/notes', {
-    params: { query: { page: 0, size: 5000, status } },
-  })
-  if (error) throw error
+  const data = dataOrThrow(await listNotesRequest({ query: { page: 0, size: 5000, status } }))
   return (data?.content ?? []) as NoteSummary[]
 }
 
 /** Just the total for a status tab — one row fetched, count read from the page metadata. */
 export async function countNotes(status?: NoteStatus): Promise<number> {
-  const { data, error } = await api.GET('/api/notes', {
-    params: { query: { page: 0, size: 1, status } },
-  })
-  if (error) throw error
+  const data = dataOrThrow(await listNotesRequest({ query: { page: 0, size: 1, status } }))
   return data?.page?.totalElements ?? 0
 }
 
 export async function searchNotes(query: string): Promise<NoteSummary[]> {
-  const { data, error } = await api.GET('/api/notes/search', { params: { query: { q: query } } })
-  if (error) throw error
-  return (data ?? []) as NoteSummary[]
+  return dataOrThrow(await searchNotesRequest({ query: { q: query } })) as NoteSummary[]
 }
 
 export async function listProjectNotes(projectId: string): Promise<NoteSummary[]> {
-  const res = await apiFetch(`/api/notes/by-project?projectId=${encodeURIComponent(projectId)}`)
-  if (!res.ok) throw new Error(`Project notes request failed: ${res.status}`)
-  return (await res.json()) as NoteSummary[]
+  return dataOrThrow(await listNotesByProject({ query: { projectId } })) as NoteSummary[]
 }
 
 export async function getNote(slug: string): Promise<NoteDetail> {
-  const { data, error } = await api.GET('/api/notes/{slug}', { params: { path: { slug } } })
-  if (error) throw error
-  return data as NoteDetail
+  return dataOrThrow(await getNoteRequest({ path: { slug } })) as NoteDetail
 }
 
 export async function createNote(body: NoteInput): Promise<NoteDetail> {
-  const { data, error } = await api.POST('/api/notes', { body })
-  if (error) throw error
-  return data as NoteDetail
+  return dataOrThrow(await createNoteRequest({ body })) as NoteDetail
 }
 
 export async function updateNote(id: string, body: NoteUpdate): Promise<NoteDetail> {
-  const { data, error } = await api.PUT('/api/notes/{id}', { params: { path: { id } }, body })
-  if (error) throw error
-  return data as NoteDetail
+  return dataOrThrow(await updateNoteRequest({ path: { id }, body })) as NoteDetail
 }
 
 export async function moveNoteToFolder(
@@ -73,12 +65,10 @@ export async function moveNoteToFolder(
 
 /** Staging verdict ("→ Resources" / "Archive") or a restore. */
 export async function setNoteStatus(id: string, status: NoteStatus): Promise<NoteDetail> {
-  const { data, error } = await api.PATCH('/api/notes/{id}/status', {
-    params: { path: { id } },
+  return dataOrThrow(await setNoteStatusRequest({
+    path: { id },
     body: { status },
-  })
-  if (error) throw error
-  return data as NoteDetail
+  })) as NoteDetail
 }
 
 /** Lists RESOURCE notes (the trusted KB), or runs keyword search when {@code search} is non-empty. */

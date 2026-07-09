@@ -1,4 +1,8 @@
-import { api } from './api'
+import {
+  deleteNote as deleteNoteRequest,
+  draftCapture,
+} from './hey-api'
+import { dataOrThrow, voidOrThrow } from './hey-api-result'
 import type { CaptureDraft, CaptureRequest } from './hey-api'
 import { createEvent, deleteEvent } from './calendar-api'
 import { listDisciplines } from './disciplines-api'
@@ -25,8 +29,7 @@ async function resolveDisciplineId(name?: string | null): Promise<string | undef
 }
 
 export async function deleteNote(id: string): Promise<void> {
-  const { error } = await api.DELETE('/api/notes/{id}', { params: { path: { id } } })
-  if (error) throw error
+  voidOrThrow(await deleteNoteRequest({ path: { id } }))
 }
 
 /**
@@ -36,11 +39,9 @@ export async function deleteNote(id: string): Promise<void> {
  * {@code kind} (the "Thêm task"/"Thêm note" chips) skips classification.
  */
 export async function capture(text: string, kind?: CaptureKind): Promise<CaptureResult> {
-  const { data, error } = await api.POST('/api/capture/draft', {
+  const draft = dataOrThrow(await draftCapture({
     body: { text, kind } satisfies CaptureRequest,
-  })
-  if (error) throw error
-  const draft = data as CaptureDraft
+  })) as CaptureDraft
 
   if (draft.kind === 'TASK' && draft.task) {
     const t = draft.task

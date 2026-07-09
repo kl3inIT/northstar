@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -48,8 +49,9 @@ class AttachmentController {
         this.attachments = attachments;
     }
 
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
+    @Operation(operationId = "uploadAttachment")
     AttachmentView upload(@RequestParam("file") MultipartFile file) {
         byte[] bytes;
         try {
@@ -101,6 +103,7 @@ class AttachmentController {
     }
 
     @GetMapping("/{id}")
+    @Operation(operationId = "serveAttachment")
     ResponseEntity<byte[]> serve(@PathVariable UUID id,
             @RequestHeader(name = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
         // Metadata-only lookup first: a conditional revalidation that ends in 304

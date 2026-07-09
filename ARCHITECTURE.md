@@ -10,8 +10,8 @@ active increment, not here.
   Spring Security 7, Spring Data JPA, PostgreSQL, pgvector, Flyway, Spring AI.
 - Frontend: Vite, React 19, TypeScript, Tailwind v4, shadcn/ui, TanStack Router,
   TanStack Query.
-- Contract: the API emits `contracts/openapi.json`; generated clients/types
-  consume that contract.
+- Contract: the API emits `contracts/openapi.json`; Hey API generates the web
+  fetch client, SDK functions, and DTO types from that contract.
 - Build config: dependency versions live in `gradle/libs.versions.toml`; shared
   Gradle convention plugins live in `build-logic/`.
 
@@ -101,9 +101,14 @@ verification in `:core:test` is the boundary check.
 
 - Runtime communication is HTTP and JSON.
 - `apps/api` emits OpenAPI through springdoc.
-- `web` generates Hey API TypeScript DTOs from `contracts/openapi.json` into
-  `web/src/lib/hey-api/`.
-- Runtime HTTP remains on the app's `openapi-fetch` transport wrapper.
+- `web` generates Hey API TypeScript DTOs and fetch SDK functions from
+  `contracts/openapi.json` into `web/src/lib/hey-api/`.
+- The generated fetch client is configured through
+  `web/src/lib/hey-api-runtime.ts`, which routes requests through the app's
+  CSRF/session-aware `apiFetch` transport.
+- Normal JSON CRUD endpoints use the generated SDK functions. AI SDK chat
+  streaming still calls `apiFetch` directly because it speaks the AI SDK UI
+  message stream rather than a plain JSON response.
 - Do not hand-write generated client types. Change the API, regenerate the
   contract, then regenerate the client.
 

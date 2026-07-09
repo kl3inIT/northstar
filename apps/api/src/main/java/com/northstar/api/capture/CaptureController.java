@@ -4,6 +4,7 @@ import com.northstar.core.capture.CaptureDraft;
 import com.northstar.core.capture.CaptureService;
 import com.northstar.core.capture.VoiceTranscriber;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.Operation;
 import java.io.IOException;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,12 +33,14 @@ class CaptureController {
     }
 
     @PostMapping("/draft")
+    @Operation(operationId = "draftCapture")
     CaptureDraft draft(@Valid @RequestBody CaptureRequest request) {
         return capture.draft(request.text().strip(), request.kind());
     }
 
     /** Voice capture: audio in, text out — the recording is never stored. */
     @PostMapping(value = "/transcribe", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(operationId = "transcribeCaptureAudio")
     TranscriptionResponse transcribe(@RequestPart("audio") MultipartFile audio) {
         byte[] bytes;
         try {

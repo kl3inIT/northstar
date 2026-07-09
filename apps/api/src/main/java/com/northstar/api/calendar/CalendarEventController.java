@@ -8,6 +8,7 @@ import java.time.Duration;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,6 +45,7 @@ class CalendarEventController {
     }
 
     @GetMapping
+    @Operation(operationId = "listCalendarEvents")
     List<CalendarEventSummary> range(
             @RequestParam("from") Instant from,
             @RequestParam("to") Instant to,
@@ -56,12 +58,14 @@ class CalendarEventController {
 
     /** The raw master row — what the "edit series" form prefills from. */
     @GetMapping("/{id}")
+    @Operation(operationId = "getCalendarEvent")
     CalendarEventSummary find(@PathVariable UUID id) {
         return events.find(id);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Operation(operationId = "createCalendarEvent")
     CalendarEventSummary create(@Valid @RequestBody CalendarEventRequest request) {
         requireValidSpan(request.startAt(), request.endAt());
         return events.create(request.title(), request.notes(), request.startAt(), request.endAt(),
@@ -70,6 +74,7 @@ class CalendarEventController {
 
     /** Edits the row itself — for a recurring event that means the whole series. */
     @PutMapping("/{id}")
+    @Operation(operationId = "updateCalendarEvent")
     CalendarEventSummary update(@PathVariable UUID id, @Valid @RequestBody CalendarEventRequest request) {
         requireValidSpan(request.startAt(), request.endAt());
         return events.update(id, request.title(), request.notes(), request.startAt(), request.endAt(),
@@ -78,6 +83,7 @@ class CalendarEventController {
 
     /** Drag-drop / resize: move the block without resending the text fields. */
     @PatchMapping("/{id}/schedule")
+    @Operation(operationId = "rescheduleCalendarEvent")
     CalendarEventSummary reschedule(@PathVariable UUID id, @Valid @RequestBody RescheduleRequest request) {
         requireValidSpan(request.startAt(), request.endAt());
         return events.reschedule(id, request.startAt(), request.endAt());
@@ -90,6 +96,7 @@ class CalendarEventController {
      */
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "deleteCalendarEvent")
     void delete(@PathVariable UUID id,
             @RequestParam(name = "occurrenceStart", required = false) Instant occurrenceStart) {
         if (occurrenceStart == null) {

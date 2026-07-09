@@ -3,7 +3,8 @@
  * server-side) and served immutably from /api/files/{id}.
  */
 
-import { apiFetch } from './http'
+import { uploadAttachment } from './hey-api'
+import { dataOrThrow } from './hey-api-result'
 
 export interface AttachmentMeta {
   id: string
@@ -13,11 +14,8 @@ export interface AttachmentMeta {
 }
 
 export async function uploadFile(blob: Blob, filename: string): Promise<AttachmentMeta> {
-  const form = new FormData()
-  form.append('file', blob, filename)
-  const res = await apiFetch('/api/files', { method: 'POST', body: form })
-  if (!res.ok) throw new Error(`upload failed: ${res.status}`)
-  return (await res.json()) as AttachmentMeta
+  const file = blob instanceof File ? blob : new File([blob], filename, { type: blob.type })
+  return dataOrThrow(await uploadAttachment({ body: { file } }), 'upload failed') as AttachmentMeta
 }
 
 export function fileUrl(id: string): string {

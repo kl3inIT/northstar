@@ -1,5 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from './api'
+import {
+  createCalendarEvent,
+  deleteCalendarEvent,
+  getCalendarEvent,
+  listCalendarEvents,
+  rescheduleCalendarEvent,
+  updateCalendarEvent,
+} from './hey-api'
+import { dataOrThrow, voidOrThrow } from './hey-api-result'
 import type { CalendarEventSummary } from './hey-api'
 import type { IEvent } from '@/features/calendar/interfaces'
 import type { TEventColor } from '@/features/calendar/types'
@@ -46,51 +54,42 @@ function toEvent(e: CalendarEventSummary): IEvent {
 }
 
 export async function rangeEvents(from: string, to: string): Promise<IEvent[]> {
-  const { data, error } = await api.GET('/api/calendar/events', {
-    params: { query: { from, to } },
+  const data = dataOrThrow(await listCalendarEvents({
+    query: { from, to },
     headers: tzHeaders,
-  })
-  if (error) throw error
-  return (data ?? []).map(toEvent)
+  }))
+  return data.map(toEvent)
 }
 
 /** The raw master row — what the "edit series" form prefills from. */
 export async function getEvent(id: string): Promise<CalendarEventSummary> {
-  const { data, error } = await api.GET('/api/calendar/events/{id}', { params: { path: { id } } })
-  if (error) throw error
-  return data as CalendarEventSummary
+  return dataOrThrow(await getCalendarEvent({ path: { id } }))
 }
 
 export async function createEvent(body: CalendarEventInput): Promise<IEvent> {
-  const { data, error } = await api.POST('/api/calendar/events', { body })
-  if (error) throw error
-  return toEvent(data as CalendarEventSummary)
+  return toEvent(dataOrThrow(await createCalendarEvent({ body })))
 }
 
 export async function updateEvent(id: string, body: CalendarEventInput): Promise<IEvent> {
-  const { data, error } = await api.PUT('/api/calendar/events/{id}', {
-    params: { path: { id } },
+  return toEvent(dataOrThrow(await updateCalendarEvent({
+    path: { id },
     body,
-  })
-  if (error) throw error
-  return toEvent(data as CalendarEventSummary)
+  })))
 }
 
 export async function rescheduleEvent(id: string, startAt: string, endAt: string): Promise<IEvent> {
-  const { data, error } = await api.PATCH('/api/calendar/events/{id}/schedule', {
-    params: { path: { id } },
+  return toEvent(dataOrThrow(await rescheduleCalendarEvent({
+    path: { id },
     body: { startAt, endAt },
-  })
-  if (error) throw error
-  return toEvent(data as CalendarEventSummary)
+  })))
 }
 
 /** Without occurrenceStart: delete the event / whole series. With it: "chỉ buổi này". */
 export async function deleteEvent(id: string, occurrenceStart?: string): Promise<void> {
-  const { error } = await api.DELETE('/api/calendar/events/{id}', {
-    params: { path: { id }, query: occurrenceStart ? { occurrenceStart } : undefined },
-  })
-  if (error) throw error
+  voidOrThrow(await deleteCalendarEvent({
+    path: { id },
+    query: occurrenceStart ? { occurrenceStart } : undefined,
+  }))
 }
 
 export function useRangeEvents(from: string, to: string) {

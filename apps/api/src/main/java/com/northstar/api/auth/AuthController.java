@@ -4,6 +4,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -44,16 +46,19 @@ class AuthController {
     }
 
     @GetMapping("/me")
-    AuthSession me(@Nullable Authentication authentication, @Nullable CsrfToken csrfToken) {
+    @Operation(operationId = "getAuthSession")
+    AuthSession me(@Nullable Authentication authentication, @Parameter(hidden = true) @Nullable CsrfToken csrfToken) {
         return sessionOf(authentication);
     }
 
     @GetMapping("/csrf")
-    CsrfTokenResponse csrf(CsrfToken csrfToken) {
+    @Operation(operationId = "getCsrfToken")
+    CsrfTokenResponse csrf(@Parameter(hidden = true) CsrfToken csrfToken) {
         return new CsrfTokenResponse(csrfToken.getHeaderName(), csrfToken.getParameterName(), csrfToken.getToken());
     }
 
     @PostMapping("/login")
+    @Operation(operationId = "login")
     AuthSession login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest,
             HttpServletResponse servletResponse) {
         Authentication authenticated;
@@ -72,6 +77,7 @@ class AuthController {
 
     @PostMapping("/logout")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "logout")
     void logout(HttpServletRequest request, HttpServletResponse response) {
         Authentication authentication = securityContextHolderStrategy.getContext().getAuthentication();
         new SecurityContextLogoutHandler().logout(request, response, authentication);

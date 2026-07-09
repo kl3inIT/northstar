@@ -51,8 +51,9 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { api } from '@/lib/api'
+import { listOpenTasksByDiscipline } from '@/lib/hey-api'
 import type { TaskSummary } from '@/lib/hey-api'
+import { dataOrThrow } from '@/lib/hey-api-result'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
 import { iso } from '@/lib/dates'
 import {
@@ -760,11 +761,9 @@ function LinkTaskPopover({ project, linkedIds }: { project: Project; linkedIds: 
     queryKey: ['open-tasks', project.disciplineId],
     enabled: open && !!project.disciplineId,
     queryFn: async () => {
-      const { data, error } = await api.GET<TaskSummary[]>('/api/tasks/open', {
-        params: { query: { disciplineId: project.disciplineId as string } },
-      })
-      if (error) throw error
-      return data ?? []
+      return dataOrThrow(await listOpenTasksByDiscipline({
+        query: { disciplineId: project.disciplineId as string },
+      }))
     },
   })
   const linkable = candidates.filter((t) => !t.projectId && !linkedIds.includes(t.id))

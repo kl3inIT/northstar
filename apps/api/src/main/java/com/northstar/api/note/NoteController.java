@@ -8,6 +8,7 @@ import com.northstar.core.note.NoteSummary;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PagedModel;
@@ -46,6 +47,7 @@ class NoteController {
 
     /** Without {@code status}: every note (legacy view). With it: one working-state tab. */
     @GetMapping
+    @Operation(operationId = "listNotes")
     PagedModel<NoteSummary> list(
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "100") int size,
@@ -56,22 +58,26 @@ class NoteController {
     }
 
     @GetMapping("/search")
+    @Operation(operationId = "searchNotes")
     List<NoteSummary> search(@RequestParam("q") String q) {
         return notes.search(q);
     }
 
     @GetMapping("/by-project")
+    @Operation(operationId = "listNotesByProject")
     List<NoteSummary> byProject(@RequestParam("projectId") UUID projectId) {
         return notes.listByProject(projectId);
     }
 
     @GetMapping("/{slug}")
+    @Operation(operationId = "getNote")
     NoteDetail get(@PathVariable String slug) {
         return notes.getBySlug(slug).orElseThrow(() -> new NoteNotFoundException("Note not found: " + slug));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Operation(operationId = "createNote")
     NoteDetail create(@Valid @RequestBody CreateNoteRequest request) {
         return notes.create(request.title(), request.folderPath(), request.contentMarkdown(), request.tags(),
                 request.status() == null ? NoteStatus.RESOURCE : request.status(), request.projectId());
@@ -79,11 +85,13 @@ class NoteController {
 
     /** Staging verdict ("→ Resources" / "Archive") or a restore. */
     @PatchMapping("/{id}/status")
+    @Operation(operationId = "setNoteStatus")
     NoteDetail setStatus(@PathVariable UUID id, @Valid @RequestBody NoteStatusRequest request) {
         return notes.setStatus(id, request.status());
     }
 
     @PutMapping("/{id}")
+    @Operation(operationId = "updateNote")
     NoteDetail update(@PathVariable UUID id, @Valid @RequestBody UpdateNoteRequest request) {
         return notes.update(id, request.title(), request.folderPath(),
                 request.contentMarkdown(), request.tags(), request.version(), request.projectId());
@@ -91,6 +99,7 @@ class NoteController {
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "deleteNote")
     void delete(@PathVariable UUID id) {
         notes.delete(id);
     }

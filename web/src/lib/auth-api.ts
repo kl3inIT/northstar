@@ -1,49 +1,37 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch } from './http'
+import {
+  getAuthSession,
+  login as loginRequest,
+  logout as logoutRequest,
+  type AuthSession as ApiAuthSession,
+  type LoginRequest,
+} from './hey-api'
+import { dataOrThrow, voidOrThrow } from './hey-api-result'
 
 export interface AuthSession {
   authenticated: boolean
   username: string | null
 }
 
-interface LoginInput {
-  username: string
-  password: string
-}
+type LoginInput = LoginRequest
 
-interface ProblemBody {
-  detail?: string
-  title?: string
-}
-
-async function problemMessage(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as ProblemBody
-    return body.detail ?? body.title ?? `Request failed: ${response.status}`
-  } catch {
-    return `Request failed: ${response.status}`
+function normalizeSession(session: ApiAuthSession): AuthSession {
+  return {
+    authenticated: session.authenticated ?? false,
+    username: session.username ?? null,
   }
 }
 
 export async function getSession(): Promise<AuthSession> {
-  const response = await apiFetch('/api/auth/me')
-  if (!response.ok) throw new Error(await problemMessage(response))
-  return (await response.json()) as AuthSession
+  return normalizeSession(dataOrThrow(await getAuthSession()))
 }
 
 export async function login(input: LoginInput): Promise<AuthSession> {
-  const response = await apiFetch('/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(input),
-  })
-  if (!response.ok) throw new Error(await problemMessage(response))
-  return (await response.json()) as AuthSession
+  return normalizeSession(dataOrThrow(await loginRequest({ body: input })))
 }
 
 export async function logout(): Promise<void> {
-  const response = await apiFetch('/api/auth/logout', { method: 'POST' })
-  if (!response.ok) throw new Error(await problemMessage(response))
+  voidOrThrow(await logoutRequest())
 }
 
 export function useAuthSession() {

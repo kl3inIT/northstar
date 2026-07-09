@@ -1,5 +1,6 @@
 package com.northstar.api.capture;
 
+import io.swagger.v3.oas.annotations.Operation;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -34,6 +35,7 @@ class RealtimeSessionController {
     }
 
     @PostMapping("/realtime-session")
+    @Operation(operationId = "createRealtimeCaptureSession")
     RealtimeSessionResponse mint() {
         // gpt-realtime-whisper streams deltas continuously and rejects
         // turn_detection, so the session config stays minimal.

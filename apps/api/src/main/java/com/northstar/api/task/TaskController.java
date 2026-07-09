@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -39,11 +40,13 @@ class TaskController {
     }
 
     @GetMapping("/today")
+    @Operation(operationId = "listTodayTasks")
     List<TaskSummary> today(@RequestHeader(name = "X-Timezone", required = false) String tz) {
         return tasks.today(zone(tz));
     }
 
     @GetMapping("/upcoming")
+    @Operation(operationId = "listUpcomingTasks")
     List<TaskSummary> upcoming(
             @RequestHeader(name = "X-Timezone", required = false) String tz,
             @RequestParam(name = "days", defaultValue = "7") int days) {
@@ -51,12 +54,14 @@ class TaskController {
     }
 
     @GetMapping("/someday")
+    @Operation(operationId = "listSomedayTasks")
     List<TaskSummary> someday() {
         return tasks.someday();
     }
 
     /** Open tasks of one discipline — the agenda inside a study block's details. */
     @GetMapping("/open")
+    @Operation(operationId = "listOpenTasksByDiscipline")
     List<TaskSummary> openByDiscipline(@RequestParam("disciplineId") UUID disciplineId) {
         return tasks.openByDiscipline(disciplineId);
     }
@@ -68,6 +73,7 @@ class TaskController {
     private static final long MAX_RANGE_DAYS = 500;
 
     @GetMapping("/range")
+    @Operation(operationId = "listTasksByDateRange")
     List<TaskSummary> range(
             @RequestParam("from") LocalDate from,
             @RequestParam("to") LocalDate to) {
@@ -79,42 +85,49 @@ class TaskController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Operation(operationId = "createTask")
     TaskSummary create(@Valid @RequestBody TaskRequest request) {
         return tasks.create(request.title(), request.notes(), request.dueDate(), request.dueTime(),
                 request.plannedDate(), request.disciplineId(), request.projectId());
     }
 
     @PutMapping("/{id}")
+    @Operation(operationId = "updateTask")
     TaskSummary update(@PathVariable UUID id, @Valid @RequestBody TaskRequest request) {
         return tasks.update(id, request.title(), request.notes(), request.dueDate(), request.dueTime(),
                 request.plannedDate(), request.disciplineId());
     }
 
     @PatchMapping("/{id}/status")
+    @Operation(operationId = "setTaskStatus")
     TaskSummary setStatus(@PathVariable UUID id, @RequestBody TaskStatusRequest request) {
         return tasks.setDone(id, request.done());
     }
 
     /** Star/unstar the "do" day (null clears); never moves the deadline. */
     @PatchMapping("/{id}/planned")
+    @Operation(operationId = "setTaskPlannedDate")
     TaskSummary setPlanned(@PathVariable UUID id, @RequestBody TaskPlannedRequest request) {
         return tasks.setPlanned(id, request.plannedDate());
     }
 
     /** Every task of one project — the project's agenda. */
     @GetMapping("/by-project")
+    @Operation(operationId = "listTasksByProject")
     List<TaskSummary> byProject(@RequestParam("projectId") UUID projectId) {
         return tasks.byProject(projectId);
     }
 
     /** Attach to / detach from a project (null detaches); touches nothing else. */
     @PatchMapping("/{id}/project")
+    @Operation(operationId = "setTaskProject")
     TaskSummary setProject(@PathVariable UUID id, @RequestBody TaskProjectRequest request) {
         return tasks.setProject(id, request.projectId());
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "deleteTask")
     void delete(@PathVariable UUID id) {
         tasks.delete(id);
     }

@@ -19,6 +19,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import io.swagger.v3.oas.annotations.Operation;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.data.domain.Page;
@@ -65,23 +66,27 @@ class DisciplineController {
     }
 
     @GetMapping
+    @Operation(operationId = "listDisciplines")
     List<DisciplineSummary> list() {
         return disciplines.list();
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
+    @Operation(operationId = "createDiscipline")
     DisciplineSummary create(@Valid @RequestBody DisciplineRequest request) {
         return disciplines.create(request.name(), request.color());
     }
 
     @PutMapping("/{id}")
+    @Operation(operationId = "updateDiscipline")
     DisciplineSummary update(@PathVariable UUID id, @Valid @RequestBody DisciplineRequest request) {
         return disciplines.update(id, request.name(), request.color());
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "deleteDiscipline")
     void delete(@PathVariable UUID id) {
         DisciplineSummary discipline = disciplines.find(id);
         DeletionGuard guard = deletionGuard(id);
@@ -95,6 +100,7 @@ class DisciplineController {
 
     /** The /disciplines grid: every discipline with its live counts. */
     @GetMapping("/cards")
+    @Operation(operationId = "listDisciplineCards")
     List<DisciplineCard> cards(@RequestHeader(name = "X-Timezone", required = false) String tz) {
         Instant now = Instant.now();
         Map<UUID, Long> eventCounts = events.range(now, now.plus(UPCOMING_WINDOW), zone(tz)).stream()
@@ -116,6 +122,7 @@ class DisciplineController {
 
     /** The slice page: everything one discipline holds right now. */
     @GetMapping("/{id}/overview")
+    @Operation(operationId = "getDisciplineOverview")
     DisciplineOverview overview(@PathVariable UUID id,
             @RequestHeader(name = "X-Timezone", required = false) String tz) {
         DisciplineSummary discipline = disciplines.find(id);

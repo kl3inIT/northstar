@@ -55,7 +55,12 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { MicButton } from '@/components/mic-button'
-import { api } from '@/lib/api'
+import {
+  deleteAssistantConversation,
+  listAssistantConversations,
+  listAssistantHistory,
+} from '@/lib/hey-api'
+import { dataOrThrow, voidOrThrow } from '@/lib/hey-api-result'
 import type {
   ConversationSummary as ApiConversationSummary,
   HistoryMessage as ApiHistoryMessage,
@@ -134,18 +139,13 @@ type ConversationSummary = Required<ApiConversationSummary>
 type HistoryMessage = Omit<ApiHistoryMessage, 'parts'> & { parts?: unknown }
 
 async function fetchConversations(signal?: AbortSignal): Promise<ConversationSummary[]> {
-  const response = await apiFetch('/api/assistant/conversations', { signal })
-  if (!response.ok) throw new Error(`Conversations request failed: ${response.status}`)
-  return (await response.json()) as ConversationSummary[]
+  return dataOrThrow(await listAssistantConversations({ signal })) as ConversationSummary[]
 }
 
 async function fetchHistory(conversationId: string, signal?: AbortSignal): Promise<UIMessage[]> {
-  const response = await apiFetch(
-    `/api/assistant/history?conversationId=${encodeURIComponent(conversationId)}`,
-    { signal },
-  )
-  if (!response.ok) throw new Error(`Assistant history request failed: ${response.status}`)
-  const data = (await response.json()) as HistoryMessage[]
+  const data = dataOrThrow(
+    await listAssistantHistory({ query: { conversationId }, signal }),
+  ) as HistoryMessage[]
   return (data ?? []).map((m, i) => ({
     id: `history-${i}`,
     role: (m.role ?? 'assistant') as 'user' | 'assistant',
@@ -234,8 +234,9 @@ export function AssistantPage() {
   }, [isPending, conversations])
 
   function remove(id: string) {
-    api.DELETE('/api/assistant/conversations/{id}', { params: { path: { id } } })
-      .then(() => {
+    deleteAssistantConversation({ path: { id } })
+      .then((result) => {
+        voidOrThrow(result)
         queryClient.invalidateQueries({ queryKey: ['assistant-conversations'] })
         queryClient.removeQueries({ queryKey: ['assistant-history', id] })
         if (id === conversationId) setConversationId(crypto.randomUUID())

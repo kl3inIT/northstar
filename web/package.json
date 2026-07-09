@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "typecheck": "tsc -b",
     "preview": "vite preview",
-    "gen:api": "pnpm dlx @hey-api/openapi-ts@0.99.0 -i ../contracts/openapi.json -o src/lib/hey-api -p @hey-api/typescript"
+    "gen:api": "pnpm dlx @hey-api/openapi-ts@0.99.0 -f openapi-ts.config.mjs"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.12",
@@ -46,7 +46,6 @@
     "lucide-react": "^1.23.0",
     "nanoid": "^5.1.16",
     "next-themes": "^0.4.6",
-    "openapi-fetch": "^0.17.0",
     "radix-ui": "^1.6.2",
     "react": "^19.2.7",
     "react-arborist": "^3.13.2",

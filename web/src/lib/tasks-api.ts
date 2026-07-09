@@ -1,5 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from './api'
+import {
+  createTask as createTaskRequest,
+  deleteTask as deleteTaskRequest,
+  listOpenTasksByDiscipline,
+  listSomedayTasks,
+  listTasksByDateRange,
+  listTodayTasks,
+  listUpcomingTasks,
+  setTaskPlannedDate,
+  setTaskStatus,
+  updateTask as updateTaskRequest,
+} from './hey-api'
+import { dataOrThrow, voidOrThrow } from './hey-api-result'
 import type { TaskRequest, TaskSummary } from './hey-api'
 
 export type TaskStatus = 'OPEN' | 'DONE'
@@ -40,80 +52,62 @@ function toTask(t: TaskSummary): Task {
 }
 
 export async function todayTasks(): Promise<Task[]> {
-  const { data, error } = await api.GET('/api/tasks/today', { headers: tzHeaders })
-  if (error) throw error
-  return (data ?? []).map(toTask)
+  const data = dataOrThrow(await listTodayTasks({ headers: tzHeaders }))
+  return data.map(toTask)
 }
 
 export async function upcomingTasks(days = 7): Promise<Task[]> {
-  const { data, error } = await api.GET('/api/tasks/upcoming', {
+  const data = dataOrThrow(await listUpcomingTasks({
     headers: tzHeaders,
-    params: { query: { days } },
-  })
-  if (error) throw error
-  return (data ?? []).map(toTask)
+    query: { days },
+  }))
+  return data.map(toTask)
 }
 
 export async function rangeTasks(from: string, to: string): Promise<Task[]> {
-  const { data, error } = await api.GET('/api/tasks/range', {
-    params: { query: { from, to } },
-  })
-  if (error) throw error
-  return (data ?? []).map(toTask)
+  const data = dataOrThrow(await listTasksByDateRange({ query: { from, to } }))
+  return data.map(toTask)
 }
 
 export async function somedayTasks(): Promise<Task[]> {
-  const { data, error } = await api.GET('/api/tasks/someday')
-  if (error) throw error
-  return (data ?? []).map(toTask)
+  const data = dataOrThrow(await listSomedayTasks())
+  return data.map(toTask)
 }
 
 /** Open tasks of one discipline — the agenda inside a study block's details. */
 export async function openTasksByDiscipline(disciplineId: string): Promise<Task[]> {
-  const { data, error } = await api.GET('/api/tasks/open', {
-    params: { query: { disciplineId } },
-  })
-  if (error) throw error
-  return (data ?? []).map(toTask)
+  const data = dataOrThrow(await listOpenTasksByDiscipline({ query: { disciplineId } }))
+  return data.map(toTask)
 }
 
 export async function createTask(body: TaskInput): Promise<Task> {
-  const { data, error } = await api.POST('/api/tasks', { body })
-  if (error) throw error
-  return toTask(data as TaskSummary)
+  return toTask(dataOrThrow(await createTaskRequest({ body })))
 }
 
 export async function updateTask(id: string, body: TaskInput): Promise<Task> {
-  const { data, error } = await api.PUT('/api/tasks/{id}', {
-    params: { path: { id } },
+  return toTask(dataOrThrow(await updateTaskRequest({
+    path: { id },
     body,
-  })
-  if (error) throw error
-  return toTask(data as TaskSummary)
+  })))
 }
 
 export async function setTaskDone(id: string, done: boolean): Promise<Task> {
-  const { data, error } = await api.PATCH('/api/tasks/{id}/status', {
-    params: { path: { id } },
+  return toTask(dataOrThrow(await setTaskStatus({
+    path: { id },
     body: { done },
-  })
-  if (error) throw error
-  return toTask(data as TaskSummary)
+  })))
 }
 
 /** Star/unstar the "do" day (null clears); never moves the deadline. */
 export async function setTaskPlanned(id: string, plannedDate: string | null): Promise<Task> {
-  const { data, error } = await api.PATCH('/api/tasks/{id}/planned', {
-    params: { path: { id } },
+  return toTask(dataOrThrow(await setTaskPlannedDate({
+    path: { id },
     body: { plannedDate: plannedDate ?? undefined },
-  })
-  if (error) throw error
-  return toTask(data as TaskSummary)
+  })))
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  const { error } = await api.DELETE('/api/tasks/{id}', { params: { path: { id } } })
-  if (error) throw error
+  voidOrThrow(await deleteTaskRequest({ path: { id } }))
 }
 
 export function useTodayTasks() {
