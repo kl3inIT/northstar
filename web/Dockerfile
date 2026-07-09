@@ -15,6 +15,7 @@ RUN corepack enable
 WORKDIR /repo/web
 
 # Manifest first — the install layer survives source-only changes.
+COPY pnpm-workspace.yaml /repo/pnpm-workspace.yaml
 COPY web/package.json web/pnpm-lock.yaml ./
 RUN --mount=type=cache,id=northstar-pnpm-store,target=/pnpm-store \
     pnpm config set store-dir /pnpm-store && \
