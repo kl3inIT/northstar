@@ -7,7 +7,7 @@ active increment, not here.
 ## Stack
 
 - Backend: Spring Boot 4.1, Java 25, Gradle Kotlin DSL, Spring Modulith 2.1,
-  Spring Data JPA, PostgreSQL, pgvector, Flyway, Spring AI.
+  Spring Security 7, Spring Data JPA, PostgreSQL, pgvector, Flyway, Spring AI.
 - Frontend: Vite, React 19, TypeScript, Tailwind v4, shadcn/ui, TanStack Router,
   TanStack Query.
 - Contract: the API emits `contracts/openapi.json`; generated clients consume
@@ -34,8 +34,9 @@ Northstar is one domain with three backend deployables:
 - `core` owns business logic, entities, repositories, services, migrations, and
   module boundaries under `com.northstar.core`.
 - `apps/api` exposes REST endpoints, runs Flyway migrations, serves actuator
-  endpoints, wires Spring AI/OpenAI for interactive AI features, emits OpenAPI,
-  and talks to the same PostgreSQL database as the other apps.
+  endpoints, owns web session authentication, wires Spring AI/OpenAI for
+  interactive AI features, emits OpenAPI, and talks to the same PostgreSQL
+  database as the other apps.
 - `apps/mcp` exposes MCP tools over streamable HTTP at `/mcp`. It scans
   `com.northstar.core`, reads the already-migrated schema, and does not run
   Flyway in production.
@@ -100,6 +101,20 @@ verification in `:core:test` is the boundary check.
 - `web` generates typed TypeScript clients from `contracts/openapi.json`.
 - Do not hand-write generated client types. Change the API, regenerate the
   contract, then regenerate the client.
+
+## Authentication
+
+- The web app uses Spring Security 7 servlet security with a server-side HTTP
+  session and a single configured user.
+- Credentials are supplied through `NORTHSTAR_AUTH_USERNAME` and
+  `NORTHSTAR_AUTH_PASSWORD_HASH`; plaintext passwords are not stored in the
+  repository.
+- State-changing same-origin web requests use Spring Security SPA CSRF tokens
+  (`XSRF-TOKEN` cookie, `X-XSRF-TOKEN` request header).
+- `GET /api/auth/me`, `GET /api/auth/csrf`, `POST /api/auth/login`, and
+  `POST /api/auth/logout` are the current auth endpoints.
+- Mobile authentication is intentionally not implemented yet. A future Flutter
+  client should use a separate token flow instead of browser local storage.
 
 ## Commands
 

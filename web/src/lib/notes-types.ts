@@ -28,6 +28,6 @@ export type NoteDetail = Omit<Present<Schemas['NoteDetail']>, 'outgoingLinks' | 
   backlinks: NoteRef[]
 }
 
-export type NoteInput = Schemas['CreateNoteRequest'] & { projectId?: string | null }
+export type NoteInput = Omit<Schemas['CreateNoteRequest'], 'projectId'> & { projectId?: string | null }
 
-export type NoteUpdate = Schemas['UpdateNoteRequest'] & { projectId?: string | null }
+export type NoteUpdate = Omit<Schemas['UpdateNoteRequest'], 'projectId'> & { projectId?: string | null }

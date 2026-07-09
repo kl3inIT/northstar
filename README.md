@@ -45,6 +45,7 @@ back to the kind of life the user wants to build.
 
 - Markdown knowledge base with folders, tags, note status, wiki links, and
   backlinks.
+- Single-user web login with Spring Security session auth and SPA CSRF.
 - AI capture flow for turning raw thoughts into structured note drafts.
 - Disciplines, projects, milestones, tasks, and calendar planning.
 - Recurring calendar events and free-slot lookup.
@@ -70,7 +71,7 @@ build-logic/          Gradle convention plugins
 Stack:
 
 - Backend: Spring Boot 4.1, Java 25, Gradle Kotlin DSL, Spring Modulith 2.1,
-  Spring Data JPA, Flyway, PostgreSQL, pgvector, Spring AI.
+  Spring Security 7, Spring Data JPA, Flyway, PostgreSQL, pgvector, Spring AI.
 - Frontend: Vite, React 19, TypeScript, Tailwind v4, shadcn/ui, TanStack Router,
   TanStack Query.
 - Contract: OpenAPI emitted by the API and consumed by generated clients.
@@ -86,6 +87,10 @@ Requirements:
 Run locally:
 
 ```bash
+# 0. local config
+cp .env.example .env
+# fill OPENAI_API_KEY, NORTHSTAR_AUTH_USERNAME, and NORTHSTAR_AUTH_PASSWORD_HASH
+
 # 1. database
 docker compose up -d
 

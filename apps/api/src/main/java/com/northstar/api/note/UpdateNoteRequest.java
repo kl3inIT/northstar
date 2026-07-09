@@ -1,9 +1,11 @@
 package com.northstar.api.note;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Body for PUT /api/notes/{id}. {@code version} is the version the client
@@ -15,6 +17,6 @@ record UpdateNoteRequest(
         @Size(max = 1024) String folderPath,
         String contentMarkdown,
         List<@NotBlank @Size(max = 64) String> tags,
-        UUID projectId,
+        @Nullable @Schema(nullable = true) UUID projectId,
         Long version) {
 }

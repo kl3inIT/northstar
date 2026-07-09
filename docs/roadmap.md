@@ -12,6 +12,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | AI capture baseline | Done | Capture endpoints and AI-backed note drafting path. |
 | Planning baseline | Done | Disciplines, projects/milestones, tasks, calendar events, recurrence, free-slot lookup. |
 | Assistant and MCP tools | Done | In-app assistant tool definitions and streamable-http MCP tool exposure. |
+| Web authentication baseline | Done | Single-user Spring Security session login, SPA CSRF, auth guard, logout. |
 | Repository documentation harness | In progress | Apply repo-as-system-of-record structure and consolidate existing guidance. |
 
 ## Backlog

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
+import { apiFetch } from './http'
 import type { NoteDetail, NoteInput, NoteStatus, NoteSummary, NoteUpdate } from './notes-types'
 
 /**
@@ -32,7 +33,7 @@ export async function searchNotes(query: string): Promise<NoteSummary[]> {
 }
 
 export async function listProjectNotes(projectId: string): Promise<NoteSummary[]> {
-  const res = await fetch(`/api/notes/by-project?projectId=${encodeURIComponent(projectId)}`)
+  const res = await apiFetch(`/api/notes/by-project?projectId=${encodeURIComponent(projectId)}`)
   if (!res.ok) throw new Error(`Project notes request failed: ${res.status}`)
   return (await res.json()) as NoteSummary[]
 }
@@ -104,11 +105,12 @@ export function useNoteIndex() {
 }
 
 /** Badge count for the staging review queue (sidebar + tab) — total only, not the rows. */
-export function useStagingCount() {
+export function useStagingCount(enabled = true) {
   return useQuery({
     queryKey: ['notes', 'STAGING', 'count'],
     queryFn: () => countNotes('STAGING'),
     staleTime: 30_000,
+    enabled,
   })
 }
 

@@ -43,6 +43,7 @@ import { MicButton } from '@/components/mic-button'
 import { api } from '@/lib/api'
 import type { components } from '@/lib/api.gen'
 import { fileUrl, uploadFile } from '@/lib/files-api'
+import { apiFetch } from '@/lib/http'
 import { useStagingCount } from '@/lib/notes-api'
 import { useTodayTasks } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
@@ -113,15 +114,19 @@ const PILL_INPUT =
 // optional (no `required` in the contract), so assert them present here.
 type ConversationSummary = Required<components['schemas']['ConversationSummary']>
 
-async function fetchConversations(): Promise<ConversationSummary[]> {
-  const { data } = await api.GET('/api/assistant/conversations')
-  return (data ?? []) as ConversationSummary[]
+async function fetchConversations(signal?: AbortSignal): Promise<ConversationSummary[]> {
+  const response = await apiFetch('/api/assistant/conversations', { signal })
+  if (!response.ok) throw new Error(`Conversations request failed: ${response.status}`)
+  return (await response.json()) as ConversationSummary[]
 }
 
-async function fetchHistory(conversationId: string): Promise<UIMessage[]> {
-  const { data } = await api.GET('/api/assistant/history', {
-    params: { query: { conversationId } },
-  })
+async function fetchHistory(conversationId: string, signal?: AbortSignal): Promise<UIMessage[]> {
+  const response = await apiFetch(
+    `/api/assistant/history?conversationId=${encodeURIComponent(conversationId)}`,
+    { signal },
+  )
+  if (!response.ok) throw new Error(`Assistant history request failed: ${response.status}`)
+  const data = (await response.json()) as components['schemas']['HistoryMessage'][]
   return (data ?? []).map((m, i) => ({
     id: `history-${i}`,
     role: (m.role ?? 'assistant') as 'user' | 'assistant',
@@ -169,7 +174,7 @@ export function AssistantPage() {
   const queryClient = useQueryClient()
   const { data: conversations = [], isPending } = useQuery({
     queryKey: ['assistant-conversations'],
-    queryFn: fetchConversations,
+    queryFn: ({ signal }) => fetchConversations(signal),
   })
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [historyOpen, setHistoryOpen] = useState(
@@ -370,7 +375,7 @@ function formatLastAt(iso: string): string {
 function ChatColumn({ conversationId }: { conversationId: string }) {
   const { data: history, isPending } = useQuery({
     queryKey: ['assistant-history', conversationId],
-    queryFn: () => fetchHistory(conversationId),
+    queryFn: ({ signal }) => fetchHistory(conversationId, signal),
     staleTime: Infinity,
     refetchOnWindowFocus: false,
   })
@@ -405,6 +410,8 @@ function AssistantChat({
     },
     transport: new DefaultChatTransport({
       api: '/api/assistant/chat',
+      fetch: apiFetch,
+      credentials: 'same-origin',
       prepareSendMessagesRequest: ({ messages }) => {
         const last = messages.at(-1)
         const text = (last?.parts ?? [])

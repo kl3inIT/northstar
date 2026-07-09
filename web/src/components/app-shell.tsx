@@ -19,6 +19,7 @@ import { useEffect } from 'react'
 import { CommandMenu } from '@/components/command-menu'
 import { ModeToggle } from '@/components/mode-toggle'
 import { Button } from '@/components/ui/button'
+import { useAuthSession, useLogout } from '@/lib/auth-api'
 import { Toaster } from '@/components/ui/sonner'
 import {
   Sidebar,
@@ -64,12 +65,28 @@ const NAV: NavItem[] = [
 export function AppShell() {
   const pathname = useLocation({ select: (l) => l.pathname })
   const navigate = useNavigate()
+  const isLogin = pathname === '/login'
+  const session = useAuthSession()
+  const logout = useLogout()
   // MFI review queue: machine-drafted notes waiting in Staging nag from the nav.
-  const { data: stagingCount = 0 } = useStagingCount()
+  const { data: stagingCount = 0 } = useStagingCount(Boolean(session.data?.authenticated))
+
+  useEffect(() => {
+    if (!session.isLoading && !session.data?.authenticated && !isLogin) void navigate({ to: '/login' })
+  }, [isLogin, navigate, session.data?.authenticated, session.isLoading])
+
+  useEffect(() => {
+    function unauthorized() {
+      if (!isLogin) void navigate({ to: '/login' })
+    }
+    window.addEventListener('northstar:unauthorized', unauthorized)
+    return () => window.removeEventListener('northstar:unauthorized', unauthorized)
+  }, [isLogin, navigate])
 
   // Global capture hotkey — Ctrl/Cmd+Shift+K jumps to the Capture page and
   // focuses the composer (plain Ctrl+K is the quick switcher).
   useEffect(() => {
+    if (isLogin) return
     function down(e: KeyboardEvent) {
       if (e.key.toLowerCase() === 'k' && e.shiftKey && (e.metaKey || e.ctrlKey)) {
         e.preventDefault()
@@ -80,7 +97,24 @@ export function AppShell() {
     }
     document.addEventListener('keydown', down)
     return () => document.removeEventListener('keydown', down)
-  }, [navigate])
+  }, [isLogin, navigate])
+
+  if (isLogin) {
+    return (
+      <>
+        <Toaster position="bottom-right" richColors />
+        <Outlet />
+      </>
+    )
+  }
+
+  if (session.isLoading || !session.data?.authenticated) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Sparkles className="size-5 animate-pulse text-muted-foreground" />
+      </div>
+    )
+  }
 
   return (
     <SidebarProvider>
@@ -149,7 +183,11 @@ export function AppShell() {
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Sign out" className="cursor-default opacity-60">
+              <SidebarMenuButton
+                tooltip="Sign out"
+                disabled={logout.isPending}
+                onClick={() => logout.mutate(undefined, { onSuccess: () => void navigate({ to: '/login' }) })}
+              >
                 <LogOut />
                 <span>Sign out</span>
               </SidebarMenuButton>

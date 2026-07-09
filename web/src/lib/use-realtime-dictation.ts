@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { apiFetch } from './http'
 
 /**
  * Live dictation ("nói đến đâu chữ lên đến đó") over the OpenAI Realtime API:
@@ -83,7 +84,7 @@ export function useRealtimeDictation(
   async function start(baseText: string) {
     setState('connecting')
     try {
-      const res = await fetch('/api/capture/realtime-session', { method: 'POST' })
+      const res = await apiFetch('/api/capture/realtime-session', { method: 'POST' })
       if (!res.ok) throw new Error(`mint failed: ${res.status}`)
       const { clientSecret } = (await res.json()) as { clientSecret: string }
 
