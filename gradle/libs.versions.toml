@@ -9,7 +9,7 @@ springDependencyManagement = "1.1.7"
 springModulith = "2.1.0"
 springdoc = "3.0.3"                 # OpenAPI 3 generation; 3.x is the Spring Boot 4 line (2.8.x = Boot 3.5)
 springAi = "2.0.0"                  # capture extraction now; embeddings + MCP tools later
-lucene = "9.12.3"                   # LuceneToolIndex backend (same pin as spring-ai-starter-tool-search-advisor)
+lucene = "10.5.0"                   # LuceneToolIndex backend (same pin as spring-ai-starter-tool-search-advisor)
 # Deferred until their features are implemented (kept here as the intended pins):
 # shedlock   -> distributed lock for @Scheduled jobs in :apps:worker
 
