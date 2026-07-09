@@ -39,6 +39,9 @@
   `@hey-api/typescript`, `@hey-api/client-fetch`, and `@hey-api/sdk`. Do not
   replace it with a config-file invocation until Hey API's 0.99.x config loader
   is verified against this project's TypeScript 7 toolchain in CI.
+- The app builds with TypeScript 7. The Hey API generator is isolated through
+  `pnpm dlx --package typescript@6.0.1-rc` because Hey API 0.99.0 currently
+  crashes when its generator process resolves TypeScript 7 in GitHub Actions.
 
 ## Frontend
 
