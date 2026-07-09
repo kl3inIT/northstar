@@ -1,5 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  listDisciplinesOptions,
+  listDisciplinesQueryKey,
+} from './hey-api/@tanstack/react-query.gen'
+import {
+  zCreateDisciplineBody,
+  zCreateDisciplineResponse,
+  zListDisciplinesResponse,
+  zUpdateDisciplineBody,
+  zUpdateDisciplineResponse,
+} from './hey-api/zod.gen'
+import {
   createDiscipline as createDisciplineRequest,
   deleteDiscipline as deleteDisciplineRequest,
   getDisciplineOverview,
@@ -21,14 +32,30 @@ export type { DisciplineCard, DisciplineOverview }
 // Upcoming-events windows on cards/overview follow the browser's zone.
 const tzHeaders = { 'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone }
 
+function toDiscipline(discipline: DisciplineSummary): Discipline {
+  return {
+    id: discipline.id,
+    name: discipline.name,
+    color: discipline.color,
+  }
+}
+
+function toDisciplines(disciplines: DisciplineSummary[]): Discipline[] {
+  return zListDisciplinesResponse.parse(disciplines).map(toDiscipline)
+}
+
 export async function listDisciplines(): Promise<Discipline[]> {
   const data = dataOrThrow(await listDisciplinesRequest())
-  return data.map((d) => ({ id: d.id, name: d.name, color: d.color }))
+  return toDisciplines(data)
 }
 
 /** Disciplines change rarely — cache aggressively for the picker. */
 export function useDisciplines() {
-  return useQuery({ queryKey: ['disciplines'], queryFn: listDisciplines, staleTime: 5 * 60_000 })
+  return useQuery({
+    ...listDisciplinesOptions(),
+    select: toDisciplines,
+    staleTime: 5 * 60_000,
+  })
 }
 
 async function fetchCards(): Promise<DisciplineCard[]> {
@@ -58,14 +85,18 @@ export interface DisciplineInput {
 }
 
 async function createDiscipline(body: DisciplineInput): Promise<Discipline> {
-  return dataOrThrow(await createDisciplineRequest({ body }))
+  const parsedBody = zCreateDisciplineBody.parse(body)
+  const data = dataOrThrow(await createDisciplineRequest({ body: parsedBody }))
+  return toDiscipline(zCreateDisciplineResponse.parse(data))
 }
 
 async function updateDiscipline(id: string, body: DisciplineInput): Promise<Discipline> {
-  return dataOrThrow(await updateDisciplineRequest({
+  const parsedBody = zUpdateDisciplineBody.parse(body)
+  const data = dataOrThrow(await updateDisciplineRequest({
     path: { id },
-    body,
+    body: parsedBody,
   }))
+  return toDiscipline(zUpdateDisciplineResponse.parse(data))
 }
 
 async function deleteDiscipline(id: string): Promise<void> {
@@ -76,6 +107,7 @@ function useInvalidateDisciplines() {
   const queryClient = useQueryClient()
   return () => {
     queryClient.invalidateQueries({ queryKey: ['disciplines'] })
+    queryClient.invalidateQueries({ queryKey: listDisciplinesQueryKey() })
     queryClient.invalidateQueries({ queryKey: ['discipline-cards'] })
     queryClient.invalidateQueries({ queryKey: ['discipline-overview'] })
   }

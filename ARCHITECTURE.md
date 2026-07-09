@@ -101,8 +101,9 @@ verification in `:core:test` is the boundary check.
 
 - Runtime communication is HTTP and JSON.
 - `apps/api` emits OpenAPI through springdoc.
-- `web` generates Hey API TypeScript DTOs, a Fetch API client, and SDK
-  functions from `contracts/openapi.json` into `web/src/lib/hey-api/`.
+- `web` generates Hey API TypeScript DTOs, a Fetch API client, SDK functions,
+  Zod schemas, and TanStack Query helpers from `contracts/openapi.json` into
+  `web/src/lib/hey-api/`.
 - The generated fetch client is configured through `web/src/lib/hey-api-config.ts`,
   which calls Hey's `client.setConfig()` to route requests through the app's
   CSRF/session-aware `apiFetch` transport.

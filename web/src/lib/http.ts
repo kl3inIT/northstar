@@ -26,6 +26,14 @@ function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
   return 'GET'
 }
 
+function requestHeaders(input: RequestInfo | URL, init?: RequestInit): Headers {
+  const headers = new Headers(input instanceof Request ? input.headers : undefined)
+  if (init?.headers) {
+    new Headers(init.headers).forEach((value, key) => headers.set(key, value))
+  }
+  return headers
+}
+
 /**
  * Same-origin API fetch: keep the session in an HttpOnly cookie and attach the
  * SPA CSRF token only for state-changing requests. Cross-origin fetches are
@@ -33,7 +41,7 @@ function requestMethod(input: RequestInfo | URL, init?: RequestInit): string {
  */
 export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const method = requestMethod(input, init)
-  const headers = new Headers(init.headers)
+  const headers = requestHeaders(input, init)
 
   if (isSameOrigin(input) && !SAFE_METHODS.has(method)) {
     await ensureCsrfToken()

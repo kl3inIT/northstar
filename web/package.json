@@ -9,7 +9,7 @@
     "lint": "oxlint",
     "typecheck": "tsc -b",
     "preview": "vite preview",
-    "gen:api": "pnpm dlx --package @hey-api/openapi-ts@0.99.0 --package typescript@6.0.1-rc openapi-ts -i ../contracts/openapi.json -o src/lib/hey-api -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk"
+    "gen:api": "pnpm dlx --package @hey-api/openapi-ts@0.99.0 --package typescript@6.0.1-rc openapi-ts -i ../contracts/openapi.json -o src/lib/hey-api -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk zod @tanstack/react-query"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.12",

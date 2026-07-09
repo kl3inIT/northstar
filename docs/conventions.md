@@ -28,6 +28,13 @@
   contract and is intentionally gitignored.
 - Hey API generates DTO types, the fetch client, and SDK functions. Keep
   endpoint DTO and SDK imports pointed at `@/lib/hey-api`.
+- Hey API also generates Zod schemas and TanStack Query helpers. Use Zod schemas
+  for runtime validation at trust boundaries. Use generated TanStack Query
+  helpers only for simple endpoint reads/mutations where the default query key,
+  options, and invalidation behavior are enough. For flows with domain mapping,
+  cross-resource invalidation, optimistic UI, timezone headers, uploads, or
+  protocol-specific behavior, keep a small hand-written hook around the
+  generated SDK function.
 - Generated requests use Hey's generated Fetch API client. Configure that client
   in `web/src/lib/hey-api-config.ts` with `client.setConfig()` so requests go
   through the app's CSRF/session-aware `apiFetch` implementation.
@@ -36,9 +43,10 @@
   `apiFetch` only for protocol-specific flows such as AI SDK chat streaming or
   other endpoints that intentionally need raw `Response` handling.
 - `pnpm gen:api` uses the pinned Hey API CLI directly with explicit plugins:
-  `@hey-api/typescript`, `@hey-api/client-fetch`, and `@hey-api/sdk`. Do not
-  replace it with a config-file invocation until Hey API's 0.99.x config loader
-  is verified against this project's TypeScript 7 toolchain in CI.
+  `@hey-api/typescript`, `@hey-api/client-fetch`, `@hey-api/sdk`, `zod`, and
+  `@tanstack/react-query`. Do not replace it with a config-file invocation until
+  Hey API's 0.99.x config loader is verified against this project's TypeScript 7
+  toolchain in CI.
 - The app builds with TypeScript 7. The Hey API generator is isolated through
   `pnpm dlx --package typescript@6.0.1-rc` because Hey API 0.99.0 currently
   crashes when its generator process resolves TypeScript 7 in GitHub Actions.
