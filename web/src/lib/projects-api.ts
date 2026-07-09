@@ -1,11 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
-import type { components } from './api.gen'
+import type { MilestoneSummary, ProjectSummary, TaskSummary } from './hey-api'
 
-type Schemas = components['schemas']
-
-export type Project = Schemas['ProjectSummary']
-export type Milestone = Schemas['MilestoneSummary']
+export type Project = ProjectSummary
+export type Milestone = MilestoneSummary
 
 export interface ProjectInput {
   name: string
@@ -136,7 +134,7 @@ export function useProjectTasks(projectId: string | null) {
     queryKey: ['project-tasks', projectId],
     enabled: !!projectId,
     queryFn: async () => {
-      const { data, error } = await api.GET('/api/tasks/by-project', {
+      const { data, error } = await api.GET<TaskSummary[]>('/api/tasks/by-project', {
         params: { query: { projectId: projectId as string } },
       })
       if (error) throw error

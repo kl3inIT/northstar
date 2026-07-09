@@ -52,7 +52,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { api } from '@/lib/api'
-import type { components } from '@/lib/api.gen'
+import type { TaskSummary } from '@/lib/hey-api'
 import { useDisciplines, type Discipline } from '@/lib/disciplines-api'
 import { iso } from '@/lib/dates'
 import {
@@ -79,7 +79,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 
-type ProjTask = components['schemas']['TaskSummary']
+type ProjTask = TaskSummary
 
 const PROJECT_GANTT_COLORS = [
   '#2563eb',
@@ -760,7 +760,7 @@ function LinkTaskPopover({ project, linkedIds }: { project: Project; linkedIds: 
     queryKey: ['open-tasks', project.disciplineId],
     enabled: open && !!project.disciplineId,
     queryFn: async () => {
-      const { data, error } = await api.GET('/api/tasks/open', {
+      const { data, error } = await api.GET<TaskSummary[]>('/api/tasks/open', {
         params: { query: { disciplineId: project.disciplineId as string } },
       })
       if (error) throw error

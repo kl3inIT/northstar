@@ -56,7 +56,10 @@ import {
 } from '@/components/ui/sheet'
 import { MicButton } from '@/components/mic-button'
 import { api } from '@/lib/api'
-import type { components } from '@/lib/api.gen'
+import type {
+  ConversationSummary as ApiConversationSummary,
+  HistoryMessage as ApiHistoryMessage,
+} from '@/lib/hey-api'
 import { fileUrl, uploadFile } from '@/lib/files-api'
 import { apiFetch } from '@/lib/http'
 import { useStagingCount } from '@/lib/notes-api'
@@ -127,8 +130,8 @@ const PILL_INPUT =
 
 // The server always populates every field; the generated schema marks them
 // optional (no `required` in the contract), so assert them present here.
-type ConversationSummary = Required<components['schemas']['ConversationSummary']>
-type HistoryMessage = components['schemas']['HistoryMessage'] & { parts?: unknown }
+type ConversationSummary = Required<ApiConversationSummary>
+type HistoryMessage = Omit<ApiHistoryMessage, 'parts'> & { parts?: unknown }
 
 async function fetchConversations(signal?: AbortSignal): Promise<ConversationSummary[]> {
   const response = await apiFetch('/api/assistant/conversations', { signal })

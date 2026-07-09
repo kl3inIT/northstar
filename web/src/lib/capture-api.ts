@@ -1,11 +1,9 @@
 import { api } from './api'
-import type { components } from './api.gen'
+import type { CaptureDraft, CaptureRequest } from './hey-api'
 import { createEvent, deleteEvent } from './calendar-api'
 import { listDisciplines } from './disciplines-api'
 import { createNote } from './notes-api'
 import { createTask, deleteTask } from './tasks-api'
-
-type Schemas = components['schemas']
 
 export type CaptureKind = 'TASK' | 'NOTE' | 'EVENT'
 
@@ -39,10 +37,10 @@ export async function deleteNote(id: string): Promise<void> {
  */
 export async function capture(text: string, kind?: CaptureKind): Promise<CaptureResult> {
   const { data, error } = await api.POST('/api/capture/draft', {
-    body: { text, kind } satisfies Schemas['CaptureRequest'],
+    body: { text, kind } satisfies CaptureRequest,
   })
   if (error) throw error
-  const draft = data as Schemas['CaptureDraft']
+  const draft = data as CaptureDraft
 
   if (draft.kind === 'TASK' && draft.task) {
     const t = draft.task

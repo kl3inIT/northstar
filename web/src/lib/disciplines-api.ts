@@ -1,23 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
-import type { components } from './api.gen'
-
-type Schemas = components['schemas']
+import type { DisciplineCard, DisciplineOverview, DisciplineSummary } from './hey-api'
 
 export type Discipline = {
   id: string
   name: string
-  color: Schemas['DisciplineSummary']['color']
+  color: DisciplineSummary['color']
 }
 
-export type DisciplineCard = Schemas['DisciplineCard']
-export type DisciplineOverview = Schemas['DisciplineOverview']
+export type { DisciplineCard, DisciplineOverview }
 
 // Upcoming-events windows on cards/overview follow the browser's zone.
 const tzHeaders = { 'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone }
 
 export async function listDisciplines(): Promise<Discipline[]> {
-  const { data, error } = await api.GET('/api/disciplines')
+  const { data, error } = await api.GET<DisciplineSummary[]>('/api/disciplines')
   if (error) throw error
   return (data ?? []).map((d) => ({ id: d.id, name: d.name, color: d.color }))
 }

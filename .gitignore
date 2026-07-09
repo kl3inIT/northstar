@@ -37,4 +37,5 @@ Thumbs.db
 
 # --- Generated API clients (regenerated from contracts/openapi.json) ---
 web/src/lib/api.gen.d.ts
+web/src/lib/hey-api/
 mobile/lib/api/generated/

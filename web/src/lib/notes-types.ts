@@ -1,6 +1,10 @@
-import type { components } from './api.gen'
-
-type Schemas = components['schemas']
+import type {
+  CreateNoteRequest,
+  NoteDetail as ApiNoteDetail,
+  NoteRef as ApiNoteRef,
+  NoteSummary as ApiNoteSummary,
+  UpdateNoteRequest,
+} from './hey-api'
 
 /**
  * The api's records always serialize every field; springdoc marks them optional only
@@ -15,19 +19,19 @@ type Present<T> = T extends readonly (infer U)[]
     : T
 
 // A wiki-link target: slug is genuinely null when the linked note does not exist yet.
-export type NoteRef = Omit<Present<Schemas['NoteRef']>, 'slug'> & { slug: string | null }
+export type NoteRef = Omit<Present<ApiNoteRef>, 'slug'> & { slug: string | null }
 
-export type NoteSummary = Omit<Present<Schemas['NoteSummary']>, 'projectId'> & { projectId: string | null }
+export type NoteSummary = Omit<Present<ApiNoteSummary>, 'projectId'> & { projectId: string | null }
 
 /** MFI working state: STAGING (chờ duyệt) → RESOURCE (kho) / ARCHIVED (lưu trữ). */
 export type NoteStatus = NoteSummary['status']
 
-export type NoteDetail = Omit<Present<Schemas['NoteDetail']>, 'outgoingLinks' | 'backlinks' | 'projectId'> & {
+export type NoteDetail = Omit<Present<ApiNoteDetail>, 'outgoingLinks' | 'backlinks' | 'projectId'> & {
   projectId: string | null
   outgoingLinks: NoteRef[]
   backlinks: NoteRef[]
 }
 
-export type NoteInput = Omit<Schemas['CreateNoteRequest'], 'projectId'> & { projectId?: string | null }
+export type NoteInput = Omit<CreateNoteRequest, 'projectId'> & { projectId?: string | null }
 
-export type NoteUpdate = Omit<Schemas['UpdateNoteRequest'], 'projectId'> & { projectId?: string | null }
+export type NoteUpdate = Omit<UpdateNoteRequest, 'projectId'> & { projectId?: string | null }

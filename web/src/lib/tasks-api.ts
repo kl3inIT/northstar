@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
-import type { components } from './api.gen'
-
-type Schemas = components['schemas']
+import type { TaskRequest, TaskSummary } from './hey-api'
 
 export type TaskStatus = 'OPEN' | 'DONE'
 
@@ -21,12 +19,12 @@ export type Task = {
   disciplineId: string | null
 }
 
-export type TaskInput = Schemas['TaskRequest']
+export type TaskInput = TaskRequest
 
 const TZ = Intl.DateTimeFormat().resolvedOptions().timeZone
 const tzHeaders = { 'X-Timezone': TZ }
 
-function toTask(t: Schemas['TaskSummary']): Task {
+function toTask(t: TaskSummary): Task {
   return {
     id: t.id ?? '',
     title: t.title ?? '',
@@ -82,7 +80,7 @@ export async function openTasksByDiscipline(disciplineId: string): Promise<Task[
 export async function createTask(body: TaskInput): Promise<Task> {
   const { data, error } = await api.POST('/api/tasks', { body })
   if (error) throw error
-  return toTask(data as Schemas['TaskSummary'])
+  return toTask(data as TaskSummary)
 }
 
 export async function updateTask(id: string, body: TaskInput): Promise<Task> {
@@ -91,7 +89,7 @@ export async function updateTask(id: string, body: TaskInput): Promise<Task> {
     body,
   })
   if (error) throw error
-  return toTask(data as Schemas['TaskSummary'])
+  return toTask(data as TaskSummary)
 }
 
 export async function setTaskDone(id: string, done: boolean): Promise<Task> {
@@ -100,7 +98,7 @@ export async function setTaskDone(id: string, done: boolean): Promise<Task> {
     body: { done },
   })
   if (error) throw error
-  return toTask(data as Schemas['TaskSummary'])
+  return toTask(data as TaskSummary)
 }
 
 /** Star/unstar the "do" day (null clears); never moves the deadline. */
@@ -110,7 +108,7 @@ export async function setTaskPlanned(id: string, plannedDate: string | null): Pr
     body: { plannedDate: plannedDate ?? undefined },
   })
   if (error) throw error
-  return toTask(data as Schemas['TaskSummary'])
+  return toTask(data as TaskSummary)
 }
 
 export async function deleteTask(id: string): Promise<void> {

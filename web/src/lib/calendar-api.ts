@@ -1,12 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './api'
-import type { components } from './api.gen'
+import type { CalendarEventSummary } from './hey-api'
 import type { IEvent } from '@/features/calendar/interfaces'
 import type { TEventColor } from '@/features/calendar/types'
 
-type Schemas = components['schemas']
-
-export type EventColor = Schemas['CalendarEventSummary']['color']
+export type EventColor = CalendarEventSummary['color']
 
 // Recurring series expand server-side at the local time-of-day of this zone.
 const tzHeaders = { 'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone }
@@ -28,7 +26,7 @@ export interface CalendarEventInput {
  * recurring occurrence shares its master's server id, so its client id is
  * made unique (`id@startAt`) and the server id moves to masterId.
  */
-function toEvent(e: Schemas['CalendarEventSummary']): IEvent {
+function toEvent(e: CalendarEventSummary): IEvent {
   const recurring = !!e.rrule
   return {
     id: recurring ? `${e.id}@${e.startAt}` : e.id,
@@ -57,16 +55,16 @@ export async function rangeEvents(from: string, to: string): Promise<IEvent[]> {
 }
 
 /** The raw master row — what the "edit series" form prefills from. */
-export async function getEvent(id: string): Promise<Schemas['CalendarEventSummary']> {
+export async function getEvent(id: string): Promise<CalendarEventSummary> {
   const { data, error } = await api.GET('/api/calendar/events/{id}', { params: { path: { id } } })
   if (error) throw error
-  return data as Schemas['CalendarEventSummary']
+  return data as CalendarEventSummary
 }
 
 export async function createEvent(body: CalendarEventInput): Promise<IEvent> {
   const { data, error } = await api.POST('/api/calendar/events', { body })
   if (error) throw error
-  return toEvent(data as Schemas['CalendarEventSummary'])
+  return toEvent(data as CalendarEventSummary)
 }
 
 export async function updateEvent(id: string, body: CalendarEventInput): Promise<IEvent> {
@@ -75,7 +73,7 @@ export async function updateEvent(id: string, body: CalendarEventInput): Promise
     body,
   })
   if (error) throw error
-  return toEvent(data as Schemas['CalendarEventSummary'])
+  return toEvent(data as CalendarEventSummary)
 }
 
 export async function rescheduleEvent(id: string, startAt: string, endAt: string): Promise<IEvent> {
@@ -84,7 +82,7 @@ export async function rescheduleEvent(id: string, startAt: string, endAt: string
     body: { startAt, endAt },
   })
   if (error) throw error
-  return toEvent(data as Schemas['CalendarEventSummary'])
+  return toEvent(data as CalendarEventSummary)
 }
 
 /** Without occurrenceStart: delete the event / whole series. With it: "chỉ buổi này". */

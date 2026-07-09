@@ -1,0 +1,9 @@
+packages:
+  - web
+
+sharedWorkspaceLockfile: false
+
+minimumReleaseAgeExclude:
+  - typescript@7.0.2
+  - '@typescript/*'
+  - '@hey-api/openapi-ts@0.99.0'

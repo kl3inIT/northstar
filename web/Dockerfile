@@ -20,7 +20,7 @@ RUN --mount=type=cache,id=northstar-pnpm-store,target=/pnpm-store \
     pnpm config set store-dir /pnpm-store && \
     pnpm install --frozen-lockfile
 
-# api.gen.d.ts is gitignored — regenerate it from the committed contract.
+# Hey API output is gitignored — regenerate it from the committed contract.
 COPY contracts/openapi.json /repo/contracts/openapi.json
 COPY web/ .
 RUN pnpm gen:api && pnpm build
