@@ -44,4 +44,10 @@ tasks.withType<JavaCompile> {
 tasks.withType<Test> {
     useJUnitPlatform()
     usesService(testcontainersLock)
+    maxHeapSize = "768m"
+    jvmArgs(
+        "-XX:ActiveProcessorCount=4",
+        "-XX:CICompilerCount=2",
+        "-Xss512k",
+    )
 }

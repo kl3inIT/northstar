@@ -1,3 +1,13 @@
 northstar:
   auth:
     enabled: false
+
+spring:
+  datasource:
+    hikari:
+      # Testcontainers stops after the test class. Keeping no warm idle
+      # connection avoids Hikari refill attempts against a just-stopped mapped
+      # port during teardown.
+      minimum-idle: 0
+      maximum-pool-size: 3
+      connection-timeout: 2000

@@ -35,6 +35,20 @@ This boots Spring contexts, runs Flyway/Testcontainers tests, and exits.
 
 Do not use `bootRun` as Gate 2. It is non-terminating and can hang a session.
 
+### Testcontainers Pools
+
+Integration tests use real PostgreSQL containers. Test resources keep Hikari's
+test pool small with `minimum-idle=0` so teardown does not keep trying to refill
+idle connections against a Testcontainers port that has just been stopped.
+Gradle also serializes test tasks through a shared Testcontainers lock and caps
+test JVM CPU/compiler threads so Docker-backed Spring tests do not exhaust local
+or CI native memory.
+
+If a Hikari `connection refused` warning appears only during test teardown and
+the test command exits green, treat it as noise to clean up, not as a failed
+assertion. If it appears before assertions complete or causes retries/timeouts,
+debug the test lifecycle immediately.
+
 ## Gate 3 - Runs Or Renders
 
 For user-facing or flow changes:

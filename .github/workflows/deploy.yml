@@ -1,7 +1,7 @@
 # Deploy to the VPS — manual dispatch, runs ON the box.
 #
 # Straight port of zero-mail's hard-won deploy shape, minus the semver gate
-# (single dev → deploy :main directly):
+# (single dev -> auto-deploy the exact sha image that passed CI):
 #   • self-hosted runner on the VPS: the deploy is a local process, so
 #     Hostinger's edge DDoS filter can never drop an inbound SSH session
 #   • snapshot the running image IDs BEFORE recreate → auto-rollback on any
@@ -19,7 +19,8 @@
 name: Deploy
 
 on:
-  # Auto-CD: after images are built+pushed on a push to main, deploy them.
+  # Auto-CD: after images are built+pushed on a push to main, deploy the
+  # immutable sha-<short> tag from that build.
   # (northstar is not strict like zero-mail — no manual gate on every release.)
   workflow_run:
     workflows: ["Build and Push Images"]
@@ -46,6 +47,7 @@ jobs:
     name: Deploy (self-hosted VPS runner)
     runs-on: [self-hosted, northstar]
     timeout-minutes: 20
+    environment: production
     # On workflow_run, only proceed if the build actually succeeded; manual
     # dispatch always proceeds.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
@@ -53,15 +55,27 @@ jobs:
     steps:
       - name: Deploy stack
         env:
-          DEPLOY_TAG: ${{ inputs.tag || 'main' }}
+          DEPLOY_TAG_INPUT: ${{ inputs.tag }}
+          BUILD_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
           # GHCR paths are lowercase; the repo owner is kl3inIT.
           OWNER="${OWNER,,}"
+          if [[ -n "${DEPLOY_TAG_INPUT:-}" ]]; then
+            DEPLOY_TAG="$DEPLOY_TAG_INPUT"
+          elif [[ -n "${BUILD_HEAD_SHA:-}" ]]; then
+            DEPLOY_TAG="sha-${BUILD_HEAD_SHA:0:7}"
+          else
+            echo "::error::Cannot determine image tag to deploy."
+            exit 1
+          fi
+          echo "Deploying image tag: ${DEPLOY_TAG}"
+
           cd /apps/north-star
           git fetch --quiet origin main
-          git checkout --quiet origin/main -- docker/docker-compose.yml docker/docker-compose.infra.yml
+          DEPLOY_REF="${BUILD_HEAD_SHA:-origin/main}"
+          git checkout --quiet "$DEPLOY_REF" -- docker/docker-compose.yml docker/docker-compose.infra.yml
 
           echo "::group::Backup database before migrate"
           # Northstar shares the zero-mail Postgres instance; dump the dedicated
@@ -191,7 +205,7 @@ jobs:
           fi
           # Roll api+web back to their snapshots. The worker is additive (not on
           # the request path): recreate it only if we actually snapshotted it —
-          # never invent a :main/:latest ref — otherwise leave the new one in place.
+          # never invent a :main/:latest ref -- otherwise leave the new one in place.
           rollback_services="api web"
           export NORTHSTAR_API_IMAGE="$prev_api"
           export NORTHSTAR_WEB_IMAGE="$prev_web"

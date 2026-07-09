@@ -1,10 +1,10 @@
 # Build container images and push to GHCR.
 #
 # Single-developer simplification of zero-mail's pipeline: no semver release
-# train — every green CI run on main publishes :main + :sha-<short> images, and
-# the deploy workflow rolls the VPS onto :main. Rollback safety comes from the
-# deploy job's image-ID snapshot (zero-mail's .last-deploy.txt pattern), not
-# from version tags.
+# train. Every green CI run on main publishes :main + :sha-<short> images, and
+# the deploy workflow rolls the VPS onto the immutable :sha-<short> that CI
+# actually validated. Rollback safety comes from both manual sha tags and the
+# deploy job's image-ID snapshot (zero-mail's .last-deploy.txt pattern).
 #
 # Gated on CI: this runs only after the "CI" workflow completes successfully on
 # main (workflow_run), so a red suite (Modulith verify, integration tests, web
@@ -65,6 +65,7 @@ jobs:
       - name: Compute image meta
         id: meta
         run: |
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "sha=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
           # GHCR requires a lowercase repository path; the owner is kl3inIT.
           echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
@@ -86,4 +87,4 @@ jobs:
           cache-to: type=gha,mode=max,scope=northstar-${{ matrix.component }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ steps.meta.outputs.revision }}

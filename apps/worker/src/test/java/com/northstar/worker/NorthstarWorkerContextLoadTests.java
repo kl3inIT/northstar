@@ -3,6 +3,7 @@ package com.northstar.worker;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.annotation.DirtiesContext;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -19,7 +20,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "spring.flyway.enabled=true",
         // The worker now wires OpenAI (indexing/captions); the starter needs a key
         // to build its beans, but nothing calls OpenAI during a context-load test.
-        "spring.ai.openai.api-key=test-key"})
+        "spring.ai.openai.api-key=test-key",
+        "spring.datasource.hikari.minimum-idle=0",
+        "spring.datasource.hikari.maximum-pool-size=3",
+        "spring.datasource.hikari.connection-timeout=2000"})
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class NorthstarWorkerContextLoadTests {
 
