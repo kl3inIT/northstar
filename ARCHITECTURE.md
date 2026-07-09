@@ -89,6 +89,9 @@ verification in `:core:test` is the boundary check.
 - `apps/api` wires ChatClient, OpenAI chat, chat memory JDBC, tool search, and
   pgvector support for interactive capture, assistant, alignment, and query
   embedding.
+- Assistant text history uses Spring AI's `spring_ai_chat_memory`; assistant
+  tool workflow replay uses the Northstar-owned
+  `northstar_assistant_tool_trace` projection table.
 - `apps/worker` wires OpenAI and pgvector for indexing jobs that should not
   compete with API request threads.
 - Search combines durable PostgreSQL data with derived keyword/vector indexes.

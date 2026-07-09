@@ -7,23 +7,25 @@ import com.northstar.core.attachment.AttachmentService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.TextStyle;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.function.Consumer;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
-import org.springframework.ai.chat.memory.ChatMemoryRepository;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.content.Media;
-import java.time.Instant;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -50,7 +52,8 @@ import tools.jackson.databind.ObjectMapper;
  * live tool-call events into an AI SDK UI Message Stream (v1) over SSE, which
  * the web app's useChat + ai-elements render directly. Memory is keyed by the
  * client-supplied conversation id; /history rehydrates the transcript so a
- * page reload does not show an empty chat.
+ * page reload does not show an empty chat or lose completed tool workflow
+ * steps.
  */
 @RestController
 @RequestMapping("/api/assistant")
@@ -99,7 +102,6 @@ class AssistantController {
 
     private final ChatClient chat;
     private final ChatMemory memory;
-    private final ChatMemoryRepository memoryRepository;
     private final List<NorthstarTool> tools;
     private final ObjectMapper json;
     private final JdbcClient jdbc;
@@ -108,12 +110,11 @@ class AssistantController {
     private final ConversationTitleService titles;
 
     AssistantController(@Qualifier(AssistantConfig.ASSISTANT_CHAT_CLIENT) ChatClient chat,
-            ChatMemory memory, ChatMemoryRepository memoryRepository, List<NorthstarTool> tools,
+            ChatMemory memory, List<NorthstarTool> tools,
             ObjectMapper json, JdbcClient jdbc, AttachmentService attachments, MemoryTools longTermMemory,
             ConversationTitleService titles) {
         this.chat = chat;
         this.memory = memory;
-        this.memoryRepository = memoryRepository;
         this.tools = tools;
         this.json = json;
         this.jdbc = jdbc;
@@ -144,7 +145,11 @@ class AssistantController {
                 : markers.isBlank() ? message : message + "\n\n" + markers;
 
         SseEmitter emitter = new SseEmitter(TURN_TIMEOUT_MILLIS);
-        UiMessageStream.pipe(streamTurn(stored, toMedia(images), conversationId(request.conversationId())),
+        UiMessageStream.pipe(streamTurn(
+                stored,
+                toMedia(images),
+                conversationId(request.conversationId()),
+                UUID.randomUUID().toString()),
                 emitter, json);
         return emitter;
     }
@@ -183,17 +188,84 @@ class AssistantController {
                 .toList();
     }
 
-    /** The stored transcript (user/assistant text only) for rehydrating the UI on load. */
+    /** Stored transcript plus persisted tool parts for rehydrating the UI on load. */
     @GetMapping("/history")
     List<HistoryMessage> history(@RequestParam(required = false) String conversationId) {
-        // The FULL transcript, straight from the repository — not memory.get(), which
-        // returns only the model's recent window (WindowedChatMemory).
-        return memoryRepository.findByConversationId(conversationId(conversationId)).stream()
-                .flatMap(message -> switch (message) {
-                    case UserMessage user -> textOf(user.getText(), "user");
-                    case AssistantMessage assistant -> textOf(assistant.getText(), "assistant");
-                    default -> Stream.empty();
+        // The FULL transcript, straight from JDBC — not memory.get(), which returns
+        // only the model's recent window (WindowedChatMemory). Tool workflow lives in
+        // our own projection table so Spring AI's vendor-owned memory schema stays
+        // unchanged.
+        String id = conversationId(conversationId);
+        List<HistoryRow> rows = new ArrayList<>();
+
+        rows.addAll(jdbc.sql("""
+                SELECT content, type, "timestamp", sequence_id
+                  FROM spring_ai_chat_memory
+                 WHERE conversation_id = ?
+                   AND type IN ('USER', 'ASSISTANT')
+                 ORDER BY sequence_id
+                """)
+                .param(id)
+                .query((rs, _) -> {
+                    String text = rs.getString("content");
+                    String role = "USER".equals(rs.getString("type")) ? "user" : "assistant";
+                    return new HistoryRow(
+                            role,
+                            text,
+                            text == null || text.isBlank() ? List.of() : List.of(textPart(text)),
+                            rs.getTimestamp("timestamp").toInstant(),
+                            rs.getLong("sequence_id"),
+                            "user".equals(role) ? 0 : 2);
                 })
+                .list()
+                .stream()
+                .filter(row -> !row.parts().isEmpty())
+                .toList());
+
+        Map<String, List<ToolTraceRow>> tracesByTurn = new LinkedHashMap<>();
+        jdbc.sql("""
+                SELECT turn_id, sequence_index, tool_call_id, tool_name, state,
+                       input_json::text AS input_json,
+                       output_json::text AS output_json,
+                       error_text,
+                       created_at
+                  FROM northstar_assistant_tool_trace
+                 WHERE conversation_id = ?
+                 ORDER BY created_at, sequence_index
+                """)
+                .param(id)
+                .query((rs, _) -> new ToolTraceRow(
+                        rs.getString("turn_id"),
+                        rs.getInt("sequence_index"),
+                        rs.getString("tool_call_id"),
+                        rs.getString("tool_name"),
+                        rs.getString("state"),
+                        rs.getString("input_json"),
+                        rs.getString("output_json"),
+                        rs.getString("error_text"),
+                        rs.getTimestamp("created_at").toInstant()))
+                .list()
+                .forEach(row -> tracesByTurn.computeIfAbsent(row.turnId(), _ -> new ArrayList<>()).add(row));
+
+        tracesByTurn.values().forEach(traceRows -> {
+            if (traceRows.isEmpty()) {
+                return;
+            }
+            rows.add(new HistoryRow(
+                    "assistant",
+                    "",
+                    traceRows.stream().map(this::toolPart).toList(),
+                    traceRows.getFirst().createdAt(),
+                    traceRows.getFirst().sequenceIndex(),
+                    1));
+        });
+
+        return rows.stream()
+                .sorted(Comparator
+                        .comparing(HistoryRow::at)
+                        .thenComparingInt(HistoryRow::kindOrder)
+                        .thenComparingLong(HistoryRow::sequence))
+                .map(HistoryRow::message)
                 .toList();
     }
 
@@ -230,6 +302,12 @@ class AssistantController {
     @DeleteMapping("/conversations/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     void deleteConversation(@PathVariable String id) {
+        jdbc.sql("DELETE FROM northstar_assistant_tool_trace WHERE conversation_id = ?")
+                .param(id)
+                .update();
+        jdbc.sql("DELETE FROM northstar_conversation_title WHERE conversation_id = ?")
+                .param(id)
+                .update();
         memory.clear(id);
     }
 
@@ -241,9 +319,14 @@ class AssistantController {
         return stripped.length() <= 80 ? stripped : stripped.substring(0, 77) + "…";
     }
 
-    private Flux<Part> streamTurn(String userMessage, List<Media> images, String conversationId) {
+    private Flux<Part> streamTurn(String userMessage, List<Media> images, String conversationId,
+            String turnId) {
         Sinks.Many<Part> toolEvents = Sinks.many().unicast().onBackpressureBuffer();
-        Consumer<Part> emit = toolEvents::tryEmitNext;
+        ToolTraceRecorder trace = new ToolTraceRecorder(conversationId, turnId);
+        Consumer<Part> emit = part -> {
+            trace.record(part);
+            toolEvents.tryEmitNext(part);
+        };
 
         ZoneId zone = ZoneId.systemDefault();
         LocalDate today = LocalDate.now(zone);
@@ -279,19 +362,156 @@ class AssistantController {
         return StringUtils.hasText(requested) ? requested : DEFAULT_CONVERSATION_ID;
     }
 
-    private static Stream<HistoryMessage> textOf(String text, String role) {
-        return text == null || text.isBlank()
-                ? Stream.empty()
-                : Stream.of(new HistoryMessage(role, text));
+    private static Map<String, Object> textPart(String text) {
+        Map<String, Object> part = new LinkedHashMap<>();
+        part.put("type", "text");
+        part.put("text", text);
+        return part;
+    }
+
+    private Map<String, Object> toolPart(ToolTraceRow row) {
+        Map<String, Object> part = new LinkedHashMap<>();
+        part.put("type", "tool-" + row.toolName());
+        part.put("toolCallId", row.toolCallId());
+        part.put("state", row.state());
+        Object input = parseJsonValue(row.inputJson());
+        Object output = parseJsonValue(row.outputJson());
+        if (input != null) {
+            part.put("input", input);
+        }
+        if (output != null) {
+            part.put("output", output);
+        }
+        if (StringUtils.hasText(row.errorText())) {
+            part.put("errorText", row.errorText());
+        }
+        return part;
+    }
+
+    private Object parseJsonValue(String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return json.readValue(value, Object.class);
+        } catch (RuntimeException e) {
+            return value;
+        }
     }
 
     record ChatRequest(@Size(max = 20_000) String message, String conversationId,
             @Size(max = 3) List<UUID> attachmentIds) {
     }
 
-    record HistoryMessage(String role, String text) {
+    record HistoryMessage(String role, String text, List<Map<String, Object>> parts) {
+    }
+
+    private record HistoryRow(String role, String text, List<Map<String, Object>> parts,
+            Instant at, long sequence, int kindOrder) {
+
+        HistoryMessage message() {
+            return new HistoryMessage(role, text, parts);
+        }
+    }
+
+    private record ToolTraceRow(String turnId, int sequenceIndex, String toolCallId,
+            String toolName, String state, String inputJson, String outputJson,
+            String errorText, Instant createdAt) {
     }
 
     record ConversationSummary(String id, String title, Instant lastAt, long messages) {
+    }
+
+    private final class ToolTraceRecorder {
+
+        private final String conversationId;
+        private final String turnId;
+        private final AtomicInteger nextSequence = new AtomicInteger();
+        private final Map<String, Integer> sequenceByCallId = new ConcurrentHashMap<>();
+
+        private ToolTraceRecorder(String conversationId, String turnId) {
+            this.conversationId = conversationId;
+            this.turnId = turnId;
+        }
+
+        void record(Part part) {
+            switch (part) {
+                case Part.ToolInputStart tool -> upsert(tool.toolCallId(), tool.toolName(),
+                        "input-streaming", null, null, null);
+                case Part.ToolInputAvailable tool -> upsert(tool.toolCallId(), tool.toolName(),
+                        "input-available", toJson(tool.input()), null, null);
+                case Part.ToolOutputAvailable tool -> recordOutput(tool.toolCallId(), toJson(tool.output()));
+                default -> {
+                }
+            }
+        }
+
+        private void upsert(String toolCallId, String toolName, String state,
+                String inputJson, String outputJson, String errorText) {
+            Timestamp now = Timestamp.from(Instant.now());
+            jdbc.sql("""
+                    INSERT INTO northstar_assistant_tool_trace (
+                        id, conversation_id, turn_id, sequence_index, tool_call_id, tool_name,
+                        state, input_json, output_json, error_text, created_at, updated_at
+                    )
+                    VALUES (
+                        :id, :conversationId, :turnId, :sequenceIndex, :toolCallId, :toolName,
+                        :state, CAST(:inputJson AS jsonb), CAST(:outputJson AS jsonb), :errorText, :createdAt, :updatedAt
+                    )
+                    ON CONFLICT (conversation_id, tool_call_id)
+                    DO UPDATE SET
+                        turn_id = EXCLUDED.turn_id,
+                        tool_name = EXCLUDED.tool_name,
+                        state = EXCLUDED.state,
+                        input_json = COALESCE(EXCLUDED.input_json, northstar_assistant_tool_trace.input_json),
+                        output_json = COALESCE(EXCLUDED.output_json, northstar_assistant_tool_trace.output_json),
+                        error_text = COALESCE(EXCLUDED.error_text, northstar_assistant_tool_trace.error_text),
+                        updated_at = EXCLUDED.updated_at
+                    """)
+                    .param("id", UUID.randomUUID())
+                    .param("conversationId", conversationId)
+                    .param("turnId", turnId)
+                    .param("sequenceIndex", sequenceFor(toolCallId))
+                    .param("toolCallId", toolCallId)
+                    .param("toolName", toolName)
+                    .param("state", state)
+                    .param("inputJson", inputJson)
+                    .param("outputJson", outputJson)
+                    .param("errorText", errorText)
+                    .param("createdAt", now)
+                    .param("updatedAt", now)
+                    .update();
+        }
+
+        private void recordOutput(String toolCallId, String outputJson) {
+            Timestamp now = Timestamp.from(Instant.now());
+            int updated = jdbc.sql("""
+                    UPDATE northstar_assistant_tool_trace
+                       SET state = 'output-available',
+                           output_json = CAST(:outputJson AS jsonb),
+                           updated_at = :updatedAt
+                     WHERE conversation_id = :conversationId
+                       AND tool_call_id = :toolCallId
+                    """)
+                    .param("conversationId", conversationId)
+                    .param("toolCallId", toolCallId)
+                    .param("outputJson", outputJson)
+                    .param("updatedAt", now)
+                    .update();
+            if (updated == 0) {
+                upsert(toolCallId, "unknown", "output-available", null, outputJson, null);
+            }
+        }
+
+        private int sequenceFor(String toolCallId) {
+            return sequenceByCallId.computeIfAbsent(toolCallId, _ -> nextSequence.getAndIncrement());
+        }
+
+        private String toJson(Object value) {
+            if (value == null) {
+                return null;
+            }
+            return json.writeValueAsString(value);
+        }
     }
 }

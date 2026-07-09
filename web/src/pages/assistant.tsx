@@ -3,17 +3,32 @@ import { Link } from '@tanstack/react-router'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, type FileUIPart, type ToolUIPart, type UIMessage } from 'ai'
 import {
+  CalendarDays,
+  CheckCircle2,
   History as HistoryIcon,
   Loader2,
   MessageSquarePlus,
+  NotebookText,
   PanelRightClose,
   PanelRightOpen,
   Paperclip,
+  Search,
   Trash2,
+  Wrench,
   X,
+  XCircle,
+  type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
+import {
+  ChainOfThought,
+  ChainOfThoughtContent,
+  ChainOfThoughtHeader,
+  ChainOfThoughtSearchResult,
+  ChainOfThoughtSearchResults,
+  ChainOfThoughtStep,
+} from '@/components/ai-elements/chain-of-thought'
 import {
   Conversation,
   ConversationContent,
@@ -113,6 +128,7 @@ const PILL_INPUT =
 // The server always populates every field; the generated schema marks them
 // optional (no `required` in the contract), so assert them present here.
 type ConversationSummary = Required<components['schemas']['ConversationSummary']>
+type HistoryMessage = components['schemas']['HistoryMessage'] & { parts?: unknown }
 
 async function fetchConversations(signal?: AbortSignal): Promise<ConversationSummary[]> {
   const response = await apiFetch('/api/assistant/conversations', { signal })
@@ -126,12 +142,30 @@ async function fetchHistory(conversationId: string, signal?: AbortSignal): Promi
     { signal },
   )
   if (!response.ok) throw new Error(`Assistant history request failed: ${response.status}`)
-  const data = (await response.json()) as components['schemas']['HistoryMessage'][]
+  const data = (await response.json()) as HistoryMessage[]
   return (data ?? []).map((m, i) => ({
     id: `history-${i}`,
     role: (m.role ?? 'assistant') as 'user' | 'assistant',
-    parts: [{ type: 'text', text: m.text ?? '' }],
+    parts: historyParts(m),
   }))
+}
+
+function historyParts(message: HistoryMessage): UIMessage['parts'] {
+  if (Array.isArray(message.parts)) {
+    const parts = message.parts.filter(isHistoryPart)
+    if (parts.length > 0) return parts
+  }
+  return message.text ? [{ type: 'text', text: message.text }] : []
+}
+
+function isHistoryPart(part: unknown): part is UIMessage['parts'][number] {
+  if (!isRecord(part) || typeof part.type !== 'string') return false
+  if (part.type === 'text') return typeof part.text === 'string'
+  if (part.type === 'file') return typeof part.url === 'string'
+  if (part.type.startsWith('tool-')) {
+    return typeof part.toolCallId === 'string' && typeof part.state === 'string'
+  }
+  return false
 }
 
 /**
@@ -512,10 +546,13 @@ function AssistantChat({
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
       <Conversation className="min-h-0 flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl px-4 py-6">
-          {messages.map((m) => (
-            <Message from={m.role} key={m.id}>
-              <MessageContent>
-                {m.parts.map((part, i) => {
+          {messages.map((m) => {
+            const toolParts = m.parts.filter(isToolPart)
+            return (
+              <Message from={m.role} key={m.id}>
+                <MessageContent>
+                  {m.role === 'assistant' && toolParts.length > 0 && <ToolWorkflow tools={toolParts} />}
+                  {m.parts.map((part, i) => {
                   if (part.type === 'text') {
                     return (
                       <MessageResponse key={i} components={CHAT_MARKDOWN_COMPONENTS}>
@@ -534,28 +571,13 @@ function AssistantChat({
                       />
                     )
                   }
-                  if (part.type.startsWith('tool-')) {
-                    const tool = part as ToolUIPart
-                    return (
-                      // zeromail's tool row: a quiet one-liner, no card chrome.
-                      <Tool key={i} className="mb-0 border-0 bg-transparent">
-                        <ToolHeader
-                          type={tool.type}
-                          state={tool.state}
-                          className="px-0 py-1 text-muted-foreground"
-                        />
-                        <ToolContent>
-                          {tool.input !== undefined && <ToolInput input={tool.input} />}
-                          <ToolOutput output={tool.output} errorText={tool.errorText} />
-                        </ToolContent>
-                      </Tool>
-                    )
-                  }
+                  if (isToolPart(part)) return null
                   return null
-                })}
-              </MessageContent>
-            </Message>
-          ))}
+                  })}
+                </MessageContent>
+              </Message>
+            )
+          })}
           {status === 'submitted' && <PendingDots />}
         </ConversationContent>
         <ConversationScrollButton />
@@ -564,6 +586,208 @@ function AssistantChat({
       <div className="mx-auto w-full max-w-3xl px-4 pb-6">{input}</div>
     </div>
   )
+}
+
+function isToolPart(part: UIMessage['parts'][number]): part is ToolUIPart {
+  return part.type.startsWith('tool-')
+}
+
+function ToolWorkflow({ tools }: { tools: ToolUIPart[] }) {
+  const complete = tools.filter((tool) => tool.state === 'output-available').length
+  const hasActive = tools.some((tool) => tool.state === 'input-available' || tool.state === 'input-streaming')
+  const hasError = tools.some((tool) => tool.state === 'output-error' || tool.errorText)
+  const defaultOpen = hasActive || hasError || tools.length <= 2
+
+  return (
+    <ChainOfThought defaultOpen={defaultOpen} className="mb-3">
+      <ChainOfThoughtHeader>
+        Workflow · {complete}/{tools.length} complete
+      </ChainOfThoughtHeader>
+      <ChainOfThoughtContent>
+        {tools.map((tool) => {
+          const name = toolName(tool)
+          const outputLabels = outputPreviewLabels(tool.output)
+          return (
+            <ChainOfThoughtStep
+              key={tool.toolCallId ?? `${tool.type}-${name}`}
+              icon={toolIcon(name, tool)}
+              label={toolLabel(name)}
+              description={toolDescription(tool)}
+              status={toolStatus(tool)}
+            >
+              {outputLabels.length > 0 && (
+                <ChainOfThoughtSearchResults>
+                  {outputLabels.map((label) => (
+                    <ChainOfThoughtSearchResult key={label}>{label}</ChainOfThoughtSearchResult>
+                  ))}
+                </ChainOfThoughtSearchResults>
+              )}
+              <Tool className="mb-0 border-border/60 bg-background/60">
+                <ToolHeader title="Details" type={tool.type} state={tool.state} className="px-3 py-2" />
+                <ToolContent className="space-y-3 px-3 py-3">
+                  {tool.input !== undefined && <ToolInput input={tool.input} />}
+                  <ToolOutput output={tool.output} errorText={tool.errorText} />
+                </ToolContent>
+              </Tool>
+            </ChainOfThoughtStep>
+          )
+        })}
+      </ChainOfThoughtContent>
+    </ChainOfThought>
+  )
+}
+
+function toolName(tool: ToolUIPart): string {
+  return tool.type.replace(/^tool-/, '')
+}
+
+function toolLabel(name: string): string {
+  const normalized = name.replaceAll('_', ' ')
+  if (name.includes('search') || name.includes('find')) return `Search ${targetLabel(name)}`
+  if (name.startsWith('create')) return `Create ${targetLabel(name)}`
+  if (name.startsWith('update')) return `Update ${targetLabel(name)}`
+  if (name.startsWith('delete')) return `Delete ${targetLabel(name)}`
+  if (name.startsWith('list')) return `List ${targetLabel(name)}`
+  if (name.startsWith('set')) return `Set ${targetLabel(name)}`
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+}
+
+function targetLabel(name: string): string {
+  if (name.includes('task')) return 'tasks'
+  if (name.includes('note') || name.includes('knowledge')) return 'notes'
+  if (name.includes('event') || name.includes('calendar') || name.includes('slot')) return 'calendar'
+  if (name.includes('project') || name.includes('milestone')) return 'projects'
+  if (name.includes('discipline')) return 'disciplines'
+  if (name.includes('review')) return 'review'
+  return name.replaceAll('_', ' ')
+}
+
+function toolIcon(name: string, tool: ToolUIPart): LucideIcon {
+  if (tool.state === 'output-error' || tool.errorText) return XCircle
+  if (tool.state === 'output-available') return CheckCircle2
+  if (name.includes('search') || name.includes('find')) return Search
+  if (name.includes('event') || name.includes('calendar') || name.includes('slot')) return CalendarDays
+  if (name.includes('note') || name.includes('knowledge') || name.includes('review')) return NotebookText
+  return Wrench
+}
+
+function toolStatus(tool: ToolUIPart): 'complete' | 'active' | 'pending' {
+  if (tool.state === 'output-available' || tool.state === 'output-error' || tool.errorText) return 'complete'
+  if (tool.state === 'input-available' || tool.state === 'input-streaming') return 'active'
+  return 'pending'
+}
+
+function toolDescription(tool: ToolUIPart): string {
+  if (tool.errorText) return tool.errorText
+  const input = inputSummary(tool.input)
+  const result = resultSummary(tool.output)
+  if (input && result) return `${input} · ${result}`
+  return input || result || toolStateLabel(tool.state)
+}
+
+function toolStateLabel(state: ToolUIPart['state']): string {
+  if (state === 'input-streaming') return 'Preparing input'
+  if (state === 'input-available') return 'Running'
+  if (state === 'output-available') return 'Done'
+  if (state === 'approval-requested') return 'Waiting for approval'
+  if (state === 'approval-responded') return 'Approval recorded'
+  if (state === 'output-denied') return 'Denied'
+  if (state === 'output-error') return 'Error'
+  return 'Pending'
+}
+
+function inputSummary(input: unknown): string {
+  if (input == null) return ''
+  if (typeof input === 'string') return truncate(input)
+  if (!isRecord(input)) return ''
+
+  const keys = [
+    'query',
+    'q',
+    'text',
+    'title',
+    'date',
+    'days',
+    'taskId',
+    'noteSlug',
+    'projectId',
+    'disciplineName',
+    'folderPath',
+  ]
+  const parts = keys
+    .map((key) => [key, input[key]] as const)
+    .filter((entry): entry is readonly [string, string | number | boolean] =>
+      typeof entry[1] === 'string' || typeof entry[1] === 'number' || typeof entry[1] === 'boolean',
+    )
+    .slice(0, 3)
+    .map(([key, value]) => `${humanize(key)}: ${truncate(String(value), 80)}`)
+
+  return parts.join(' · ')
+}
+
+function resultSummary(output: unknown): string {
+  if (output == null) return ''
+  const count = collectionCount(output)
+  if (count !== null) return `${count} result${count === 1 ? '' : 's'}`
+  if (typeof output === 'string') return truncate(output, 120)
+  if (isRecord(output)) {
+    const title = firstString(output, ['title', 'name', 'message', 'summary', 'status'])
+    if (title) return truncate(title, 120)
+  }
+  return 'Done'
+}
+
+function outputPreviewLabels(output: unknown): string[] {
+  const items = outputItems(output)
+  return items
+    .map((item) => (isRecord(item) ? firstString(item, ['title', 'name', 'subject', 'slug', 'id']) : ''))
+    .filter(Boolean)
+    .slice(0, 5)
+    .map((label) => truncate(label, 44))
+}
+
+function outputItems(output: unknown): unknown[] {
+  if (Array.isArray(output)) return output
+  if (!isRecord(output)) return []
+  for (const key of ['results', 'items', 'content', 'tasks', 'events', 'notes', 'projects']) {
+    const value = output[key]
+    if (Array.isArray(value)) return value
+  }
+  return []
+}
+
+function collectionCount(value: unknown): number | null {
+  if (Array.isArray(value)) return value.length
+  if (!isRecord(value)) return null
+  for (const key of ['results', 'items', 'content', 'tasks', 'events', 'notes', 'projects']) {
+    const nested = value[key]
+    if (Array.isArray(nested)) return nested.length
+  }
+  return null
+}
+
+function firstString(record: Record<string, unknown>, keys: string[]): string {
+  for (const key of keys) {
+    const value = record[key]
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return ''
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function humanize(key: string): string {
+  return key
+    .replace(/Id$/, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replaceAll('_', ' ')
+    .toLowerCase()
+}
+
+function truncate(value: string, max = 100): string {
+  return value.length <= max ? value : `${value.slice(0, max - 1)}…`
 }
 
 /**

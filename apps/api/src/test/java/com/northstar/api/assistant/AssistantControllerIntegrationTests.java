@@ -8,7 +8,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
@@ -16,9 +19,11 @@ import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -48,6 +53,9 @@ class AssistantControllerIntegrationTests {
 
     @org.springframework.beans.factory.annotation.Autowired
     ConversationTitleService titleService;
+
+    @Autowired
+    JdbcClient jdbc;
 
     @LocalServerPort
     int port;
@@ -102,6 +110,56 @@ class AssistantControllerIntegrationTests {
                         URI.create("http://localhost:" + port + "/api/assistant/conversations"))
                 .GET().build(), HttpResponse.BodyHandlers.ofString());
         assertThat(after.body()).doesNotContain("test-convo");
+    }
+
+    @Test
+    void historyRehydratesPersistedToolParts() throws Exception {
+        Instant now = Instant.now();
+        jdbc.sql("""
+                INSERT INTO spring_ai_chat_memory (conversation_id, content, type, "timestamp", sequence_id)
+                VALUES (?, ?, ?, ?, ?)
+                """)
+                .params("trace-convo", "find my recent notes", "USER", Timestamp.from(now), 1L)
+                .update();
+        jdbc.sql("""
+                INSERT INTO spring_ai_chat_memory (conversation_id, content, type, "timestamp", sequence_id)
+                VALUES (?, ?, ?, ?, ?)
+                """)
+                .params("trace-convo", "I found these likely recent notes.", "ASSISTANT",
+                        Timestamp.from(now.plusMillis(500)), 2L)
+                .update();
+        jdbc.sql("""
+                INSERT INTO northstar_assistant_tool_trace (
+                    id, conversation_id, turn_id, sequence_index, tool_call_id, tool_name,
+                    state, input_json, output_json, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, CAST(? AS jsonb), CAST(? AS jsonb), ?, ?)
+                """)
+                .params(
+                        UUID.randomUUID(),
+                        "trace-convo",
+                        "turn-1",
+                        0,
+                        "toolcall-search-1",
+                        "search_knowledge",
+                        "output-available",
+                        "{\"query\":\"recent notes\"}",
+                        "{\"results\":[{\"title\":\"Daily journal\"}]}",
+                        Timestamp.from(now.plusMillis(100)),
+                        Timestamp.from(now.plusMillis(300)))
+                .update();
+
+        HttpResponse<String> history = http.send(HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/assistant/history?conversationId=trace-convo"))
+                .GET().build(), HttpResponse.BodyHandlers.ofString());
+
+        assertThat(history.body())
+                .contains("\"parts\"")
+                .contains("\"type\":\"tool-search_knowledge\"")
+                .contains("\"toolCallId\":\"toolcall-search-1\"")
+                .contains("\"state\":\"output-available\"")
+                .contains("\"query\":\"recent notes\"")
+                .contains("Daily journal");
     }
 
     @Test
