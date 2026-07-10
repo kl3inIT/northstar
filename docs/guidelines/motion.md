@@ -20,7 +20,8 @@ Use motion to preserve orientation and show state changes, not as decoration.
 - Leave dialogs, dropdowns, sheets, and toasts to their existing shadcn/Sonner
   CSS animation.
 - A completed assistant tool workflow stays expanded by default. Completion
-  must not collapse transcript height and move surrounding content.
+  must not collapse transcript height, remove the active history query, or
+  remount the transcript and move surrounding content.
 
 ## Verification
 

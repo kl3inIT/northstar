@@ -54,7 +54,9 @@ The reference is descriptive; it is not a maintained budget.
 
 The web transcript keeps a tool workflow expanded when it completes. The user
 may collapse it explicitly, but a state transition must not shrink the message
-and shift the conversation unexpectedly.
+and shift the conversation unexpectedly. Finishing a turn marks persisted
+history stale without refetching the active history query; the current
+transcript stays mounted, while returning later still reloads persisted state.
 
 Agents should follow the Northstar usage guideline for note authoring:
 Markdown is the note source format, existing notes are searched before creating

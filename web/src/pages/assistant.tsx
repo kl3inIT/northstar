@@ -444,7 +444,10 @@ function AssistantChat({
       queryClient.invalidateQueries({ queryKey: ['assistant-conversations'] })
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       queryClient.invalidateQueries({ queryKey: ['notes'] })
-      queryClient.removeQueries({ queryKey: ['assistant-history', conversationId] })
+      queryClient.invalidateQueries({
+        queryKey: ['assistant-history', conversationId],
+        refetchType: 'none',
+      })
     },
     transport: new DefaultChatTransport({
       api: '/api/assistant/chat',
@@ -616,10 +619,11 @@ function messageHasVisibleOutput(message: UIMessage): boolean {
 }
 
 function ToolWorkflow({ tools }: { tools: ToolUIPart[] }) {
+  const [open, setOpen] = useState(true)
   const complete = tools.filter((tool) => tool.state === 'output-available').length
 
   return (
-    <ChainOfThought defaultOpen className="mb-3">
+    <ChainOfThought open={open} onOpenChange={setOpen} className="mb-3">
       <ChainOfThoughtHeader>
         Workflow · {complete}/{tools.length} complete
       </ChainOfThoughtHeader>
