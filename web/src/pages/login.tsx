@@ -19,7 +19,7 @@ export function LoginPage() {
   }, [navigate, session.data?.authenticated])
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4">
+    <main className="flex min-h-screen w-full items-center justify-center bg-background px-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Northstar</CardTitle>
@@ -60,7 +60,11 @@ export function LoginPage() {
               />
             </div>
             {login.error && <p className="text-sm text-destructive">{login.error.message}</p>}
-            <Button type="submit" disabled={login.isPending || !username.trim() || !password}>
+            <Button
+              type="submit"
+              className="disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
+              disabled={login.isPending || !username.trim() || !password}
+            >
               {login.isPending ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
               Sign in
             </Button>
