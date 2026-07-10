@@ -53,7 +53,10 @@ class AuthController {
 
     @GetMapping("/csrf")
     @Operation(operationId = "getCsrfToken")
-    CsrfTokenResponse csrf(@Parameter(hidden = true) CsrfToken csrfToken) {
+    CsrfTokenResponse csrf(@Parameter(hidden = true) @Nullable CsrfToken csrfToken) {
+        if (csrfToken == null) {
+            return new CsrfTokenResponse("", "", "");
+        }
         return new CsrfTokenResponse(csrfToken.getHeaderName(), csrfToken.getParameterName(), csrfToken.getToken());
     }
 
