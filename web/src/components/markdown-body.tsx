@@ -16,12 +16,22 @@ const WIKI = /\[\[\s*([^\]|]+?)\s*(?:\|\s*([^\]]*?)\s*)?\]\]/g
 // while relative paths pass through untouched.
 const WIKI_PATH = '/wiki/'
 
+// Obsidian-style relative links to .md files ([label](note_name.md)) reference
+// notes by file name; rehype-harden cannot parse a bare relative URL and would
+// render them as "[blocked]". Route them through /wiki/ too, title = basename.
+const MD_NOTE_LINK = /\]\((?![a-z][a-z0-9+.-]*:|\/|#)([^)\s]+?)\.md\)/gi
+
 /** Rewrite [[Title]] / [[Title|alias]] into markdown links on the /wiki/ path. */
 function linkifyWiki(markdown: string): string {
-  return markdown.replace(WIKI, (_match, title: string, alias?: string) => {
-    const label = (alias && alias.trim()) || title.trim()
-    return `[${label}](${WIKI_PATH}${encodeURIComponent(title.trim())})`
-  })
+  return markdown
+    .replace(WIKI, (_match, title: string, alias?: string) => {
+      const label = (alias && alias.trim()) || title.trim()
+      return `[${label}](${WIKI_PATH}${encodeURIComponent(title.trim())})`
+    })
+    .replace(MD_NOTE_LINK, (_match, target: string) => {
+      const basename = decodeURIComponent(target).split('/').pop() ?? target
+      return `](${WIKI_PATH}${encodeURIComponent(basename)})`
+    })
 }
 
 function normalizeHeading(text: string): string {
