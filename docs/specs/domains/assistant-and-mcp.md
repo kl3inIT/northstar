@@ -17,8 +17,12 @@ looking frozen.
 
 Current MCP tool areas:
 
-- Knowledge: `search_knowledge`, `get_note`, `create_note`, `append_to_note`,
-  `update_note`.
+- Knowledge: `search_knowledge`, `get_note`, `list_folders`, `create_note`,
+  `append_to_note`, `update_note`. `list_folders` returns every existing folder
+  path with its note count so callers place notes into real folders; the tool
+  contract tells agents to check it before choosing a `folderPath` and to only
+  create new folders on explicit user request (the `Memory` folder is reserved
+  for assistant memory).
 - Tasks: `today_tasks`, `upcoming_tasks`, `find_tasks`, `create_task`,
   `update_task`, `set_task_done`, `delete_task`. Both `create_task` and
   `update_task` take an optional project to file the task under (create files it

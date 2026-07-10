@@ -41,6 +41,22 @@ public interface NoteRepository extends JpaRepository<Note, UUID> {
     Page<Note> findByAnyTag(@Param("tags") Collection<String> tags,
             @Param("excluded") NoteStatus excluded, Pageable pageable);
 
+    /** One folder path with its live note count. */
+    interface FolderCount {
+        String getFolderPath();
+        long getNoteCount();
+    }
+
+    /** Distinct folders of notes in one working state or another, path order. */
+    @Query("""
+            SELECT n.folderPath AS folderPath, COUNT(n) AS noteCount
+            FROM Note n
+            WHERE n.status <> :excluded
+            GROUP BY n.folderPath
+            ORDER BY n.folderPath
+            """)
+    List<FolderCount> countByFolder(@Param("excluded") NoteStatus excluded);
+
     /** A ranked full-text hit: note id plus a {@code <mark>}-highlighted body fragment. */
     interface SearchHit {
         UUID getId();

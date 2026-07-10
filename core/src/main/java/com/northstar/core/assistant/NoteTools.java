@@ -1,5 +1,6 @@
 package com.northstar.core.assistant;
 
+import com.northstar.core.note.FolderSummary;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteStatus;
@@ -35,6 +36,15 @@ class NoteTools implements NorthstarTool {
     private static final String GET_NOTE = """
             Read one note in full (Markdown body, tags, outgoing links and backlinks) \
             by its slug — slugs come from search_knowledge results.""";
+
+    private static final String LIST_FOLDERS = """
+            The user's knowledge-base folder tree: every existing folder path with its \
+            note count ('' = root). ALWAYS check this before choosing a folderPath for \
+            create_note or a folder move in update_note, unless the right folder was \
+            already confirmed in this conversation — file into an existing folder \
+            instead of inventing a new path, and only create a new folder when the \
+            user explicitly asks for one. The 'Memory' folder is the assistant's own \
+            memory store — never file user notes there.""";
 
     private static final String CREATE_NOTE = """
             Save new knowledge into the user's knowledge base as a Markdown note. Use when \
@@ -77,6 +87,14 @@ class NoteTools implements NorthstarTool {
         return search.search(query, SEARCH_LIMIT);
     }
 
+    @Tool(name = "list_folders", description = LIST_FOLDERS)
+    @McpTool(name = "list_folders", description = LIST_FOLDERS,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false,
+                    openWorldHint = false))
+    List<FolderSummary> listFolders() {
+        return notes.listFolders();
+    }
+
     @Tool(name = "get_note", description = GET_NOTE)
     @McpTool(name = "get_note", description = GET_NOTE,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false,
@@ -98,8 +116,8 @@ class NoteTools implements NorthstarTool {
                     required = true) String slug,
             @ToolParam(description = "New title; pass '' or omit to keep", required = false)
             @McpToolParam(description = "New title; pass '' or omit to keep", required = false) String title,
-            @ToolParam(description = "New folder path like 'English/IELTS'; pass '' or omit to keep, 'none' for root", required = false)
-            @McpToolParam(description = "New folder path like 'English/IELTS'; pass '' or omit to keep, 'none' for root",
+            @ToolParam(description = "New folder path like 'English/IELTS'; pass '' or omit to keep, 'none' for root. When moving, pick an EXISTING folder from list_folders.", required = false)
+            @McpToolParam(description = "New folder path like 'English/IELTS'; pass '' or omit to keep, 'none' for root. When moving, pick an EXISTING folder from list_folders.",
                     required = false) String folderPath,
             @ToolParam(description = "REPLACEMENT Markdown body (full text, not a diff); pass '' or omit to keep — to add to the end use append_to_note", required = false)
             @McpToolParam(description = "REPLACEMENT Markdown body (full text, not a diff); pass '' or omit to keep — to add to the end use append_to_note",
@@ -174,8 +192,8 @@ class NoteTools implements NorthstarTool {
     NoteDetail createNote(
             @ToolParam(description = "Short, specific title")
             @McpToolParam(description = "Short, specific title", required = true) String title,
-            @ToolParam(description = "Folder path like 'English/IELTS'; empty or omitted = root", required = false)
-            @McpToolParam(description = "Folder path like 'English/IELTS'; empty or omitted = root",
+            @ToolParam(description = "Folder path like 'English/IELTS'; empty or omitted = root. Pick an EXISTING folder from list_folders — do not invent new paths.", required = false)
+            @McpToolParam(description = "Folder path like 'English/IELTS'; empty or omitted = root. Pick an EXISTING folder from list_folders — do not invent new paths.",
                     required = false) String folderPath,
             @ToolParam(description = "Note body in Markdown")
             @McpToolParam(description = "Note body in Markdown", required = true) String contentMarkdown,

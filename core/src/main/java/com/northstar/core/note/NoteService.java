@@ -164,6 +164,18 @@ public class NoteService {
     }
 
     /**
+     * Every existing folder with its note count, path order, archived notes
+     * excluded — the knowledge base's folder tree for callers that cannot see
+     * the UI (the assistant picking where a new note belongs).
+     */
+    @Transactional(readOnly = true)
+    public List<FolderSummary> listFolders() {
+        return notes.countByFolder(NoteStatus.ARCHIVED).stream()
+                .map(f -> new FolderSummary(f.getFolderPath(), f.getNoteCount()))
+                .toList();
+    }
+
+    /**
      * Every note in one exact folder, title order, unpaged — for small curated
      * folders the caller owns end-to-end (the assistant's Memory folder), not
      * for browsing arbitrary user folders.
