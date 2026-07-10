@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { CommandMenu } from '@/components/command-menu'
+import { PageTransition } from '@/components/motion'
 import { ModeToggle } from '@/components/mode-toggle'
 import { Button } from '@/components/ui/button'
 import { useAuthSession, useLogout } from '@/lib/auth-api'
@@ -40,7 +41,7 @@ import { useStagingCount } from '@/lib/notes-api'
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines' | '/projects'
+  to?: '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines' | '/projects' | '/finance'
   exact?: boolean
 }
 
@@ -51,9 +52,9 @@ const NAV: NavItem[] = [
   { label: 'Notes', icon: FileText, to: '/notes' },
   { label: 'Projects', icon: FolderKanban, to: '/projects' },
   { label: 'Disciplines', icon: Compass, to: '/disciplines' },
+  { label: 'Finance', icon: Wallet, to: '/finance' },
   { label: 'Study', icon: BookOpen },
   { label: 'Scholarships', icon: Trophy },
-  { label: 'Finance', icon: Wallet },
   { label: 'Habits', icon: Target },
 ]
 
@@ -103,7 +104,9 @@ export function AppShell() {
     return (
       <>
         <Toaster position="bottom-right" richColors />
-        <Outlet />
+        <PageTransition key={pathname} className="flex min-h-screen min-w-0 flex-1">
+          <Outlet />
+        </PageTransition>
       </>
     )
   }
@@ -206,7 +209,9 @@ export function AppShell() {
           <span className="text-sm font-semibold">Northstar</span>
         </header>
         <div className="flex min-h-0 min-w-0 flex-1">
-          <Outlet />
+          <PageTransition key={pathname} className="flex min-h-0 min-w-0 flex-1">
+            <Outlet />
+          </PageTransition>
         </div>
       </SidebarInset>
     </SidebarProvider>

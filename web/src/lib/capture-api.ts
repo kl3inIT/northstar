@@ -1,20 +1,24 @@
 import {
   deleteNote as deleteNoteRequest,
+  deleteTransaction,
   draftCapture,
+  draftReceiptCapture,
+  recordTransactions,
 } from './hey-api'
 import { dataOrThrow, voidOrThrow } from './hey-api-result'
-import type { CaptureDraft, CaptureRequest } from './hey-api'
+import type { CaptureDraft, CaptureRequest, ExpenseItem, TransactionSummary } from './hey-api'
 import { createEvent, deleteEvent } from './calendar-api'
 import { listDisciplines } from './disciplines-api'
 import { createNote } from './notes-api'
 import { createTask, deleteTask } from './tasks-api'
 
-export type CaptureKind = 'TASK' | 'NOTE' | 'EVENT'
+export type CaptureKind = 'TASK' | 'NOTE' | 'EVENT' | 'EXPENSE'
 
 export type CaptureResult =
   | { kind: 'TASK'; id: string; title: string; dueDate: string | null; undo: () => Promise<void> }
   | { kind: 'NOTE'; id: string; title: string; slug: string; folderPath: string; undo: () => Promise<void> }
   | { kind: 'EVENT'; id: string; title: string; startAt: string; undo: () => Promise<void> }
+  | { kind: 'EXPENSE'; id: string; title: string; items: TransactionSummary[]; undo: () => Promise<void> }
 
 /** "2026-07-07" + "14:00" in the browser's zone (what the user meant when speaking). */
 function local(date: string, time: string): Date {
@@ -32,6 +36,56 @@ export async function deleteNote(id: string): Promise<void> {
   voidOrThrow(await deleteNoteRequest({ path: { id } }))
 }
 
+export async function deleteLedgerEntry(id: string): Promise<void> {
+  voidOrThrow(await deleteTransaction({ path: { id } }))
+}
+
+const VND = new Intl.NumberFormat('vi-VN')
+
+/**
+ * Save the draft's expense items as ledger rows and shape the echo the toast
+ * shows — the echo (amount · category per item) is the moment the user ratifies
+ * what the AI parsed, so it always names every amount and category.
+ */
+async function saveExpense(items: ExpenseItem[]): Promise<CaptureResult> {
+  const today = new Date()
+  const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const created = dataOrThrow(await recordTransactions({
+    body: {
+      items: items.map((i) => ({
+        type: i.type ?? 'EXPENSE',
+        amount: i.amount ?? 0,
+        occurredOn: i.occurredOn || isoToday,
+        description: i.description || 'expense',
+        category: i.category || undefined,
+        exceptional: i.exceptional ?? false,
+      })),
+    },
+  })) as TransactionSummary[]
+  const title = created
+    .map((t) => `${t.description} · ${VND.format(t.amount)} ₫ · ${t.category}`)
+    .join('  |  ')
+  return {
+    kind: 'EXPENSE',
+    id: created[0]?.id ?? '',
+    title,
+    items: created,
+    undo: async () => {
+      await Promise.all(created.map((t) => deleteLedgerEntry(t.id)))
+    },
+  }
+}
+
+/** Receipt photo capture: image → expense draft → saved ledger rows, same echo/undo. */
+export async function captureReceipt(image: File): Promise<CaptureResult> {
+  const draft = dataOrThrow(await draftReceiptCapture({ body: { image } })) as CaptureDraft
+  const items = draft.expense?.items ?? []
+  if (items.length === 0) {
+    throw new Error('No expense items found on the receipt')
+  }
+  return saveExpense(items)
+}
+
 /**
  * Fire-and-forget capture: classify with one LLM call, then create the task or
  * note immediately. The caller shows a toast with the returned {@code undo}
@@ -42,6 +96,10 @@ export async function capture(text: string, kind?: CaptureKind): Promise<Capture
   const draft = dataOrThrow(await draftCapture({
     body: { text, kind } satisfies CaptureRequest,
   })) as CaptureDraft
+
+  if (draft.kind === 'EXPENSE' && draft.expense?.items?.length) {
+    return saveExpense(draft.expense.items)
+  }
 
   if (draft.kind === 'TASK' && draft.task) {
     const t = draft.task

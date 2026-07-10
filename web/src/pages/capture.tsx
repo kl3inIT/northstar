@@ -2,6 +2,7 @@ import { Link, useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   CalendarDays,
+  Camera,
   CheckSquare,
   ExternalLink,
   FileText,
@@ -9,6 +10,7 @@ import {
   Sparkles,
   Tag,
   Trash2,
+  Wallet,
 } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -25,8 +27,10 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { deleteEvent, useRangeEvents } from '@/lib/calendar-api'
-import { capture, deleteNote, type CaptureKind } from '@/lib/capture-api'
+import { capture, captureReceipt, deleteLedgerEntry, deleteNote, type CaptureKind } from '@/lib/capture-api'
 import { MicButton } from '@/components/mic-button'
+import { m } from '@/components/motion-primitives'
+import { useTransactions } from '@/lib/finance-api'
 import { useNotes } from '@/lib/notes-api'
 import { deleteTask, useTodayTasks, useUpcomingTasks, type Task } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
@@ -47,12 +51,33 @@ export function CapturePage() {
   const [kind, setKind] = useState<CaptureKind | null>(null)
   const [pending, setPending] = useState<PendingCapture[]>([])
   const nextKey = useRef(1)
+  const receiptInput = useRef<HTMLInputElement>(null)
   const queryClient = useQueryClient()
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['tasks'] })
     queryClient.invalidateQueries({ queryKey: ['notes'] })
     queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+    queryClient.invalidateQueries({ queryKey: ['finance'] })
+    queryClient.invalidateQueries({ queryKey: ['finance-summary'] })
+  }
+
+  function report(result: Awaited<ReturnType<typeof capture>>) {
+    invalidate()
+    const label = result.kind === 'TASK' ? 'Task'
+      : result.kind === 'EVENT' ? 'Event'
+      : result.kind === 'EXPENSE' ? 'Expense'
+      : 'Note'
+    toast.success(
+      `${label}: ${result.title}`,
+      {
+        action: {
+          label: 'Undo',
+          onClick: () =>
+            result.undo().then(invalidate).catch(() => toast.error('Undo failed.')),
+        },
+      },
+    )
   }
 
   function fire(raw: string, forced: CaptureKind | null) {
@@ -61,23 +86,28 @@ export function CapturePage() {
     capture(raw, forced ?? undefined)
       .then((result) => {
         setPending((p) => p.filter((x) => x.key !== key))
-        invalidate()
-        const label = result.kind === 'TASK' ? 'Task' : result.kind === 'EVENT' ? 'Event' : 'Note'
-        toast.success(
-          `${label}: ${result.title}`,
-          {
-            action: {
-              label: 'Undo',
-              onClick: () =>
-                result.undo().then(invalidate).catch(() => toast.error('Undo failed.')),
-            },
-          },
-        )
+        report(result)
       })
       .catch(() => {
         setPending((p) => p.filter((x) => x.key !== key))
         toast.error('Capture failed — try again.', {
           action: { label: 'Retry', onClick: () => fire(raw, forced) },
+        })
+      })
+  }
+
+  function fireReceipt(image: File) {
+    const key = nextKey.current++
+    setPending((p) => [{ key, text: `Reading receipt ${image.name}…` }, ...p])
+    captureReceipt(image)
+      .then((result) => {
+        setPending((p) => p.filter((x) => x.key !== key))
+        report(result)
+      })
+      .catch((e: Error) => {
+        setPending((p) => p.filter((x) => x.key !== key))
+        toast.error(e.message || 'Receipt capture failed — try again.', {
+          action: { label: 'Retry', onClick: () => fireReceipt(image) },
         })
       })
   }
@@ -96,7 +126,7 @@ export function CapturePage() {
         <Sparkles className="size-5 text-primary" />
       </div>
       <p className="mt-1 text-sm text-muted-foreground">
-        Capture ideas instantly — AI files them as tasks or notes.
+        Capture anything instantly — AI files it in the right place.
       </p>
 
       <PromptInput onSubmit={onSubmit} className="mt-5">
@@ -105,7 +135,7 @@ export function CapturePage() {
             data-capture-input
             value={text}
             onChange={(e) => setText(e.currentTarget.value)}
-            placeholder="Type or paste… a task or a note, Enter to capture"
+            placeholder="Type or paste… a task, note, event, or expense"
             autoFocus
           />
         </PromptInputBody>
@@ -129,6 +159,26 @@ export function CapturePage() {
             >
               <FileText className="size-4" /> Add note
             </PromptInputButton>
+            <PromptInputButton
+              variant={kind === 'EXPENSE' ? 'default' : 'ghost'}
+              onClick={() => setKind((k) => (k === 'EXPENSE' ? null : 'EXPENSE'))}
+            >
+              <Wallet className="size-4" /> Add expense
+            </PromptInputButton>
+            <PromptInputButton onClick={() => receiptInput.current?.click()}>
+              <Camera className="size-4" /> Receipt
+            </PromptInputButton>
+            <input
+              ref={receiptInput}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.currentTarget.files?.[0]
+                e.currentTarget.value = ''
+                if (file) fireReceipt(file)
+              }}
+            />
             <MicButton value={text} onChange={setText} />
           </PromptInputTools>
           <div className="flex items-center gap-3">
@@ -158,7 +208,17 @@ type Row = {
   folderPath?: string
   startDate?: string
   allDay?: boolean
+  amount?: number
+  txType?: 'EXPENSE' | 'INCOME'
+  category?: string
   createdAt: string
+}
+
+const VND_FMT = new Intl.NumberFormat('vi-VN')
+
+function currentMonthKey(): string {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
 function formatDue(dueDate: string, dueTime: string | null | undefined): string {
@@ -188,6 +248,7 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
   const { data: upcoming = [] } = useUpcomingTasks(30)
   const range = eventWindow()
   const { data: events = [] } = useRangeEvents(range.from, range.to)
+  const { data: transactions = [] } = useTransactions(currentMonthKey())
   const [showAll, setShowAll] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -228,7 +289,17 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
       createdAt: e.createdAt,
     })
   }
-  const all = [...taskRows, ...noteRows, ...eventRows].sort((a, b) =>
+  const expenseRows: Row[] = transactions.map((t) => ({
+    kind: 'EXPENSE',
+    key: `x-${t.id}`,
+    id: t.id,
+    title: t.description,
+    amount: t.amount,
+    txType: t.type,
+    category: t.category,
+    createdAt: t.createdAt,
+  }))
+  const all = [...taskRows, ...noteRows, ...eventRows, ...expenseRows].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt),
   )
   const rows = showAll ? all : all.slice(0, 8)
@@ -238,6 +309,8 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
       navigate({ to: '/notes/$slug', params: { slug: row.slug } })
     } else if (row.kind === 'EVENT') {
       navigate({ to: '/calendar' })
+    } else if (row.kind === 'EXPENSE') {
+      navigate({ to: '/finance' })
     } else {
       navigate({ to: '/tasks' })
     }
@@ -247,12 +320,15 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
     const del =
       row.kind === 'TASK' ? deleteTask(row.id)
       : row.kind === 'EVENT' ? deleteEvent(row.id)
+      : row.kind === 'EXPENSE' ? deleteLedgerEntry(row.id)
       : deleteNote(row.id)
     del
       .then(() => {
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
         queryClient.invalidateQueries({ queryKey: ['notes'] })
         queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
+        queryClient.invalidateQueries({ queryKey: ['finance'] })
+        queryClient.invalidateQueries({ queryKey: ['finance-summary'] })
         toast.success(`Deleted “${row.title}”`)
       })
       .catch(() => toast.error('Delete failed — try again.'))
@@ -271,20 +347,20 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
       </div>
       <div className="divide-y">
         {pending.map((p) => (
-          <div key={p.key} className="flex items-center gap-3 py-3">
+          <m.div key={p.key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3 py-3">
             <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" />
             <span className="truncate text-sm italic text-muted-foreground">
               Classifying… “{p.text}”
             </span>
-          </div>
+          </m.div>
         ))}
-        {rows.map((r) => (
-          <div key={r.key} className="flex items-center gap-3 py-2">
+        {rows.map((r, index) => (
+          <m.div key={r.key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index, 8) * 0.035 }} className="flex items-center gap-3 py-2">
             <Badge
-              variant={r.kind === 'TASK' ? 'default' : r.kind === 'EVENT' ? 'outline' : 'secondary'}
+              variant={r.kind === 'TASK' ? 'default' : r.kind === 'EVENT' || r.kind === 'EXPENSE' ? 'outline' : 'secondary'}
               className="shrink-0"
             >
-              {r.kind === 'TASK' ? 'Task' : r.kind === 'EVENT' ? 'Event' : 'Note'}
+              {r.kind === 'TASK' ? 'Task' : r.kind === 'EVENT' ? 'Event' : r.kind === 'EXPENSE' ? 'Expense' : 'Note'}
             </Badge>
             {r.kind === 'NOTE' && r.slug ? (
               <Link
@@ -313,6 +389,13 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
                   <CalendarDays className="size-3 shrink-0" />
                   <span>{r.startDate ? formatEventStart(r.startDate, r.allDay) : ''}</span>
                 </>
+              ) : r.kind === 'EXPENSE' ? (
+                <>
+                  <Wallet className="size-3 shrink-0" />
+                  <span className="tabular-nums">
+                    {r.txType === 'INCOME' ? '+' : ''}{VND_FMT.format(r.amount ?? 0)} ₫ · {r.category}
+                  </span>
+                </>
               ) : (
                 <>
                   <Tag className="size-3 shrink-0" />
@@ -335,7 +418,7 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
                 <Trash2 className="size-3.5" />
               </Button>
             </span>
-          </div>
+          </m.div>
         ))}
       </div>
     </section>

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { toast } from 'sonner'
 import { Checkbox } from '@/components/ui/checkbox'
+import { m } from '@/components/motion-primitives'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   KanbanBoard,
@@ -150,24 +151,24 @@ function GroupedViews({
   const visible = groups.filter((g) => g.tasks.length > 0)
 
   if (visible.length === 0) {
-    return <p className="mt-8 text-sm text-muted-foreground">No tasks yet — Capture or quick-add on Today.</p>
+    return <m.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-8 text-sm text-muted-foreground">No tasks yet — Capture or quick-add on Today.</m.p>
   }
 
   if (board) {
-    return <TaskKanban groups={groups} today={today} disciplines={disciplines} />
+    return <m.div key="task-board" initial={{ opacity: 0 }} animate={{ opacity: 1 }}><TaskKanban groups={groups} today={today} disciplines={disciplines} /></m.div>
   }
 
   return (
     <div className="mx-auto mt-6 max-w-3xl space-y-6">
-      {visible.map((g) => (
-        <section key={g.bucket.id}>
+      {visible.map((g, index) => (
+        <m.section key={g.bucket.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index, 5) * 0.045 }}>
           <GroupLabel label={g.bucket.name} count={g.tasks.length} tone={g.bucket.tone} />
           <div className="divide-y">
             {g.tasks.map((t) => (
               <TaskLine key={t.id} task={t} overdue={g.bucket.id === 'overdue'} disciplines={disciplines} />
             ))}
           </div>
-        </section>
+        </m.section>
       ))}
     </div>
   )

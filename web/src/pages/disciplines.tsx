@@ -12,6 +12,7 @@ import {
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { m } from '@/components/motion-primitives'
 import {
   Dialog,
   DialogContent,
@@ -76,10 +77,11 @@ export function DisciplinesPage() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => (
+        {cards.map((card, index) => (
           <DisciplineCardItem
             key={card.discipline.id}
             card={card}
+            index={index}
             onOpen={() => navigate({ to: '/disciplines/$id', params: { id: card.discipline.id } })}
             onDelete={() => setDeleting(card)}
           />
@@ -104,16 +106,18 @@ export function DisciplinesPage() {
 
 function DisciplineCardItem({
   card,
+  index,
   onOpen,
   onDelete,
 }: {
   card: DisciplineCard
+  index: number
   onOpen: () => void
   onDelete: () => void
 }) {
   const blocked = linkedWorkCount(card) > 0
   return (
-    <div className="rounded-xl border p-5 transition-colors hover:bg-accent/50">
+    <m.article initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index, 8) * 0.05 }} className="rounded-lg border p-5 transition-colors hover:bg-accent/50">
       <div className="flex items-start gap-3">
         <button type="button" onClick={onOpen} className="min-w-0 flex-1 text-left">
           <div className="flex items-center gap-2.5">
@@ -148,7 +152,7 @@ function DisciplineCardItem({
           <Trash2 className="size-4" />
         </Button>
       </div>
-    </div>
+    </m.article>
   )
 }
 
