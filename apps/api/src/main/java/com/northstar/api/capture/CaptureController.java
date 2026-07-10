@@ -6,6 +6,7 @@ import com.northstar.core.capture.VoiceTranscriber;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import java.io.IOException;
+import java.util.Locale;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -36,6 +37,23 @@ class CaptureController {
     @Operation(operationId = "draftCapture")
     CaptureDraft draft(@Valid @RequestBody CaptureRequest request) {
         return capture.draft(request.text().strip(), request.kind());
+    }
+
+    /** Receipt capture: photo in, expense draft out — the image is never stored. */
+    @PostMapping(value = "/receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(operationId = "draftReceiptCapture")
+    CaptureDraft receipt(@RequestPart("image") MultipartFile image) {
+        String mimeType = image.getContentType();
+        if (mimeType == null || !mimeType.toLowerCase(Locale.ROOT).startsWith("image/")) {
+            throw new IllegalArgumentException("Upload must be an image, got '" + mimeType + "'");
+        }
+        byte[] bytes;
+        try {
+            bytes = image.getBytes();
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Could not read the uploaded image", e);
+        }
+        return capture.draftFromImage(bytes, mimeType);
     }
 
     /** Voice capture: audio in, text out — the recording is never stored. */

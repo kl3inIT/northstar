@@ -3,6 +3,7 @@ package com.northstar.api.capture;
 import com.northstar.core.capture.CaptureService;
 import com.northstar.core.capture.VoiceTranscriber;
 import com.northstar.core.discipline.DisciplineService;
+import com.northstar.core.finance.FinanceService;
 import com.northstar.core.note.NoteService;
 import java.time.ZoneId;
 import org.springframework.ai.audio.transcription.TranscriptionModel;
@@ -20,8 +21,8 @@ class CaptureConfig {
 
     @Bean
     CaptureService captureService(ChatClient chatClient, NoteService notes,
-            DisciplineService disciplines) {
-        return new CaptureService(chatClient, notes, disciplines, ZoneId.systemDefault());
+            DisciplineService disciplines, FinanceService finance) {
+        return new CaptureService(chatClient, notes, disciplines, finance, ZoneId.systemDefault());
     }
 
     @Bean

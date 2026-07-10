@@ -8,6 +8,11 @@ import static org.mockito.Mockito.when;
 import com.northstar.core.capture.CaptureDraft;
 import com.northstar.core.capture.CaptureService;
 import com.northstar.core.capture.VoiceTranscriber;
+import com.northstar.core.finance.FinanceService;
+import com.northstar.core.finance.NewTransaction;
+import com.northstar.core.finance.TransactionSource;
+import com.northstar.core.finance.TransactionType;
+import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -51,6 +56,9 @@ class CaptureServiceIntegrationTests {
 
     @Autowired
     CaptureService capture;
+
+    @Autowired
+    FinanceService finance;
 
     @Autowired
     VoiceTranscriber transcriber;
@@ -167,5 +175,77 @@ class CaptureServiceIntegrationTests {
         assertThat(draft.task().title()).isEqualTo("Làm docs MLN121");
         assertThat(draft.task().dueDate()).isEqualTo("2026-07-03");
         assertThat(draft.task().dueTime()).isEqualTo("14:00");
+    }
+
+    @Test
+    void expenseCaptureKeepsEveryAmountAndCarriesTheConstrainedVocabulary() {
+        modelReturns("""
+                {"reasoning":"Ba khoan chi da xay ra.","kind":"EXPENSE",
+                 "expense":{"items":[
+                   {"type":"EXPENSE","amount":30000,"description":"an sang",
+                    "category":"An uong","occurredOn":"","exceptional":false},
+                   {"type":"EXPENSE","amount":45000,"description":"cafe",
+                    "category":"Cafe","occurredOn":"","exceptional":false},
+                   {"type":"EXPENSE","amount":62000,"description":"grab ve",
+                    "category":"Di lai","occurredOn":"","exceptional":false}]}}
+                """);
+
+        CaptureDraft draft = capture.draft("nay tieu: sang 30k, cafe 45k, grab ve 62k");
+
+        assertThat(draft.kind()).isEqualTo(CaptureDraft.Kind.EXPENSE);
+        assertThat(draft.expense().items()).hasSize(3);
+        assertThat(draft.expense().items()).extracting(item -> item.amount())
+                .containsExactly(30_000L, 45_000L, 62_000L);
+        ArgumentCaptor<Prompt> prompt = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(prompt.capture());
+        assertThat(prompt.getValue().getSystemMessage().getText())
+                .contains("EVERY amount")
+                .contains("35k=35000")
+                .contains("NEVER treat SD/số dư")
+                .contains("TPBank: TK x1234")
+                .contains("Expense categories (pick from these)")
+                .contains("- Cafe");
+    }
+
+    @Test
+    void categoryCorrectionBecomesAUserSpecificCaptureExample() {
+        LocalDate day = LocalDate.of(2042, 2, 2);
+        var transaction = finance.record(new NewTransaction(TransactionType.EXPENSE, 55_000,
+                day, "Highlands làm việc", "Ăn uống", false), TransactionSource.CAPTURE);
+        finance.update(transaction.id(), transaction.amount(), day, transaction.description(),
+                "Cafe", false);
+        modelReturns("""
+                {"kind":"EXPENSE","expense":{"items":[
+                  {"type":"EXPENSE","amount":65000,"description":"Highlands họp team",
+                   "category":"Cafe","occurredOn":"","exceptional":false}]}}
+                """);
+
+        capture.draft("highlands họp team 65k");
+
+        ArgumentCaptor<Prompt> prompt = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(prompt.capture());
+        assertThat(prompt.getValue().getSystemMessage().getText())
+                .contains("Recent category corrections made by this user")
+                .contains("EXPENSE \"Highlands làm việc\" -> \"Cafe\"");
+    }
+
+    @Test
+    void receiptCaptureUsesTheMultimodalExpensePath() {
+        modelReturns("""
+                {"kind":"EXPENSE","expense":{"items":[
+                  {"type":"EXPENSE","amount":85000,"description":"receipt total",
+                   "category":"Khac","occurredOn":"2026-07-10","exceptional":false}]}}
+                """);
+
+        CaptureDraft draft = capture.draftFromImage(new byte[] {1, 2, 3}, "image/png");
+
+        assertThat(draft.kind()).isEqualTo(CaptureDraft.Kind.EXPENSE);
+        assertThat(draft.expense().items()).singleElement()
+                .satisfies(item -> assertThat(item.amount()).isEqualTo(85_000));
+        ArgumentCaptor<Prompt> prompt = ArgumentCaptor.forClass(Prompt.class);
+        verify(chatModel).call(prompt.capture());
+        assertThat(prompt.getValue().getSystemMessage().getText())
+                .contains("already chose the kind: EXPENSE")
+                .contains("photo of a receipt/bill");
     }
 }
