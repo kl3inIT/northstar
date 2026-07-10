@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   History as HistoryIcon,
   Loader2,
+  Globe2,
   MessageSquarePlus,
   NotebookText,
   PanelRightClose,
@@ -666,6 +667,8 @@ function toolName(tool: ToolUIPart): string {
 }
 
 function toolLabel(name: string): string {
+  if (name === 'search_web') return 'Search the web'
+  if (name === 'read_web_page') return 'Read web page'
   const normalized = name.replaceAll('_', ' ')
   if (name.includes('search') || name.includes('find')) return `Search ${targetLabel(name)}`
   if (name.startsWith('create')) return `Create ${targetLabel(name)}`
@@ -677,6 +680,7 @@ function toolLabel(name: string): string {
 }
 
 function targetLabel(name: string): string {
+  if (name.includes('web')) return 'the web'
   if (name.includes('task')) return 'tasks'
   if (name.includes('note') || name.includes('knowledge')) return 'notes'
   if (name.includes('event') || name.includes('calendar') || name.includes('slot')) return 'calendar'
@@ -689,6 +693,7 @@ function targetLabel(name: string): string {
 function toolIcon(name: string, tool: ToolUIPart): LucideIcon {
   if (tool.state === 'output-error' || tool.errorText) return XCircle
   if (tool.state === 'output-available') return CheckCircle2
+  if (name === 'search_web' || name === 'read_web_page') return Globe2
   if (name.includes('search') || name.includes('find')) return Search
   if (name.includes('event') || name.includes('calendar') || name.includes('slot')) return CalendarDays
   if (name.includes('note') || name.includes('knowledge') || name.includes('review')) return NotebookText
@@ -773,7 +778,7 @@ function outputPreviewLabels(output: unknown): string[] {
 function outputItems(output: unknown): unknown[] {
   if (Array.isArray(output)) return output
   if (!isRecord(output)) return []
-  for (const key of ['results', 'items', 'content', 'tasks', 'events', 'notes', 'projects']) {
+  for (const key of ['sources', 'results', 'items', 'content', 'tasks', 'events', 'notes', 'projects']) {
     const value = output[key]
     if (Array.isArray(value)) return value
   }
@@ -783,7 +788,7 @@ function outputItems(output: unknown): unknown[] {
 function collectionCount(value: unknown): number | null {
   if (Array.isArray(value)) return value.length
   if (!isRecord(value)) return null
-  for (const key of ['results', 'items', 'content', 'tasks', 'events', 'notes', 'projects']) {
+  for (const key of ['sources', 'results', 'items', 'content', 'tasks', 'events', 'notes', 'projects']) {
     const nested = value[key]
     if (Array.isArray(nested)) return nested.length
   }

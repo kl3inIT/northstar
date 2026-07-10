@@ -41,7 +41,7 @@ import { useStagingCount } from '@/lib/notes-api'
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines' | '/projects' | '/finance'
+  to?: '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines' | '/projects' | '/finance' | '/settings'
   exact?: boolean
 }
 
@@ -180,9 +180,11 @@ export function AppShell() {
               <ModeToggle />
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Settings" className="cursor-default opacity-60">
-                <Settings />
-                <span>Settings</span>
+              <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith('/settings')}>
+                <Link to="/settings">
+                  <Settings />
+                  <span>Settings</span>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
