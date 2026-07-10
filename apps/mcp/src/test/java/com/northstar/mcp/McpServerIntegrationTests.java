@@ -4,9 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.time.LocalDate;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -57,7 +57,11 @@ class McpServerIntegrationTests {
         String tools = post(session, "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}").body();
         assertThat(tools).contains("search_knowledge", "get_note", "create_note",
                 "today_tasks", "upcoming_tasks", "create_task", "set_task_done",
-                "upcoming_events", "create_event", "find_free_slots");
+                "upcoming_events", "create_event", "find_free_slots",
+                "list_budgets", "set_budget", "list_savings_goals",
+                "save_savings_goal", "contribute_savings_goal",
+                "list_subscriptions", "save_subscription", "mark_subscription_paid",
+                "delete_subscription");
         assertThat(tools).contains("\"status\"");
         // MCP behavior hints ride along so clients can gate confirmation UX.
         assertThat(tools).contains("\"readOnlyHint\":true", "\"destructiveHint\":false");
@@ -82,6 +86,47 @@ class McpServerIntegrationTests {
                     "tags":["mcp","probe"],
                     "status":"RESOURCE"}}}""").body();
         assertThat(note).contains("MCP approved note probe", "\\\"status\\\":\\\"RESOURCE\\\"")
+                .doesNotContain("\"isError\":true");
+
+        String budget = post(session, """
+                {"jsonrpc":"2.0","id":6,"method":"tools/call","params":{
+                  "name":"set_budget","arguments":{
+                    "month":"2026-07","category":"Cafe","limitAmount":1000000}}} """).body();
+        assertThat(budget).contains("Cafe", "1000000").doesNotContain("\"isError\":true");
+
+        String budgets = post(session, """
+                {"jsonrpc":"2.0","id":7,"method":"tools/call","params":{
+                  "name":"list_budgets","arguments":{"month":"2026-07"}}} """).body();
+        assertThat(budgets).contains("Cafe", "1000000").doesNotContain("\"isError\":true");
+
+        String goal = post(session, """
+                {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{
+                  "name":"save_savings_goal","arguments":{
+                    "id":"","name":"Emergency fund","targetAmount":20000000,
+                    "savedAmount":5000000,"targetDate":"2027-07-01",
+                    "monthlyContribution":1000000,"version":0}}} """).body();
+        assertThat(goal).contains("Emergency fund", "5000000")
+                .doesNotContain("\"isError\":true");
+
+        String goals = post(session, """
+                {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{
+                  "name":"list_savings_goals","arguments":{}}} """).body();
+        assertThat(goals).contains("Emergency fund", "20000000")
+                .doesNotContain("\"isError\":true");
+
+        String subscription = post(session, """
+                {"jsonrpc":"2.0","id":10,"method":"tools/call","params":{
+                  "name":"save_subscription","arguments":{
+                    "id":"","version":0,"name":"MCP cloud subscription",
+                    "amount":299000,"category":"Hoa don","cycle":"MONTHLY",
+                    "nextDueOn":"2026-07-31","active":true}}} """).body();
+        assertThat(subscription).contains("MCP cloud subscription", "299000", "\\\"version\\\":0")
+                .doesNotContain("\"isError\":true");
+
+        String subscriptions = post(session, """
+                {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{
+                  "name":"list_subscriptions","arguments":{}}} """).body();
+        assertThat(subscriptions).contains("MCP cloud subscription", "2026-07-31", "\\\"version\\\":0")
                 .doesNotContain("\"isError\":true");
     }
 

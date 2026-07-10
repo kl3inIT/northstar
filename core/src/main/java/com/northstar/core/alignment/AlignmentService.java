@@ -2,6 +2,10 @@ package com.northstar.core.alignment;
 
 import com.northstar.core.calendar.CalendarEventService;
 import com.northstar.core.calendar.CalendarEventSummary;
+import com.northstar.core.finance.FinanceService;
+import com.northstar.core.finance.SubscriptionSummary;
+import com.northstar.core.finance.TransactionSummary;
+import com.northstar.core.finance.TransactionType;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteStatus;
@@ -9,6 +13,7 @@ import com.northstar.core.note.NoteSummary;
 import com.northstar.core.task.TaskService;
 import com.northstar.core.task.TaskStatus;
 import com.northstar.core.task.TaskSummary;
+import java.text.NumberFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -16,8 +21,12 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.WeekFields;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,7 +103,11 @@ public class AlignmentService {
               whatever language they are in), direct and honest, no flattery, no filler.
               What the week delivered and what slipped; call out a pattern if you see
               one (the same task sliding repeatedly, work piling up at the weekend); if
-              notes are waiting for review (Staging), one sentence about it. If the
+              notes are waiting for review (Staging), one sentence about it. If a
+              "Money this week" section is present, ONE sentence comparing spending to
+              the typical week and naming the one-off purchases — descriptive and
+              factual, never scolding, never advice about spending less; if it lists
+              subscriptions due soon, name them and their dates in that sentence. If the
               numbers are nearly empty, exactly 2 short sentences — do not pad. No
               headings, do not restate the numbers table, never invent work that is
               not in the numbers.
@@ -105,13 +118,15 @@ public class AlignmentService {
     private final TaskService tasks;
     private final CalendarEventService events;
     private final NoteService notes;
+    private final FinanceService finance;
 
     public AlignmentService(ChatClient chat, TaskService tasks, CalendarEventService events,
-            NoteService notes) {
+            NoteService notes, FinanceService finance) {
         this.chat = chat;
         this.tasks = tasks;
         this.events = events;
         this.notes = notes;
+        this.finance = finance;
     }
 
     /** Today's review note if it was already generated (zone-local day). */
@@ -253,7 +268,85 @@ public class AlignmentService {
                 staging.stream().map(n -> "- " + n.title()).toList());
         section(sb, "Next week (%s with a due date)".formatted(count(nextWeek.size(), "task")),
                 nextWeek.stream().map(t -> "- %s (due %s)".formatted(t.title(), t.dueDate())).toList());
+        spendingSection(sb, monday);
         return sb.toString().stripTrailing();
+    }
+
+    /**
+     * The week's money, in the one feedback structure with experimental support
+     * (Huebner 2020; Sussman &amp; Alter 2012): ordinary category totals AND the
+     * one-off purchases aggregated, next to a typical-week reference inferred
+     * from the ledger (median of the 4 prior weeks) — a descriptive norm, not a
+     * budget. Silent ledger (no entries this week, no history) = no section at
+     * all; finance never nags someone who is not tracking money.
+     */
+    private void spendingSection(StringBuilder sb, LocalDate monday) {
+        List<TransactionSummary> week = finance.range(monday, monday.plusDays(6));
+        long typical = finance.typicalWeekExpense(monday);
+        // Recurring charges due through the end of NEXT week — the digest content
+        // users consistently rate highest is "what's about to charge me". Charges
+        // post automatically when due; this line is awareness, not a chore.
+        // Cancel-reminder dates in the window are called out too (a reminder task
+        // exists as well — the review reinforces it).
+        List<SubscriptionSummary> dueSoon = finance.subscriptionsDueBy(monday.plusDays(13));
+        List<SubscriptionSummary> cancelSoon = finance.subscriptions().stream()
+                .filter(SubscriptionSummary::active)
+                .filter(s -> s.cancelReminderOn() != null && !s.cancelReminderOn().isBefore(monday)
+                        && !s.cancelReminderOn().isAfter(monday.plusDays(13)))
+                .toList();
+        if (week.isEmpty() && typical == 0 && dueSoon.isEmpty() && cancelSoon.isEmpty()) {
+            return;
+        }
+        List<TransactionSummary> expenses = week.stream()
+                .filter(t -> t.type() == TransactionType.EXPENSE).toList();
+        long spent = expenses.stream().mapToLong(TransactionSummary::amount).sum();
+        long income = week.stream().filter(t -> t.type() == TransactionType.INCOME)
+                .mapToLong(TransactionSummary::amount).sum();
+        List<TransactionSummary> oneOffs = expenses.stream()
+                .filter(TransactionSummary::exceptional).toList();
+        long ordinary = spent - oneOffs.stream().mapToLong(TransactionSummary::amount).sum();
+        String topCategories = expenses.stream()
+                .filter(t -> !t.exceptional())
+                .collect(Collectors.groupingBy(TransactionSummary::category,
+                        Collectors.summingLong(TransactionSummary::amount)))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(3)
+                .map(e -> "%s %s".formatted(e.getKey(), vnd(e.getValue())))
+                .collect(Collectors.joining(", "));
+
+        List<String> lines = new ArrayList<>();
+        lines.add("- Ordinary spending: %s₫%s".formatted(vnd(ordinary),
+                topCategories.isEmpty() ? "" : " — top: " + topCategories));
+        if (oneOffs.isEmpty()) {
+            lines.add("- One-offs: (none)");
+        } else {
+            lines.add("- One-offs (%d, total %s₫): %s".formatted(oneOffs.size(),
+                    vnd(oneOffs.stream().mapToLong(TransactionSummary::amount).sum()),
+                    oneOffs.stream().map(t -> "%s %s₫".formatted(t.description(), vnd(t.amount())))
+                            .collect(Collectors.joining("; "))));
+        }
+        if (income > 0) {
+            lines.add("- Income: %s₫".formatted(vnd(income)));
+        }
+        if (!dueSoon.isEmpty()) {
+            lines.add("- Subscriptions charging soon (auto-posted): " + dueSoon.stream()
+                    .map(s -> "%s %s₫ (%s)".formatted(s.name(), vnd(s.amount()), s.nextDueOn()))
+                    .collect(Collectors.joining("; ")));
+        }
+        if (!cancelSoon.isEmpty()) {
+            lines.add("- Cancel-by dates this window: " + cancelSoon.stream()
+                    .map(s -> "%s (%s, currently %s₫/%s)".formatted(s.name(), s.cancelReminderOn(),
+                            vnd(s.amount()), s.cycle().name().toLowerCase(Locale.ROOT)))
+                    .collect(Collectors.joining("; ")));
+        }
+        section(sb, "Money this week (spent %s₫, typical week ~%s₫)"
+                .formatted(vnd(spent), vnd(typical)), lines);
+    }
+
+    /** VND with Vietnamese thousands dots — "1190000" reads as "1.190.000". */
+    private static String vnd(long amount) {
+        return NumberFormat.getIntegerInstance(Locale.of("vi", "VN")).format(amount);
     }
 
     private List<NoteSummary> stagingNotes() {

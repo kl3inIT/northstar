@@ -2,6 +2,8 @@ package com.northstar.api;
 
 import com.northstar.core.calendar.CalendarEventNotFoundException;
 import com.northstar.core.discipline.DisciplineNotFoundException;
+import com.northstar.core.finance.FinancePlanningNotFoundException;
+import com.northstar.core.finance.TransactionNotFoundException;
 import com.northstar.core.note.NoteNotFoundException;
 import com.northstar.core.project.ProjectNotFoundException;
 import com.northstar.core.task.TaskNotFoundException;
@@ -14,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -44,7 +47,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @ExceptionHandler({NoteNotFoundException.class, TaskNotFoundException.class,
             CalendarEventNotFoundException.class, DisciplineNotFoundException.class,
-            ProjectNotFoundException.class})
+            ProjectNotFoundException.class, TransactionNotFoundException.class,
+            FinancePlanningNotFoundException.class})
     ProblemDetail notFound(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
@@ -55,9 +59,9 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 
-    /** Stale write (optimistic locking): the resource changed since the client read it. */
-    @ExceptionHandler(OptimisticLockingFailureException.class)
-    ProblemDetail conflict(OptimisticLockingFailureException e) {
+    /** Concurrent write or uniqueness conflict: the requested state is no longer applicable. */
+    @ExceptionHandler({OptimisticLockingFailureException.class, DataIntegrityViolationException.class})
+    ProblemDetail conflict(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, e.getMessage());
     }
 

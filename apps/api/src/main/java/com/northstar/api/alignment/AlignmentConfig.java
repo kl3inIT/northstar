@@ -2,6 +2,7 @@ package com.northstar.api.alignment;
 
 import com.northstar.core.alignment.AlignmentService;
 import com.northstar.core.calendar.CalendarEventService;
+import com.northstar.core.finance.FinanceService;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.task.TaskService;
 import org.springframework.ai.chat.client.ChatClient;
@@ -18,7 +19,7 @@ class AlignmentConfig {
 
     @Bean
     AlignmentService alignmentService(ChatClient chatClient, TaskService tasks,
-            CalendarEventService events, NoteService notes) {
-        return new AlignmentService(chatClient, tasks, events, notes);
+            CalendarEventService events, NoteService notes, FinanceService finance) {
+        return new AlignmentService(chatClient, tasks, events, notes, finance);
     }
 }

@@ -5,6 +5,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 import com.northstar.core.alignment.AlignmentService;
+import com.northstar.core.finance.FinanceService;
+import com.northstar.core.finance.NewTransaction;
+import com.northstar.core.finance.TransactionSource;
+import com.northstar.core.finance.TransactionType;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.task.TaskService;
 import com.northstar.core.task.TaskSummary;
@@ -51,6 +55,9 @@ class AlignmentServiceIntegrationTests {
 
     @Autowired
     TaskService tasks;
+
+    @Autowired
+    FinanceService finance;
 
     private final ZoneId zone = ZoneId.systemDefault();
 
@@ -100,5 +107,27 @@ class AlignmentServiceIntegrationTests {
                 .contains("the raw numbers are below")
                 .contains("## The numbers, week");
         assertThat(alignment.findWeekly(zone)).map(NoteDetail::id).hasValue(note.id());
+    }
+
+    @Test
+    void weeklyReviewSeparatesOrdinaryAndOneOffSpending() {
+        LocalDate monday = LocalDate.now(zone).with(java.time.DayOfWeek.MONDAY);
+        finance.record(new NewTransaction(TransactionType.EXPENSE, 35_000, monday,
+                "an sang", "An uong", false), TransactionSource.CAPTURE);
+        finance.record(new NewTransaction(TransactionType.EXPENSE, 500_000, monday.plusDays(1),
+                "qua cuoi", "Hieu hi", true), TransactionSource.CAPTURE);
+        modelReturns("- Spending includes one routine item and one one-off",
+                """
+                {"commentary":"Spending was split between routine food and a one-off gift.",
+                 "priority":"Keep the week focused."}
+                """);
+
+        NoteDetail note = alignment.generateWeekly(zone);
+
+        assertThat(note.contentMarkdown())
+                .contains("**Money this week")
+                .contains("Ordinary spending: 35.000")
+                .contains("One-offs (1, total 500.000")
+                .contains("qua cuoi 500.000");
     }
 }
