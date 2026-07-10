@@ -66,7 +66,8 @@ The immediate product direction is to make daily use feel natural:
 - Preserve the raw capture.
 - Let AI draft notes or structured entities.
 - Review and accept the result.
-- Use Today, tasks, projects, and calendar to choose the next action.
+- Ask the Assistant to compose daily context, then use tasks, projects, calendar,
+  and domain pages to inspect or correct the underlying records.
 
 ## Build Philosophy
 
@@ -92,7 +93,6 @@ context.
 
 Future modules tracked in the roadmap include:
 
-- Today dashboard.
 - Study tutor and study logs for IELTS/HSK.
 - Scholarship/university research.
 - Habit tracking.

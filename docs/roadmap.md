@@ -14,11 +14,11 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Assistant and MCP tools | Done | In-app assistant tool definitions and streamable-http MCP tool exposure. |
 | Web authentication baseline | Done | Single-user Spring Security session login, SPA CSRF, auth guard, logout. |
 | Finance tracking V1.5 | Done | Capture-first VND ledger, balance reconciliation, learned category corrections, budgets, savings goals, subscription auto-post/detection, CSV, Insights, receipt/SMS extraction, assistant/MCP tools, and weekly review facts. |
+| Today dashboard | Deferred | Assistant/chat is the daily cockpit for composing tasks, calendar, projects, finance, and review context. Revisit only if a zero-prompt glance surface becomes necessary. |
 | Repository documentation harness | In progress | Apply repo-as-system-of-record structure and consolidate existing guidance. |
 
 ## Backlog
 
-- Today dashboard over tasks, calendar, projects, and review prompts.
 - Study tutor and structured study logs for IELTS/HSK.
 - Scholarship/university research workflows.
 - Habit tracking and streaks.

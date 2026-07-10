@@ -48,7 +48,7 @@ Use this rule of thumb:
 
 ## Daily Flow
 
-1. Check today's tasks and upcoming events.
+1. Ask the Assistant for today's tasks and upcoming events.
 2. Pick one project or discipline focus.
 3. Create/complete tasks for concrete next actions.
 4. Put real time blocks on the calendar when needed.
@@ -99,7 +99,7 @@ Create a small initial structure:
 
 1. Discipline: `Northstar`
 2. Project: `Northstar MVP`
-3. Task: `Review Today dashboard direction`
+3. Task: `Review Assistant daily briefing quality`
 4. Calendar event: one focused planning block
 5. Note: `Northstar operating principles`
 
