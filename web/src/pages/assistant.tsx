@@ -469,6 +469,13 @@ function AssistantChat({
   })
 
   const [text, setText] = useState('')
+  const busy = status === 'submitted' || status === 'streaming'
+  const latestMessage = messages.at(-1)
+  const showWaiting = busy && (
+    latestMessage === undefined ||
+    latestMessage.role === 'user' ||
+    (latestMessage.role === 'assistant' && !messageHasVisibleOutput(latestMessage))
+  )
 
   async function onSubmit(message: PromptInputMessage) {
     const trimmed = message.text.trim()
@@ -530,6 +537,7 @@ function AssistantChat({
       <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-5 overflow-y-auto px-6">
         <h1 className="text-3xl font-semibold tracking-tight">{greeting()}</h1>
         <div className="w-full max-w-2xl">{input}</div>
+        {showWaiting && <WaitingMessage />}
         {/* Plain wrap, not the horizontal ScrollArea — zeromail centers chips in rows. */}
         <div className="flex max-w-2xl flex-wrap justify-center gap-2">
           {suggestions.map((text) => (
@@ -551,6 +559,7 @@ function AssistantChat({
       <Conversation className="min-h-0 flex-1">
         <ConversationContent className="mx-auto w-full max-w-3xl px-4 py-6">
           {messages.map((m) => {
+            if (!messageHasVisibleOutput(m)) return null
             const toolParts = m.parts.filter(isToolPart)
             return (
               <Message from={m.role} key={m.id}>
@@ -582,7 +591,7 @@ function AssistantChat({
               </Message>
             )
           })}
-          {status === 'submitted' && <PendingDots />}
+          {showWaiting && <WaitingMessage />}
         </ConversationContent>
         <ConversationScrollButton />
       </Conversation>
@@ -594,6 +603,16 @@ function AssistantChat({
 
 function isToolPart(part: UIMessage['parts'][number]): part is ToolUIPart {
   return part.type.startsWith('tool-')
+}
+
+function partHasVisibleOutput(part: UIMessage['parts'][number]): boolean {
+  if (part.type === 'text') return part.text.trim().length > 0
+  if (part.type === 'file') return Boolean((part as FileUIPart).url)
+  return isToolPart(part)
+}
+
+function messageHasVisibleOutput(message: UIMessage): boolean {
+  return message.parts.some(partHasVisibleOutput)
 }
 
 function ToolWorkflow({ tools }: { tools: ToolUIPart[] }) {
@@ -849,18 +868,13 @@ function AttachmentStrip() {
   )
 }
 
-function PendingDots(): ReactNode {
+function WaitingMessage(): ReactNode {
   return (
     <Message from="assistant">
       <MessageContent>
-        <span className="flex items-center gap-1 py-1">
-          {[0, 0.16, 0.32].map((delay) => (
-            <span
-              key={delay}
-              className="size-1.5 animate-bounce rounded-full bg-muted-foreground/60"
-              style={{ animationDelay: `${delay}s` }}
-            />
-          ))}
+        <span className="flex items-center gap-2 py-1 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          Thinking…
         </span>
       </MessageContent>
     </Message>

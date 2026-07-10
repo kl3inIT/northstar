@@ -6,6 +6,7 @@ Reusable testing mechanics live in
 | Behavior | Coverage | Notes |
 | --- | --- | --- |
 | API assistant stream, history, and persisted tool workflow replay | Automated | `apps/api/src/test/java/com/northstar/api/assistant/AssistantControllerIntegrationTests.java` |
+| Assistant waiting state before visible output | Static | `pnpm -C web typecheck`; still needs a browser regression around submitted/streaming turns. |
 | MCP handshake, tools/list, and tool calls | Automated | `apps/mcp/src/test/java/com/northstar/mcp/McpServerIntegrationTests.java`; includes `create_note` with explicit `status=RESOURCE`. |
 | Daily/weekly review quality | Automated baseline | `apps/api/src/test/java/com/northstar/api/alignment/AlignmentServiceIntegrationTests.java` covers alignment service behavior. |
 | Real external MCP client session | Gap | Needs live verification when MCP wiring changes. |

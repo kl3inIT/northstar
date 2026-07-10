@@ -10,6 +10,10 @@ Conversation text is stored in Spring AI's `spring_ai_chat_memory` table, while
 tool workflow parts are stored in `northstar_assistant_tool_trace` and replayed
 from `/api/assistant/history` so completed workflow steps survive page reloads
 and conversation switches.
+While a user turn is submitted or streaming, the web chat renders an assistant
+waiting message until the latest assistant message has visible text, an image,
+or a tool workflow part. This keeps the first turn and pre-tool-call gap from
+looking frozen.
 
 Current MCP tool areas:
 
