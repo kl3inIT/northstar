@@ -65,6 +65,8 @@ Modulith modules. Current modules include:
   category corrections, monthly budgets, savings goals, recurring-charge
   definitions/detection, time-series insights, and one-off spending separation.
 - `search` - keyword/vector search and attachment text/image indexing support.
+- `web` - provider-neutral web search/page-reading contracts, runtime routing,
+  provider metadata, bounded caches, and the persisted provider override.
 - `attachment` - stored uploaded content and metadata.
 - `assistant` - tool definitions shared by the in-app assistant and MCP.
 - `alignment`, `habit`, `scholarship`, `study`, `shared` - current or reserved
@@ -93,6 +95,13 @@ verification in `:core:test` is the boundary check.
 - `apps/api` wires ChatClient, OpenAI chat, chat memory JDBC, tool search, and
   pgvector support for interactive capture, assistant, alignment, and query
   embedding.
+- Public web research is a separate provider layer: `core.web` owns contracts
+  and routing; `apps/api` supplies OpenAI Responses web search and a bounded
+  direct HTML/text reader. Search and page-reader providers can be selected at
+  runtime from Settings without restarting. Credentials stay in server config.
+- `search_web` and `read_web_page` are in-app Assistant tools only. They are not
+  published by the public MCP app, so unauthenticated MCP traffic cannot spend
+  web-provider credits or use Northstar as a fetch proxy.
 - Assistant text history uses Spring AI's `spring_ai_chat_memory`; assistant
   tool workflow replay uses the Northstar-owned
   `northstar_assistant_tool_trace` projection table.

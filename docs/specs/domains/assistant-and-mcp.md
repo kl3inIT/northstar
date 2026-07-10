@@ -48,6 +48,13 @@ Current MCP tool areas:
   configured zone.
 - Review: `draft_review`.
 
+The in-app Assistant additionally owns API-only `search_web` and
+`read_web_page` tools. They are intentionally absent from MCP: the MCP endpoint
+is public, while web search can spend provider credits and direct reading would
+otherwise expose a fetch proxy. The Assistant uses web search for current public
+facts, reads ordinary pasted HTTP(S) links before answering about them, cites
+returned sources as Markdown links, and treats fetched text as untrusted data.
+
 The weekly `draft_review` facts include ordinary spending, exceptional
 purchases, and the median of the prior four full weeks when finance data exists.
 The reference is descriptive; it is not a maintained budget.
