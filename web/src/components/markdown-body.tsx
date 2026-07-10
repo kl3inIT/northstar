@@ -10,11 +10,17 @@ import type { NoteRef } from '@/lib/notes-types'
 
 const WIKI = /\[\[\s*([^\]|]+?)\s*(?:\|\s*([^\]]*?)\s*)?\]\]/g
 
-/** Rewrite [[Title]] / [[Title|alias]] into markdown links with a wiki: scheme. */
+// Wiki links become relative /wiki/<title> paths rather than a custom wiki:
+// scheme: Streamdown's default rehype chain (rehype-sanitize → rehype-harden)
+// strips unknown protocols and renders the href-less link as "[blocked]",
+// while relative paths pass through untouched.
+const WIKI_PATH = '/wiki/'
+
+/** Rewrite [[Title]] / [[Title|alias]] into markdown links on the /wiki/ path. */
 function linkifyWiki(markdown: string): string {
   return markdown.replace(WIKI, (_match, title: string, alias?: string) => {
     const label = (alias && alias.trim()) || title.trim()
-    return `[${label}](wiki:${encodeURIComponent(title.trim())})`
+    return `[${label}](${WIKI_PATH}${encodeURIComponent(title.trim())})`
   })
 }
 
@@ -40,13 +46,11 @@ function withoutDuplicateFirstHeading(markdown: string, title?: string): string 
 // highlighted code, KaTeX math and Mermaid diagrams for free.
 const plugins = { cjk, code, math, mermaid }
 
-// Preserve the wiki: scheme (react-markdown's default sanitizer would strip it)
-// AND keep the sanitizer's protection: only wiki:, safe web schemes, and
-// relative paths (attachments, /notes) pass; javascript:/data:/vbscript: and any
+// Keep the sanitizer's protection: safe web schemes and relative paths
+// (attachments, /notes, /wiki) pass; javascript:/data:/vbscript: and any
 // other scheme are neutralized to "" so a link smuggled in via extracted
 // document text or pasted content can't run script.
 const safeUrl = (url: string): string => {
-  if (url.startsWith('wiki:')) return url
   try {
     const u = new URL(url, 'https://northstar.local/')
     if (u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'mailto:') return url
@@ -78,8 +82,8 @@ export function MarkdownBody({
         rehypePlugins={[...Object.values(defaultRehypePlugins), rehypeSlug]}
         components={{
           a({ href, children }) {
-            if (href?.startsWith('wiki:')) {
-              const title = decodeURIComponent(href.slice('wiki:'.length))
+            if (href?.startsWith(WIKI_PATH)) {
+              const title = decodeURIComponent(href.slice(WIKI_PATH.length))
               const ref = byTitle.get(title.toLowerCase())
               if (ref?.resolved && ref.slug) {
                 return (

@@ -22,6 +22,14 @@
 - The reading view suppresses a duplicate first `# Heading` when it exactly
   matches the note title, so imported Markdown can keep its own title while the
   app avoids rendering two identical H1s.
+- The reading view rewrites wiki links to relative `/wiki/<title>` markdown
+  links before rendering. A custom URL scheme does not survive the renderer's
+  sanitize/harden chain (the link loses its href and renders as `[blocked]`);
+  relative paths pass through, and the link component maps resolved titles to
+  note routes while unresolved titles render as inert dashed-underline text.
+- A Resource note can be archived from the reading view's header action;
+  Staging and Archived notes change status through the status banner instead
+  (approve/archive and restore respectively).
 
 ## Source Modules
 
