@@ -617,12 +617,9 @@ function messageHasVisibleOutput(message: UIMessage): boolean {
 
 function ToolWorkflow({ tools }: { tools: ToolUIPart[] }) {
   const complete = tools.filter((tool) => tool.state === 'output-available').length
-  const hasActive = tools.some((tool) => tool.state === 'input-available' || tool.state === 'input-streaming')
-  const hasError = tools.some((tool) => tool.state === 'output-error' || tool.errorText)
-  const defaultOpen = hasActive || hasError || tools.length <= 2
 
   return (
-    <ChainOfThought defaultOpen={defaultOpen} className="mb-3">
+    <ChainOfThought defaultOpen className="mb-3">
       <ChainOfThoughtHeader>
         Workflow · {complete}/{tools.length} complete
       </ChainOfThoughtHeader>
