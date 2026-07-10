@@ -5,7 +5,7 @@ import org.springframework.modulith.Modulithic;
 /**
  * Marker type whose package ({@code com.northstar.core}) is the base package for
  * Spring Modulith. Every direct sub-package (note, capture, task, study,
- * scholarship, discipline, finance, habit, calendar, search, shared) is an
+ * scholarship, discipline, finance, habit, calendar, search, web, shared) is an
  * application module.
  *
  * <p>Used by the Modulith verification test and reusable across the api, mcp and

@@ -24,6 +24,7 @@ dependencies {
     // auto-config, which can't see our @Qualifier'd ChatClient).
     implementation(libs.spring.ai.tool.search.advisor)
     implementation(libs.lucene.core)
+    implementation("org.jsoup:jsoup:1.22.2")
     // PgVectorStore + EmbeddingModel autoconfig — semantic half of hybrid search.
     // Schema is Flyway's (V14): spring.ai.vectorstore.pgvector.initialize-schema=false.
     implementation(libs.spring.ai.starter.pgvector)

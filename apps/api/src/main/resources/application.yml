@@ -96,6 +96,27 @@ northstar:
     title:
       enabled: true
       model: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
+  web:
+    enabled: ${NORTHSTAR_WEB_ENABLED:true}
+    default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}
+    default-page-reader: ${NORTHSTAR_WEB_PAGE_READER:direct}
+    fallback-enabled: false
+    search-fallback-order: []
+    page-reader-fallback-order: []
+    cache-ttl: 15m
+    cache-max-size: 200
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: ${NORTHSTAR_WEB_MODEL:gpt-5.5}
+      search-context-size: medium
+      connect-timeout: 5s
+      request-timeout: 60s
+    direct:
+      max-bytes: 2097152
+      max-characters: 40000
+      max-redirects: 4
+      connect-timeout: 5s
+      request-timeout: 10s
 
 server:
   port: ${NORTHSTAR_API_PORT:8888}

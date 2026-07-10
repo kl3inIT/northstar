@@ -28,8 +28,10 @@ dependencies {
     // the entity scan and a hand-guessed DDL match Hibernate's naming — the JDBC
     // flavor has no entity and ships the official Postgres DDL (copied into V15).
     implementation("org.springframework.modulith:spring-modulith-starter-jdbc")
+    implementation("com.github.ben-manes.caffeine:caffeine")
 
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.mockito:mockito-core")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

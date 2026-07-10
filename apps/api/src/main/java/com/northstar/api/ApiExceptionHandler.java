@@ -7,6 +7,8 @@ import com.northstar.core.finance.TransactionNotFoundException;
 import com.northstar.core.note.NoteNotFoundException;
 import com.northstar.core.project.ProjectNotFoundException;
 import com.northstar.core.task.TaskNotFoundException;
+import com.northstar.core.web.WebResearchException;
+import com.northstar.core.web.WebResearchFailureCode;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -57,6 +59,19 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail badRequest(IllegalArgumentException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(WebResearchException.class)
+    ProblemDetail webResearch(WebResearchException e) {
+        HttpStatus status = switch (e.code()) {
+            case DISABLED, NOT_CONFIGURED -> HttpStatus.CONFLICT;
+            case RATE_LIMITED -> HttpStatus.TOO_MANY_REQUESTS;
+            case UNAVAILABLE -> HttpStatus.BAD_GATEWAY;
+            case INVALID_REQUEST, UNSUPPORTED, BLOCKED, RESPONSE_TOO_LARGE -> HttpStatus.BAD_REQUEST;
+        };
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, e.getMessage());
+        detail.setProperty("code", e.code().name());
+        return detail;
     }
 
     /** Concurrent write or uniqueness conflict: the requested state is no longer applicable. */
