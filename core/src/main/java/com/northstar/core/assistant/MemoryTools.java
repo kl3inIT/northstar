@@ -73,7 +73,8 @@ public class MemoryTools implements NorthstarTool {
                 Step 1 — call MemoryCreate to write the memory file with YAML frontmatter
                          (name, description, type: user | feedback | project | reference).
                 Step 2 — call MemoryInsert (or MemoryStrReplace) to add a pointer line to MEMORY.md.
-                        MEMORY.md entry format: "- [Title](filename.md) — one-line hook (<=150 chars)"
+                        MEMORY.md entry format: "- [[filename_without_md|Title]] — one-line hook (<=150 chars)"
+                        (wiki-link target = file name without '.md', so index entries render as note links)
             - Check the memory index first to avoid duplicate memories; update an existing file instead.
             - For feedback/project types, structure the body as the fact, then a **Why:** line and a
               **How to apply:** line.""";
@@ -226,7 +227,7 @@ public class MemoryTools implements NorthstarTool {
             String path,
             @ToolParam(description = "The line number after which to insert the text. Use 0 to insert before the first line; pass the total line count to append at the end.")
             Integer insertLine,
-            @ToolParam(description = "The text to insert. For MEMORY.md entries use: '- [Title](filename.md) — one-line hook'")
+            @ToolParam(description = "The text to insert. For MEMORY.md entries use: '- [[filename_without_md|Title]] — one-line hook'")
             String insertText) {
         String name;
         try {

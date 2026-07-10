@@ -89,8 +89,10 @@ type: {{user, feedback, project, reference}}
 **Step 2** — call `MemoryInsert` (or `MemoryStrReplace`) to add a pointer line to `MEMORY.md`:
 
 ```
-- [Title](filename.md) — one-line hook (≤150 characters)
+- [[filename_without_md|Title]] — one-line hook (≤150 characters)
 ```
+
+Example: for `feedback_reviews.md` write `- [[feedback_reviews|Review feedback]] — …`. The wiki-link target is the file name without `.md` (that is the note's title), so the index renders as clickable note links in the app.
 
 `MEMORY.md` is an index, not a memory — one line per memory, never memory content.
 
