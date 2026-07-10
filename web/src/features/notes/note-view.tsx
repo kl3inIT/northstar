@@ -40,6 +40,7 @@ export function NoteView() {
   const { slug } = useParams({ from: '/notes/$slug' })
   const { data: note, isLoading, isError } = useNote(slug)
   const { data: projects = [] } = useProjects()
+  const setStatus = useSetNoteStatus()
   // Reading-first: opening a note shows the rendered view; the Edit button opens
   // the CodeMirror editor. Return to reading on every note switch.
   const [editing, setEditing] = useState(false)
@@ -127,6 +128,25 @@ export function NoteView() {
             >
               <Copy className="size-4" />
             </Button>
+            {/* Staging/archived notes archive via the StatusBanner instead. */}
+            {note.status === 'RESOURCE' && (
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                className="text-muted-foreground"
+                aria-label="Archive note"
+                title="Archive note"
+                disabled={setStatus.isPending}
+                onClick={() =>
+                  setStatus.mutate(
+                    { id: note.id, status: 'ARCHIVED' },
+                    { onSuccess: () => toast.success('Archived') },
+                  )
+                }
+              >
+                <Archive className="size-4" />
+              </Button>
+            )}
             <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
               <Pencil className="size-4" /> Edit
             </Button>
