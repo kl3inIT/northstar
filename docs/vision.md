@@ -24,7 +24,7 @@ Northstar combines:
 - AI capture inbox for turning raw thoughts into structured notes and entities.
 - Projects, tasks, disciplines, calendar, and daily planning.
 - Study support for IELTS/HSK and scholarship applications.
-- Finance, habit, and life tracking as future personal OS modules.
+- Finance, habit, and life tracking as personal OS modules.
 - MCP access so coding agents and other assistants can read and write explicit
   project-local context instead of relying on chat memory.
 
@@ -57,7 +57,8 @@ The planning spine follows Life -> Disciplines -> Projects:
 ## Current MVP Shape
 
 The implemented baseline already centers on notes, capture, tasks, projects,
-disciplines, calendar, assistant tools, MCP tools, attachments, and search.
+disciplines, calendar, finance, assistant tools, MCP tools, attachments, and
+search.
 
 The immediate product direction is to make daily use feel natural:
 
@@ -94,7 +95,6 @@ Future modules tracked in the roadmap include:
 - Today dashboard.
 - Study tutor and study logs for IELTS/HSK.
 - Scholarship/university research.
-- Finance management.
 - Habit tracking.
 - Couple/shared workspace.
 - Mobile app.

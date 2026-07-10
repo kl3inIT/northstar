@@ -32,7 +32,29 @@ Current MCP tool areas:
 - Projects: `list_projects`, `project_status`, `create_project`,
   `update_project`, `delete_project`, `manage_milestone`.
 - Disciplines: `list_disciplines`, `create_discipline`.
+- Finance: `log_transactions`, `spending_summary`, `find_transactions`,
+  `delete_transaction`, `list_budgets`, `set_budget`, `delete_budget`,
+  `list_savings_goals`, `save_savings_goal`, `contribute_savings_goal`, and
+  `delete_savings_goal`, plus `list_subscriptions`, `save_subscription`,
+  `mark_subscription_paid`, and `delete_subscription`. Logging accepts several
+  resolved VND entries in one call; summary reports category totals, one-offs,
+  and the previous month. Planning writes require explicit user intent so the
+  assistant can reduce maintenance without silently inventing financial plans
+  or recurring expenses. Savings-goal and subscription updates must first list
+  the resource and send back its current `version` plus unchanged fields. A
+  subscription payment must likewise use the listed `nextDueOn` and `version`
+  as the cycle identity; stale calls and retries are rejected before a second
+  expense can be created. Payment dates cannot be in the future in the user's
+  configured zone.
 - Review: `draft_review`.
+
+The weekly `draft_review` facts include ordinary spending, exceptional
+purchases, and the median of the prior four full weeks when finance data exists.
+The reference is descriptive; it is not a maintained budget.
+
+The web transcript keeps a tool workflow expanded when it completes. The user
+may collapse it explicitly, but a state transition must not shrink the message
+and shift the conversation unexpectedly.
 
 Agents should follow the Northstar usage guideline for note authoring:
 Markdown is the note source format, existing notes are searched before creating

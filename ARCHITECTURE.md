@@ -59,12 +59,16 @@ Modulith modules. Current modules include:
 - `calendar` - calendar events, recurrence, cancelled occurrences, and free-slot
   discovery.
 - `note` - Markdown knowledge base with wiki links and backlinks.
-- `capture` - AI capture draft generation for notes and future entity parsing.
+- `capture` - AI draft generation for notes, tasks, events, and finance entries
+  from text, transcribed voice, and receipt images.
+- `finance` - VND expense/income ledger, aggregate reconciliation, learned
+  category corrections, monthly budgets, savings goals, recurring-charge
+  definitions/detection, time-series insights, and one-off spending separation.
 - `search` - keyword/vector search and attachment text/image indexing support.
 - `attachment` - stored uploaded content and metadata.
 - `assistant` - tool definitions shared by the in-app assistant and MCP.
-- `alignment`, `finance`, `habit`, `scholarship`, `study`, `shared` - current
-  or reserved domain modules.
+- `alignment`, `habit`, `scholarship`, `study`, `shared` - current or reserved
+  domain modules.
 
 Cross-module coupling must go through public APIs or events. Modulith
 verification in `:core:test` is the boundary check.
