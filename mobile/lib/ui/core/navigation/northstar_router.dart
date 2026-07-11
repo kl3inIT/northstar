@@ -5,24 +5,28 @@ import 'package:northstar/ui/features/assistant/views/assistant_landing_view.dar
 import 'package:northstar/ui/features/assistant/view_models/assistant_view_model.dart';
 import 'package:northstar/ui/features/auth/view_models/auth_view_model.dart';
 import 'package:northstar/ui/features/auth/views/login_view.dart';
+import 'package:northstar/ui/features/capture/view_models/capture_view_model.dart';
+import 'package:northstar/ui/features/capture/views/capture_view.dart';
 import 'package:northstar/ui/features/more/views/more_view.dart';
 import 'package:northstar/ui/features/shell/views/feature_placeholder_view.dart';
 
 abstract final class NorthstarRoutes {
   static const startup = '/startup';
   static const login = '/login';
+  static const capture = '/capture';
   static const assistant = '/assistant';
   static const tasks = '/tasks';
   static const notes = '/notes';
   static const finance = '/finance';
   static const more = '/more';
 
-  static const protected = {assistant, tasks, notes, finance, more};
+  static const protected = {capture, assistant, tasks, notes, finance, more};
 }
 
 GoRouter createNorthstarRouter(
   AuthViewModel auth,
   AssistantViewModel assistant,
+  CaptureViewModel capture,
 ) {
   return GoRouter(
     initialLocation: NorthstarRoutes.startup,
@@ -67,6 +71,13 @@ GoRouter createNorthstarRouter(
         path: NorthstarRoutes.login,
         builder: (context, state) => LoginView(auth: auth),
       ),
+      GoRoute(
+        path: NorthstarRoutes.capture,
+        pageBuilder: (context, state) => CupertinoPage<void>(
+          key: state.pageKey,
+          child: CaptureView(viewModel: capture),
+        ),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return NorthstarShell(navigationShell: navigationShell);
@@ -76,8 +87,10 @@ GoRouter createNorthstarRouter(
             routes: [
               GoRoute(
                 path: NorthstarRoutes.assistant,
-                builder: (context, state) =>
-                    AssistantLandingView(viewModel: assistant),
+                builder: (context, state) => AssistantLandingView(
+                  viewModel: assistant,
+                  onOpenCapture: () => context.push(NorthstarRoutes.capture),
+                ),
               ),
             ],
           ),

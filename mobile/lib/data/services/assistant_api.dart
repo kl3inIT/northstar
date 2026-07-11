@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:northstar/data/models/assistant_dtos.dart';
+import 'package:northstar/data/services/authenticated_api_client.dart';
 
 class AssistantApi {
   factory AssistantApi({
@@ -14,30 +15,23 @@ class AssistantApi {
     required void Function() onUnauthorized,
   }) {
     return AssistantApi._(
-      client,
+      AuthenticatedApiClient(
+        client: client,
+        accessToken: accessToken,
+        refreshAccessToken: refreshAccessToken,
+        onUnauthorized: onUnauthorized,
+      ),
       baseUrl,
-      accessToken,
-      refreshAccessToken,
-      onUnauthorized,
     );
   }
 
-  AssistantApi._(
-    this._client,
-    this._baseUrl,
-    this._accessToken,
-    this._refreshAccessToken,
-    this._onUnauthorized,
-  );
+  AssistantApi._(this._authenticated, this._baseUrl);
 
-  final http.Client _client;
+  final AuthenticatedApiClient _authenticated;
   final Uri _baseUrl;
-  final String? Function() _accessToken;
-  final Future<String?> Function() _refreshAccessToken;
-  final void Function() _onUnauthorized;
 
   Future<List<AssistantConversationDto>> listConversations() async {
-    final response = await _sendWithRefresh(
+    final response = await _authenticated.send(
       (token) => _request('GET', '/api/assistant/conversations', token),
     );
     final body = await _readBody(response);
@@ -61,7 +55,7 @@ class AssistantApi {
     final uri = _resolve(
       '/api/assistant/history',
     ).replace(queryParameters: {'conversationId': conversationId});
-    final response = await _sendWithRefresh(
+    final response = await _authenticated.send(
       (token) => _requestForUri('GET', uri, token),
     );
     final body = await _readBody(response);
@@ -83,7 +77,7 @@ class AssistantApi {
     required String conversationId,
     required String message,
   }) async* {
-    final response = await _sendWithRefresh((token) {
+    final response = await _authenticated.send((token) {
       final request = _request('POST', '/api/assistant/chat', token);
       request.headers[HttpHeaders.acceptHeader] = 'text/event-stream';
       request.headers[HttpHeaders.contentTypeHeader] = 'application/json';
@@ -146,34 +140,6 @@ class AssistantApi {
       throw const FormatException('Assistant stream frame is not an object.');
     }
     return AssistantStreamFrame.fromJson(_normalizeMap(decoded));
-  }
-
-  Future<http.StreamedResponse> _sendWithRefresh(
-    http.Request Function(String token) createRequest,
-  ) async {
-    var token = _accessToken() ?? await _refreshAccessToken();
-    if (token == null) {
-      _onUnauthorized();
-      throw const AssistantUnauthorizedException();
-    }
-
-    var response = await _client.send(createRequest(token));
-    if (response.statusCode != 401) {
-      return response;
-    }
-    await response.stream.drain<void>();
-    token = await _refreshAccessToken();
-    if (token == null) {
-      _onUnauthorized();
-      throw const AssistantUnauthorizedException();
-    }
-    response = await _client.send(createRequest(token));
-    if (response.statusCode == 401) {
-      await response.stream.drain<void>();
-      _onUnauthorized();
-      throw const AssistantUnauthorizedException();
-    }
-    return response;
   }
 
   http.Request _request(String method, String path, String token) {

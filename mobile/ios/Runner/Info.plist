@@ -31,6 +31,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Northstar uses the camera only to read a receipt you choose to capture.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Northstar lets you choose a receipt image to review before saving its expenses.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

@@ -9,9 +9,14 @@ import 'package:northstar/ui/core/design_system/northstar_tokens.dart';
 import 'package:northstar/ui/features/assistant/view_models/assistant_view_model.dart';
 
 class AssistantLandingView extends StatefulWidget {
-  const AssistantLandingView({super.key, required this.viewModel});
+  const AssistantLandingView({
+    super.key,
+    required this.viewModel,
+    this.onOpenCapture,
+  });
 
   final AssistantViewModel viewModel;
+  final VoidCallback? onOpenCapture;
 
   @override
   State<AssistantLandingView> createState() => _AssistantLandingViewState();
@@ -123,13 +128,34 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
           key: const Key('assistant-history-button'),
           padding: EdgeInsets.zero,
           onPressed: _showConversationHistory,
-          child: const Icon(CupertinoIcons.clock),
+          child: const Icon(
+            CupertinoIcons.clock,
+            semanticLabel: 'Conversation history',
+          ),
         ),
-        trailing: CupertinoButton(
-          key: const Key('assistant-new-chat-button'),
-          padding: EdgeInsets.zero,
-          onPressed: _viewModel.startNewConversation,
-          child: const Icon(CupertinoIcons.square_pencil),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (widget.onOpenCapture != null)
+              CupertinoButton(
+                key: const Key('assistant-capture-button'),
+                padding: EdgeInsets.zero,
+                onPressed: widget.onOpenCapture,
+                child: const Icon(
+                  CupertinoIcons.plus_circle,
+                  semanticLabel: 'Capture',
+                ),
+              ),
+            CupertinoButton(
+              key: const Key('assistant-new-chat-button'),
+              padding: EdgeInsets.zero,
+              onPressed: _viewModel.startNewConversation,
+              child: const Icon(
+                CupertinoIcons.square_pencil,
+                semanticLabel: 'New conversation',
+              ),
+            ),
+          ],
         ),
       ),
       child: SafeArea(

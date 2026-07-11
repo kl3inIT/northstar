@@ -24,6 +24,11 @@
 | Assistant history and expanded conversation sidebar | Unit test plus widget test at 1024x768 | Covered |
 | Assistant Markdown remains readable on dark Cupertino surfaces | Dark-mode widget contrast assertion plus real Chromium dark-mode render | Covered |
 | Assistant SSE parsing and one-time 401 refresh | Service unit tests with streamed HTTP responses | Covered |
+| Capture opens from Assistant as a focused route without the tab bar | Widget interaction test | Covered |
+| Capture text draft, edit, explicit save, and undo affordance | Repository, ViewModel, and compact widget tests | Covered |
+| Receipt multipart upload and reviewed batch undo | Service and repository tests | Covered |
+| Receipt finance fields remain visible in dark mode | Widget test at 390x844 | Covered |
+| Capture against a real local API | Chromium walkthrough at 390x844: draft `200`, note create `201`, undo `204` | Covered |
 | Native iOS rendering and VoiceOver | Requires signed build on an iPhone | Gap |
 | Sideloadly install and live production API login | Requires the generated IPA, Apple ID signing, and an iPhone | Gap |
 | Android device rendering and TalkBack | Requires attached emulator/device | Gap |

@@ -16,7 +16,9 @@ active increment, not here.
   tabs; windows at least 600 logical pixels wide use a Cupertino-styled sidebar.
   Assistant chat uses `flutter_chat_ui`/`flutter_chat_core` for its maintained
   message-list engine, with Northstar-owned Cupertino builders, typed SSE
-  transport, repository, and `Listenable` ViewModel behavior.
+  transport, repository, and `Listenable` ViewModel behavior. Mobile Capture is
+  a focused route from Assistant: text or a system-picked receipt image becomes
+  an editable AI draft, then an explicit domain write with an undo affordance.
 - Contract: the API emits `contracts/openapi.json`; Hey API generates the web
   fetch client, SDK functions, and DTO types from that contract.
 - Build config: dependency versions live in `gradle/libs.versions.toml`; shared
@@ -160,8 +162,8 @@ verification in `:core:test` is the boundary check.
 - Flutter holds access tokens in memory and native refresh tokens in platform
   secure storage. `go_router` observes the auth state and guards the Cupertino
   route shell; the Web preview does not persist mobile credentials. Authenticated
-  Assistant requests retry once after a single-flight refresh; a second 401
-  expires the local session.
+  Assistant and Capture requests share one transport that retries once after a
+  single-flight refresh; a second 401 expires the local session.
 - Native iOS and Android do not use CORS. Cross-origin browser previews use the
   exact, comma-separated `NORTHSTAR_CORS_ALLOWED_ORIGINS` allowlist. Cross-origin
   cookies are disabled; Bearer requests may use standard REST methods with only

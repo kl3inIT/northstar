@@ -33,10 +33,7 @@ void main() {
     expect(capturedRequest.url.path, '/api/assistant/chat');
     expect(frames, hasLength(4));
     expect(frames[1], isA<AssistantTextDeltaFrame>());
-    expect(
-      (frames[1] as AssistantTextDeltaFrame).delta,
-      'Hello',
-    );
+    expect((frames[1] as AssistantTextDeltaFrame).delta, 'Hello');
     expect(frames[2], isA<AssistantToolInputStartFrame>());
     expect(frames.last, isA<AssistantDoneFrame>());
   });
@@ -70,10 +67,7 @@ void main() {
 }
 
 http.StreamedResponse _response(String body, {int statusCode = 200}) {
-  return http.StreamedResponse(
-    Stream.value(utf8.encode(body)),
-    statusCode,
-  );
+  return http.StreamedResponse(Stream.value(utf8.encode(body)), statusCode);
 }
 
 class _HandlerClient extends http.BaseClient {

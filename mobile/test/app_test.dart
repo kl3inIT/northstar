@@ -26,6 +26,22 @@ void main() {
     expect(find.byKey(const Key('notes-page')), findsOneWidget);
   });
 
+  testWidgets('opens focused Capture from the Assistant navigation bar', (
+    tester,
+  ) async {
+    _setWindowSize(tester, const Size(390, 844));
+    await tester.pumpWidget(_testApp(_signedInRepository()));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel('Capture'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('assistant-capture-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('capture-page')), findsOneWidget);
+    expect(find.text('Capture it now'), findsOneWidget);
+    expect(find.byType(CupertinoTabBar), findsNothing);
+  });
+
   testWidgets('uses the Cupertino sidebar on an expanded window', (
     tester,
   ) async {

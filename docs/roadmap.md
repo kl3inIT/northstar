@@ -21,6 +21,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Mobile token authentication and routing | Done | Separate bearer/refresh protocol, hashed rotating refresh families, replay revocation, Keychain/Android secure storage, Cupertino login, and guarded `go_router` branches. Native device accessibility validation remains. |
 | Mobile CI | Done | Path-scoped Linux quality/Web/Android gate and macOS unsigned iOS build pass on GitHub-hosted runners and publish seven-day review artifacts. |
 | iOS Sideload IPA and mobile Assistant | Done | CI packages a checksum-verified unsigned IPA for Sideloadly; Flutter provides authenticated SSE chat with Cupertino builders, history, waiting, partial text, tool progress, stop, failure, and retry. Native install validation remains. |
+| Reviewed Mobile Capture | Done | Focused Cupertino flow for text and receipt-image drafts, editable review, explicit note/task/event/expense writes, batch-safe undo, shared token refresh, compact/dark tests, and a real local API walkthrough. Voice capture and native-device validation remain. |
 | Today dashboard | Deferred | Assistant/chat is the daily cockpit for composing tasks, calendar, projects, finance, and review context. Revisit only if a zero-prompt glance surface becomes necessary. |
 | Repository documentation harness | In progress | Apply repo-as-system-of-record structure and consolidate existing guidance. |
 
