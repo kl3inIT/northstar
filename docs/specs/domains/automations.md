@@ -21,6 +21,8 @@ The API owns automation CRUD and run-now requests. The worker owns execution:
   definitions into `scheduled_tasks` every 10 seconds;
 - one persistent dynamic task instance exists per automation;
 - disabling/deleting a definition removes its projected schedule;
+- a queued manual run is skipped if its definition is deleted before a worker
+  claims it;
 - missed executions run only inside the configured catch-up window;
 - handler failures retry up to three times with exponential backoff;
 - `(automation_id, scheduled_for)` is unique so a scheduled occurrence has one

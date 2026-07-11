@@ -9,6 +9,7 @@ Reusable testing mechanics live in
 | Trigger validation and timezone-aware cron compilation | Automated | API invalid-trigger cases plus `AutomationSchedulerCoordinatorTests` verify weekday ordering, six-field cron, and IANA timezone. |
 | Definition projection state | Automated | `AutomationSchedulerCoordinatorTests` verifies an unsynced disabled definition is reconciled and its exact schedule version acknowledged. |
 | Definition CRUD, optimistic version, types, run-now, and history | Automated | `AutomationControllerIntegrationTests` uses PostgreSQL and MockMvc, including invalid workflow type/trigger and secret-boundary assertions. |
+| Deleted definition versus queued manual run | Automated | `AutomationTaskExecutorTests` verifies the worker marks the claimed run `SKIPPED` and never invokes its handler. |
 | Morning Brief validation, source deduplication, deterministic Markdown, and Staging output | Automated | `MorningBriefHandlerTests` uses fake research/note services and tracking-URL variants. |
 | Same automation/day output idempotency | Automated | `MorningBriefHandlerTests` verifies a rerun updates the existing named daily note instead of creating another. |
 | Generated API trust boundary | Automated | OpenAPI is committed; Hey API emits DTO/SDK/Zod clients and `automation-api.ts` parses list/history responses before UI use. |

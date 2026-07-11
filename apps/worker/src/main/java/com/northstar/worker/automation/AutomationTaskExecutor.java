@@ -41,7 +41,13 @@ class AutomationTaskExecutor {
 
     void executeManual(ManualAutomationData data) {
         AutomationRunClaim claim = automations.beginManualRun(data.runId());
-        if (claim.execute()) execute(claim);
+        if (!claim.execute()) return;
+        if (claim.definition().deletedAt() != null) {
+            automations.skip(claim.run().id(), "DELETED",
+                    "Automation was deleted before manual execution");
+            return;
+        }
+        execute(claim);
     }
 
     private void execute(AutomationRunClaim claim) {
