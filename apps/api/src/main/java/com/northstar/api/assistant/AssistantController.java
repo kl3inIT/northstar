@@ -294,7 +294,7 @@ class AssistantController {
             rows.add(new HistoryRow(
                     "assistant",
                     "",
-                    traceRows.stream().map(this::toolPart).toList(),
+                    traceRows.stream().flatMap(row -> toolParts(row).stream()).toList(),
                     traceRows.getFirst().createdAt(),
                     traceRows.getFirst().sequenceIndex(),
                     1));
@@ -433,6 +433,37 @@ class AssistantController {
         }
         if (StringUtils.hasText(row.errorText())) {
             part.put("errorText", row.errorText());
+        }
+        return part;
+    }
+
+    private List<Map<String, Object>> toolParts(ToolTraceRow row) {
+        Object output = parseJsonValue(row.outputJson());
+        List<Map<String, Object>> parts = new ArrayList<>();
+        parts.add(toolPart(row));
+        EventEmittingToolManager.sources(row.toolName(), row.toolCallId(), output).stream()
+                .map(AssistantController::sourcePart)
+                .forEach(parts::add);
+        return parts;
+    }
+
+    private static Map<String, Object> sourcePart(Part source) {
+        Map<String, Object> part = new LinkedHashMap<>();
+        switch (source) {
+            case Part.SourceUrl value -> {
+                part.put("type", "source-url");
+                part.put("sourceId", value.sourceId());
+                part.put("url", value.url());
+                part.put("title", value.title());
+            }
+            case Part.SourceDocument value -> {
+                part.put("type", "source-document");
+                part.put("sourceId", value.sourceId());
+                part.put("mediaType", value.mediaType());
+                part.put("title", value.title());
+                part.put("filename", value.filename());
+            }
+            default -> throw new IllegalArgumentException("Not a source part: " + source.getClass().getName());
         }
         return part;
     }

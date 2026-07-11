@@ -120,6 +120,10 @@ final class UiMessageStream {
                         "toolCallId", p.toolCallId(), "output", p.output());
                 case Part.ToolOutputError p -> fields("type", "tool-output-error",
                         "toolCallId", p.toolCallId(), "errorText", p.errorText());
+                case Part.SourceUrl p -> fields("type", "source-url", "sourceId", p.sourceId(),
+                        "url", p.url(), "title", p.title());
+                case Part.SourceDocument p -> fields("type", "source-document", "sourceId", p.sourceId(),
+                        "mediaType", p.mediaType(), "title", p.title(), "filename", p.filename());
             };
         }
 

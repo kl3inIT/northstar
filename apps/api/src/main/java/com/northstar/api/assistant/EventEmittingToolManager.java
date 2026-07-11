@@ -2,6 +2,7 @@ package com.northstar.api.assistant;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
@@ -13,6 +14,7 @@ import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.model.tool.ToolExecutionResult;
 import org.springframework.ai.tool.definition.ToolDefinition;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -72,7 +74,14 @@ class EventEmittingToolManager implements ToolCallingManager {
             List<Message> history = result.conversationHistory();
             if (!history.isEmpty() && history.getLast() instanceof ToolResponseMessage toolResponse) {
                 for (ToolResponseMessage.ToolResponse r : toolResponse.getResponses()) {
-                    emit.accept(new Part.ToolOutputAvailable(r.id(), parse(r.responseData())));
+                    Object output = parse(r.responseData());
+                    emit.accept(new Part.ToolOutputAvailable(r.id(), output));
+                    String toolName = calls.stream()
+                            .filter(call -> call.id().equals(r.id()))
+                            .map(AssistantMessage.ToolCall::name)
+                            .findFirst()
+                            .orElse("");
+                    sources(toolName, r.id(), output).forEach(emit);
                 }
             }
             // The model call and its server-side tool executions form one AI SDK
@@ -84,7 +93,7 @@ class EventEmittingToolManager implements ToolCallingManager {
     }
 
     @SuppressWarnings("unchecked")
-    private static Consumer<Part> sink(Prompt prompt) {
+    private static @Nullable Consumer<Part> sink(Prompt prompt) {
         if (prompt.getOptions() instanceof ToolCallingChatOptions opts) {
             Map<String, Object> toolContext = opts.getToolContext();
             if (toolContext != null && toolContext.get(EVENTS_KEY) instanceof Consumer<?> consumer) {
@@ -95,7 +104,7 @@ class EventEmittingToolManager implements ToolCallingManager {
     }
 
     /** Tool args/results are JSON strings; the UI wants objects — fall back to the raw string. */
-    private Object parse(String json) {
+    private @Nullable Object parse(@Nullable String json) {
         if (json == null || json.isBlank()) {
             return json;
         }
@@ -104,5 +113,77 @@ class EventEmittingToolManager implements ToolCallingManager {
         } catch (RuntimeException e) {
             return json;
         }
+    }
+
+    static List<Part> sources(String toolName, String toolCallId, @Nullable Object output) {
+        if ("search_knowledge".equals(toolName)) {
+            List<?> results = output instanceof List<?> list
+                    ? list
+                    : output instanceof Map<?, ?> map && map.get("results") instanceof List<?> list
+                            ? list
+                            : List.of();
+            return indexedMaps(results).stream()
+                    .<Part>map(entry -> knowledgeSource(entry.value(), toolCallId + "-" + entry.index()))
+                    .toList();
+        }
+        if (!(output instanceof Map<?, ?> result)) {
+            return List.of();
+        }
+        if ("search_web".equals(toolName) && result.get("sources") instanceof List<?> sources) {
+            java.util.concurrent.atomic.AtomicInteger index = new java.util.concurrent.atomic.AtomicInteger();
+            return sources.stream()
+                    .filter(Map.class::isInstance)
+                    .map(Map.class::cast)
+                    .<Part>map(source -> source(source, toolCallId + "-" + index.getAndIncrement()))
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
+        if ("read_web_page".equals(toolName)) {
+            String url = text(result.get("finalUrl"));
+            if (!url.isBlank()) {
+                return List.of(new Part.SourceUrl(toolCallId + "-0", url,
+                        fallback(text(result.get("title")), url)));
+            }
+        }
+        return List.of();
+    }
+
+    private static List<IndexedMap> indexedMaps(List<?> values) {
+        java.util.concurrent.atomic.AtomicInteger index = new java.util.concurrent.atomic.AtomicInteger();
+        return values.stream()
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .map(value -> new IndexedMap(index.getAndIncrement(), value))
+                .toList();
+    }
+
+    private static Part.SourceDocument knowledgeSource(Map<?, ?> source, String fallbackId) {
+        String url = text(source.get("url"));
+        String sourceId = url.isBlank() ? fallbackId : url;
+        String title = fallback(text(source.get("title")), sourceId);
+        String kind = text(source.get("source"));
+        String slug = text(source.get("slug"));
+        String mediaType = "note".equals(kind) ? "text/markdown" : "application/octet-stream";
+        String filename = "note".equals(kind) && !slug.isBlank() ? slug + ".md" : title;
+        return new Part.SourceDocument(sourceId, mediaType, title, filename);
+    }
+
+    private static Part.@Nullable SourceUrl source(Map<?, ?> source, String sourceId) {
+        String url = text(source.get("url"));
+        if (url.isBlank()) {
+            return null;
+        }
+        return new Part.SourceUrl(sourceId, url, fallback(text(source.get("title")), url));
+    }
+
+    private static String text(Object value) {
+        return value instanceof String text ? text.strip() : "";
+    }
+
+    private static String fallback(String value, String fallback) {
+        return value.isBlank() ? fallback : value;
+    }
+
+    private record IndexedMap(int index, Map<?, ?> value) {
     }
 }

@@ -7,6 +7,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:northstar/domain/models/assistant_models.dart';
 import 'package:northstar/ui/core/design_system/northstar_tokens.dart';
 import 'package:northstar/ui/features/assistant/view_models/assistant_view_model.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AssistantLandingView extends StatefulWidget {
   const AssistantLandingView({
@@ -95,6 +96,15 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
           for (final tool in message.tools)
             {'name': tool.name, 'status': tool.status.name},
         ],
+        'sources': [
+          for (final source in message.sources)
+            {
+              'id': source.id,
+              'title': source.title,
+              'uri': source.uri,
+              'kind': source.kind.name,
+            },
+        ],
       },
     );
   }
@@ -133,6 +143,34 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
         ),
       ),
     );
+  }
+
+  Future<void> _openSource(String value) async {
+    final uri = Uri.tryParse(value);
+    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+      return;
+    }
+    final approved = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Open external source?'),
+        content: Text(uri.host),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          CupertinoDialogAction(
+            isDefaultAction: true,
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Open'),
+          ),
+        ],
+      ),
+    );
+    if (approved == true) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
@@ -281,11 +319,16 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
     final tools = rawTools is List
         ? rawTools.whereType<Map>().toList()
         : const [];
+    final rawSources = metadata['sources'];
+    final sources = rawSources is List
+        ? rawSources.whereType<Map>().toList()
+        : const [];
     final isWaiting =
         !isSentByMe &&
         status == AssistantMessageStatus.streaming.name &&
         message.text.trim().isEmpty &&
-        tools.isEmpty;
+        tools.isEmpty &&
+        sources.isEmpty;
 
     return Semantics(
       label: isSentByMe ? 'Your message' : 'Northstar response',
@@ -340,8 +383,27 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
                 name: tool['name']?.toString() ?? 'Northstar tool',
                 status: tool['status']?.toString() ?? 'preparing',
               ),
+            if (sources.isNotEmpty) ...[
+              const SizedBox(height: NorthstarSpacing.sm),
+              Text(
+                'Sources',
+                style: NorthstarTextStyles.caption(
+                  context,
+                ).copyWith(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: NorthstarSpacing.xs),
+              for (final source in sources)
+                _AssistantSourceRow(
+                  title: source['title']?.toString() ?? 'Source',
+                  uri: source['uri']?.toString() ?? '',
+                  isDocument: source['kind']?.toString() == 'document',
+                  onOpen: _openSource,
+                ),
+            ],
             if (error != null) ...[
-              if (message.text.trim().isNotEmpty || tools.isNotEmpty)
+              if (message.text.trim().isNotEmpty ||
+                  tools.isNotEmpty ||
+                  sources.isNotEmpty)
                 const SizedBox(height: NorthstarSpacing.sm),
               Text(
                 error,
@@ -388,6 +450,51 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _AssistantSourceRow extends StatelessWidget {
+  const _AssistantSourceRow({
+    required this.title,
+    required this.uri,
+    required this.isDocument,
+    required this.onOpen,
+  });
+
+  final String title;
+  final String uri;
+  final bool isDocument;
+  final Future<void> Function(String uri) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final parsed = Uri.tryParse(uri);
+    final canOpen =
+        parsed != null && (parsed.scheme == 'http' || parsed.scheme == 'https');
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(vertical: NorthstarSpacing.xs),
+      minimumSize: const Size(0, 36),
+      alignment: Alignment.centerLeft,
+      onPressed: canOpen ? () => onOpen(uri) : null,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isDocument ? CupertinoIcons.doc_text : CupertinoIcons.globe,
+            size: 16,
+          ),
+          const SizedBox(width: NorthstarSpacing.xs),
+          Flexible(
+            child: Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: NorthstarTextStyles.caption(context),
+            ),
+          ),
+        ],
       ),
     );
   }

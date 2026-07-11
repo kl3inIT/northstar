@@ -107,6 +107,10 @@ class RemoteAssistantRepository
                 );
               })
               .toList(growable: false);
+          final sources = item.parts
+              .whereType<AssistantHistorySourceDto>()
+              .map(_sourceFromHistory)
+              .toList(growable: false);
           return AssistantMessage(
             id: 'history-$conversationId-$index',
             role: item.role == 'user'
@@ -114,6 +118,7 @@ class RemoteAssistantRepository
                 : AssistantRole.assistant,
             text: renderedText,
             tools: tools,
+            sources: sources,
           );
         })
         .toList(growable: false);
@@ -156,6 +161,24 @@ class RemoteAssistantRepository
             id: toolCallId,
             status: AssistantToolStatus.failed,
           );
+        case AssistantSourceUrlFrame(:final sourceId, :final title, :final url):
+          yield AssistantSourceEvent(
+            AssistantSource(
+              id: sourceId,
+              title: title,
+              uri: url,
+              kind: AssistantSourceKind.url,
+            ),
+          );
+        case AssistantSourceDocumentFrame(:final sourceId, :final title):
+          yield AssistantSourceEvent(
+            AssistantSource(
+              id: sourceId,
+              title: title,
+              uri: sourceId,
+              kind: AssistantSourceKind.document,
+            ),
+          );
         case AssistantErrorFrame(:final message):
           throw AssistantApiException(message, statusCode: 502);
         case AssistantAbortFrame(:final reason):
@@ -170,6 +193,17 @@ class RemoteAssistantRepository
           break;
       }
     }
+  }
+
+  AssistantSource _sourceFromHistory(AssistantHistorySourceDto part) {
+    return AssistantSource(
+      id: part.sourceId,
+      title: part.title,
+      uri: part.uri,
+      kind: part.document
+          ? AssistantSourceKind.document
+          : AssistantSourceKind.url,
+    );
   }
 
   AssistantToolStatus _historyToolStatus(AssistantHistoryToolDto part) {

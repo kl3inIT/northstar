@@ -17,6 +17,8 @@ void main() {
         '''data: {"type":"text-delta","id":"text-1","delta":"Hello"}\n\n'''
         '''data: {"type":"tool-input-start","toolCallId":"tool-1","toolName":"today_tasks"}\n\n'''
         '''data: {"type":"tool-output-error","toolCallId":"tool-1","errorText":"Tool execution failed."}\n\n'''
+        '''data: {"type":"source-url","sourceId":"web-1","url":"https://example.com","title":"Example"}\n\n'''
+        '''data: {"type":"source-document","sourceId":"/notes/northstar","mediaType":"text/markdown","title":"Northstar note","filename":"northstar.md"}\n\n'''
         '''data: [DONE]\n\n''',
       );
     });
@@ -34,12 +36,19 @@ void main() {
 
     expect(capturedRequest.headers['authorization'], 'Bearer access-token');
     expect(capturedRequest.url.path, '/api/assistant/chat');
-    expect(frames, hasLength(6));
+    expect(frames, hasLength(8));
     expect(frames[1], isA<AssistantUnknownFrame>());
     expect(frames[2], isA<AssistantTextDeltaFrame>());
     expect((frames[2] as AssistantTextDeltaFrame).delta, 'Hello');
     expect(frames[3], isA<AssistantToolInputStartFrame>());
     expect(frames[4], isA<AssistantToolOutputErrorFrame>());
+    expect(frames[5], isA<AssistantSourceUrlFrame>());
+    expect((frames[5] as AssistantSourceUrlFrame).url, 'https://example.com');
+    expect(frames[6], isA<AssistantSourceDocumentFrame>());
+    expect(
+      (frames[6] as AssistantSourceDocumentFrame).sourceId,
+      '/notes/northstar',
+    );
     expect(frames.last, isA<AssistantDoneFrame>());
   });
 
@@ -62,7 +71,10 @@ void main() {
         .toList();
 
     expect(frames.first, isA<AssistantAbortFrame>());
-    expect((frames.first as AssistantAbortFrame).reason, 'Assistant turn timed out.');
+    expect(
+      (frames.first as AssistantAbortFrame).reason,
+      'Assistant turn timed out.',
+    );
     expect(frames.last, isA<AssistantDoneFrame>());
   });
 

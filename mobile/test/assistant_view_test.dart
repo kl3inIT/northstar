@@ -146,6 +146,50 @@ void main() {
     expect(textColor, isNot(background));
     expect(textColor!.computeLuminance(), greaterThan(0.5));
   });
+
+  testWidgets('renders web and note sources with the assistant message', (
+    tester,
+  ) async {
+    _setWindowSize(tester, const Size(390, 844));
+    final repository = _WidgetAssistantRepository(
+      conversations: [
+        AssistantConversation(
+          id: 'conversation-1',
+          title: 'Research',
+          lastAt: DateTime(2026, 7, 12),
+          messageCount: 1,
+        ),
+      ],
+      historyMessages: const [
+        AssistantMessage(
+          id: 'assistant-sources',
+          role: AssistantRole.assistant,
+          text: 'Grounded answer',
+          sources: [
+            AssistantSource(
+              id: 'web-1',
+              title: 'Official documentation',
+              uri: 'https://example.com/docs',
+              kind: AssistantSourceKind.url,
+            ),
+            AssistantSource(
+              id: 'note-1',
+              title: 'Northstar App Behavior',
+              uri: '/notes/northstar-app-behavior',
+              kind: AssistantSourceKind.document,
+            ),
+          ],
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_testApp(AssistantViewModel(repository)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sources'), findsOneWidget);
+    expect(find.text('Official documentation'), findsOneWidget);
+    expect(find.text('Northstar App Behavior'), findsOneWidget);
+  });
 }
 
 Widget _testApp(AssistantViewModel viewModel) {

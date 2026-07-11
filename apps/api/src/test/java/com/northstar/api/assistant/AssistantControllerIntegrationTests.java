@@ -167,7 +167,8 @@ class AssistantControllerIntegrationTests {
                         "search_knowledge",
                         "output-available",
                         "{\"query\":\"recent notes\"}",
-                        "{\"results\":[{\"title\":\"Daily journal\"}]}",
+                        "{\"results\":[{\"source\":\"note\",\"title\":\"Daily journal\","
+                                + "\"slug\":\"daily-journal\",\"url\":\"/notes/daily-journal\"}]}",
                         Timestamp.from(now.plusMillis(100)),
                         Timestamp.from(now.plusMillis(300)))
                 .update();
@@ -182,7 +183,10 @@ class AssistantControllerIntegrationTests {
                 .contains("\"toolCallId\":\"toolcall-search-1\"")
                 .contains("\"state\":\"output-available\"")
                 .contains("\"query\":\"recent notes\"")
-                .contains("Daily journal");
+                .contains("Daily journal")
+                .contains("\"type\":\"source-document\"")
+                .contains("\"sourceId\":\"/notes/daily-journal\"")
+                .contains("\"mediaType\":\"text/markdown\"");
     }
 
     @Test

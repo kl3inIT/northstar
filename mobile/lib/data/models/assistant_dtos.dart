@@ -79,6 +79,30 @@ sealed class AssistantHistoryPartDto {
         );
       }
     }
+    if (type == 'source-url') {
+      final sourceId = json['sourceId'];
+      final url = json['url'];
+      if (sourceId is String && url is String) {
+        return AssistantHistorySourceDto(
+          sourceId: sourceId,
+          title: json['title'] is String ? json['title']! as String : url,
+          uri: url,
+          document: false,
+        );
+      }
+    }
+    if (type == 'source-document') {
+      final sourceId = json['sourceId'];
+      final title = json['title'];
+      if (sourceId is String && title is String) {
+        return AssistantHistorySourceDto(
+          sourceId: sourceId,
+          title: title,
+          uri: sourceId,
+          document: true,
+        );
+      }
+    }
     return null;
   }
 }
@@ -101,6 +125,20 @@ final class AssistantHistoryToolDto extends AssistantHistoryPartDto {
   final String toolName;
   final String state;
   final String? errorText;
+}
+
+final class AssistantHistorySourceDto extends AssistantHistoryPartDto {
+  const AssistantHistorySourceDto({
+    required this.sourceId,
+    required this.title,
+    required this.uri,
+    required this.document,
+  });
+
+  final String sourceId;
+  final String title;
+  final String uri;
+  final bool document;
 }
 
 sealed class AssistantStreamFrame {
@@ -130,6 +168,17 @@ sealed class AssistantStreamFrame {
       'tool-output-error' => AssistantToolOutputErrorFrame(
         toolCallId: _requiredString(json, 'toolCallId'),
         errorText: _requiredString(json, 'errorText'),
+      ),
+      'source-url' => AssistantSourceUrlFrame(
+        sourceId: _requiredString(json, 'sourceId'),
+        url: _requiredString(json, 'url'),
+        title: json['title'] is String
+            ? json['title']! as String
+            : _requiredString(json, 'url'),
+      ),
+      'source-document' => AssistantSourceDocumentFrame(
+        sourceId: _requiredString(json, 'sourceId'),
+        title: _requiredString(json, 'title'),
       ),
       'error' => AssistantErrorFrame(_requiredString(json, 'errorText')),
       'abort' => AssistantAbortFrame(_requiredString(json, 'reason')),
@@ -191,6 +240,28 @@ final class AssistantToolOutputErrorFrame extends AssistantStreamFrame {
 
   final String toolCallId;
   final String errorText;
+}
+
+final class AssistantSourceUrlFrame extends AssistantStreamFrame {
+  const AssistantSourceUrlFrame({
+    required this.sourceId,
+    required this.url,
+    required this.title,
+  });
+
+  final String sourceId;
+  final String url;
+  final String title;
+}
+
+final class AssistantSourceDocumentFrame extends AssistantStreamFrame {
+  const AssistantSourceDocumentFrame({
+    required this.sourceId,
+    required this.title,
+  });
+
+  final String sourceId;
+  final String title;
 }
 
 final class AssistantErrorFrame extends AssistantStreamFrame {

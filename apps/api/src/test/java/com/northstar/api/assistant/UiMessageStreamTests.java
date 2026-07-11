@@ -22,6 +22,8 @@ class UiMessageStreamTests {
                                 new Part.ToolInputStart("call-1", "today_tasks"),
                                 new Part.ToolInputAvailable("call-1", "today_tasks", java.util.Map.of()),
                                 new Part.ToolOutputAvailable("call-1", List.of("task")),
+                                new Part.SourceUrl("source-1", "https://example.com", "Example"),
+                                new Part.SourceDocument("/notes/example", "text/markdown", "Example note", "example.md"),
                                 new Part.FinishStep(),
                                 new Part.StartStep(),
                                 new Part.TextStart("text-1"),
@@ -34,13 +36,15 @@ class UiMessageStreamTests {
 
         assertThat(events).isNotNull();
         List<String> data = events.stream().map(ServerSentEvent::data).toList();
-        assertThat(data).hasSize(13);
+        assertThat(data).hasSize(15);
         assertThat(data.getFirst()).contains("\"type\":\"start\"").contains("\"messageId\":");
         assertThat(data.subList(1, data.size())).containsExactly(
                 "{\"type\":\"start-step\"}",
                 "{\"type\":\"tool-input-start\",\"toolCallId\":\"call-1\",\"toolName\":\"today_tasks\"}",
                 "{\"type\":\"tool-input-available\",\"toolCallId\":\"call-1\",\"toolName\":\"today_tasks\",\"input\":{}}",
                 "{\"type\":\"tool-output-available\",\"toolCallId\":\"call-1\",\"output\":[\"task\"]}",
+                "{\"type\":\"source-url\",\"sourceId\":\"source-1\",\"url\":\"https://example.com\",\"title\":\"Example\"}",
+                "{\"type\":\"source-document\",\"sourceId\":\"/notes/example\",\"mediaType\":\"text/markdown\",\"title\":\"Example note\",\"filename\":\"example.md\"}",
                 "{\"type\":\"finish-step\"}",
                 "{\"type\":\"start-step\"}",
                 "{\"type\":\"text-start\",\"id\":\"text-1\"}",

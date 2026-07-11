@@ -54,6 +54,16 @@ void main() {
         status: AssistantToolStatus.running,
       ),
     );
+    repository.stream.add(
+      const AssistantSourceEvent(
+        AssistantSource(
+          id: 'source-1',
+          title: 'Northstar note',
+          uri: '/notes/northstar',
+          kind: AssistantSourceKind.document,
+        ),
+      ),
+    );
     await Future<void>.delayed(Duration.zero);
 
     expect(viewModel.messages.last.text, 'Start with ');
@@ -62,6 +72,7 @@ void main() {
       viewModel.messages.last.tools.single.status,
       AssistantToolStatus.running,
     );
+    expect(viewModel.messages.last.sources.single.title, 'Northstar note');
 
     repository.stream.add(const AssistantTurnFinishedEvent());
     await repository.stream.close();

@@ -1,10 +1,20 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport, type FileUIPart, type ToolUIPart, type UIMessage } from 'ai'
+import {
+  DefaultChatTransport,
+  type FileUIPart,
+  type SourceDocumentUIPart,
+  type SourceUrlUIPart,
+  type ToolUIPart,
+  type UIMessage,
+} from 'ai'
 import {
   CalendarDays,
+  Check,
   CheckCircle2,
+  ChevronsUpDown,
+  Copy,
   History as HistoryIcon,
   Loader2,
   Globe2,
@@ -12,16 +22,20 @@ import {
   NotebookText,
   PanelRightClose,
   PanelRightOpen,
-  Paperclip,
   Search,
   Trash2,
   Wrench,
-  X,
   XCircle,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { toast } from 'sonner'
+import {
+  Attachment,
+  AttachmentPreview,
+  AttachmentRemove,
+  Attachments,
+} from '@/components/ai-elements/attachments'
 import {
   ChainOfThought,
   ChainOfThoughtContent,
@@ -35,22 +49,44 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation'
-import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message'
+import {
+  InlineCitation,
+  InlineCitationCard,
+  InlineCitationCardBody,
+  InlineCitationCardTrigger,
+  InlineCitationSource,
+  InlineCitationText,
+} from '@/components/ai-elements/inline-citation'
+import { Message, MessageAction, MessageActions, MessageContent, MessageResponse } from '@/components/ai-elements/message'
+import {
+  ModelSelector,
+  ModelSelectorContent,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorName,
+  ModelSelectorTrigger,
+} from '@/components/ai-elements/model-selector'
 import {
   PromptInput,
+  PromptInputActionAddAttachments,
+  PromptInputActionAddScreenshot,
+  PromptInputActionMenu,
+  PromptInputActionMenuContent,
+  PromptInputActionMenuTrigger,
   PromptInputBody,
   PromptInputFooter,
-  PromptInputSelect,
-  PromptInputSelectContent,
-  PromptInputSelectItem,
-  PromptInputSelectTrigger,
-  PromptInputSelectValue,
+  PromptInputHeader,
   PromptInputSubmit,
   PromptInputTextarea,
+  PromptInputTools,
   usePromptInputAttachments,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input'
 import { Suggestion } from '@/components/ai-elements/suggestion'
+import { Source, Sources, SourcesContent, SourcesTrigger } from '@/components/ai-elements/sources'
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '@/components/ai-elements/tool'
 import { Button } from '@/components/ui/button'
 import {
@@ -119,23 +155,40 @@ const CHAT_MARKDOWN_COMPONENTS = {
         </a>
       )
     }
+    if (!href) return <>{children}</>
+    const confirmExternal = (event: MouseEvent<HTMLAnchorElement>) => {
+      const ok = window.confirm(
+        `This link was written by the assistant and leads outside Northstar:\n\n${href}\n\nOpen it?`,
+      )
+      if (!ok) event.preventDefault()
+    }
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer nofollow"
-        className={CITATION_LINK}
-        onClick={(e) => {
-          const ok = window.confirm(
-            `This link was written by the assistant and leads outside Northstar:\n\n${href}\n\nOpen it?`,
-          )
-          if (!ok) e.preventDefault()
-        }}
-      >
-        {children}
-      </a>
+      <InlineCitation>
+        <InlineCitationText>
+          <a href={href} target="_blank" rel="noreferrer nofollow" className={CITATION_LINK} onClick={confirmExternal}>
+            {children}
+          </a>
+        </InlineCitationText>
+        <InlineCitationCard>
+          <InlineCitationCardTrigger sources={[href]} />
+          <InlineCitationCardBody>
+            <div className="space-y-3 p-3">
+              <InlineCitationSource title={plainText(children) || href} url={href} />
+              <a href={href} target="_blank" rel="noreferrer nofollow" className={CITATION_LINK} onClick={confirmExternal}>
+                Open source
+              </a>
+            </div>
+          </InlineCitationCardBody>
+        </InlineCitationCard>
+      </InlineCitation>
     )
   },
+}
+
+function plainText(value: ReactNode): string {
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
+  if (Array.isArray(value)) return value.map(plainText).join('')
+  return ''
 }
 
 /** Kills the InputGroup chrome: zeromail's input is a soft pill, no border, no ring. */
@@ -176,6 +229,10 @@ function isHistoryPart(part: unknown): part is UIMessage['parts'][number] {
   if (!isRecord(part) || typeof part.type !== 'string') return false
   if (part.type === 'text') return typeof part.text === 'string'
   if (part.type === 'file') return typeof part.url === 'string'
+  if (part.type === 'source-url') return typeof part.sourceId === 'string' && typeof part.url === 'string'
+  if (part.type === 'source-document') {
+    return typeof part.sourceId === 'string' && typeof part.mediaType === 'string' && typeof part.title === 'string'
+  }
   if (part.type.startsWith('tool-')) {
     return typeof part.toolCallId === 'string' && typeof part.state === 'string'
   }
@@ -248,7 +305,7 @@ export function AssistantPage() {
     deleteAssistantConversation({ path: { id } })
       .then((result) => {
         voidOrThrow(result)
-        queryClient.invalidateQueries({ queryKey: ['assistant-conversations'] })
+        void queryClient.invalidateQueries({ queryKey: ['assistant-conversations'] })
         queryClient.removeQueries({ queryKey: ['assistant-history', id] })
         if (id === conversationId) setConversationId(crypto.randomUUID())
       })
@@ -451,14 +508,14 @@ function AssistantChat({
   const modelSelection = useAssistantConversationModel(conversationId)
   const availableModels = useAiModels(modelSelection.data?.gatewayId)
   const updateModel = useUpdateAssistantConversationModel(conversationId)
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, stop } = useChat({
     messages: initialMessages,
     onFinish: () => {
       // A finished turn may have created/completed things and retitles the list.
-      queryClient.invalidateQueries({ queryKey: ['assistant-conversations'] })
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
-      queryClient.invalidateQueries({ queryKey: ['notes'] })
-      queryClient.invalidateQueries({
+      void queryClient.invalidateQueries({ queryKey: ['assistant-conversations'] })
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      void queryClient.invalidateQueries({ queryKey: ['notes'] })
+      void queryClient.invalidateQueries({
         queryKey: ['assistant-history', conversationId],
         refetchType: 'none',
       })
@@ -514,7 +571,7 @@ function AssistantChat({
       throw new Error('upload failed') // keeps the composer content for retry
     }
     setText('')
-    sendMessage({ text: trimmed, files: uploaded })
+    await sendMessage({ text: trimmed, files: uploaded })
   }
 
   const input = (
@@ -522,6 +579,7 @@ function AssistantChat({
       onSubmit={onSubmit}
       className={PILL_INPUT}
       accept="image/*"
+      globalDrop
       multiple
       maxFiles={3}
       maxFileSize={8 * 1024 * 1024}
@@ -535,8 +593,10 @@ function AssistantChat({
         )
       }
     >
-      <PromptInputBody>
+      <PromptInputHeader>
         <AttachmentStrip />
+      </PromptInputHeader>
+      <PromptInputBody>
         <PromptInputTextarea
           placeholder="Message Northstar…"
           autoFocus
@@ -546,7 +606,7 @@ function AssistantChat({
         />
       </PromptInputBody>
       <PromptInputFooter>
-        <div className="flex min-w-0 items-center gap-1">
+        <PromptInputTools>
           <ModelPicker
             gatewayName={modelSelection.data?.gatewayId}
             modelId={modelSelection.data?.modelId}
@@ -560,11 +620,17 @@ function AssistantChat({
               })
             }}
           />
-          <AttachButton />
-        </div>
+          <PromptInputActionMenu>
+            <PromptInputActionMenuTrigger aria-label="Add attachment" tooltip="Add attachment" />
+            <PromptInputActionMenuContent>
+              <PromptInputActionAddAttachments label="Add images" />
+              <PromptInputActionAddScreenshot />
+            </PromptInputActionMenuContent>
+          </PromptInputActionMenu>
+        </PromptInputTools>
         <div className="flex items-center gap-1">
           <MicButton value={text} onChange={setText} compact />
-          <PromptInputSubmit status={status} className="rounded-full" />
+          <PromptInputSubmit status={status} onStop={stop} className="rounded-full" />
         </div>
       </PromptInputFooter>
     </PromptInput>
@@ -601,8 +667,34 @@ function AssistantChat({
           {messages.map((m) => {
             if (!messageHasVisibleOutput(m)) return null
             const toolParts = m.parts.filter(isToolPart)
+            const fileParts = m.parts.filter((part): part is FileUIPart => part.type === 'file')
+            const sources = uniqueSources(m.parts.filter(isSourcePart))
+            const messageText = m.parts
+              .filter((part) => part.type === 'text')
+              .map((part) => part.text)
+              .join('\n')
             return (
               <Message from={m.role} key={m.id}>
+                {fileParts.length > 0 && (
+                  <Attachments variant="grid">
+                    {fileParts.map((file, index) => (
+                      <Attachment
+                        key={`${m.id}-file-${index}`}
+                        data={{ ...file, id: `${m.id}-file-${index}` }}
+                        className="cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                        title={file.filename ?? 'Open attachment'}
+                        onClick={() => window.open(file.url, '_blank', 'noopener,noreferrer')}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') window.open(file.url, '_blank', 'noopener,noreferrer')
+                        }}
+                      >
+                        <AttachmentPreview />
+                      </Attachment>
+                    ))}
+                  </Attachments>
+                )}
                 <MessageContent>
                   {m.role === 'assistant' && toolParts.length > 0 && <ToolWorkflow tools={toolParts} />}
                   {m.parts.map((part, i) => {
@@ -613,21 +705,43 @@ function AssistantChat({
                       </MessageResponse>
                     )
                   }
-                  if (part.type === 'file' && (part as FileUIPart).mediaType?.startsWith('image/')) {
-                    const file = part as FileUIPart
-                    return (
-                      <img
-                        key={i}
-                        src={file.url}
-                        alt={file.filename ?? 'attached image'}
-                        className="my-1 max-h-64 max-w-full rounded-lg border object-contain"
-                      />
-                    )
-                  }
+                  if (part.type === 'file') return null
                   if (isToolPart(part)) return null
                   return null
                   })}
                 </MessageContent>
+                {sources.length > 0 && (
+                  <Sources className="mb-0">
+                    <SourcesTrigger count={sources.length} />
+                    <SourcesContent>
+                      {sources.map((source) => {
+                        const href = source.type === 'source-url' ? source.url : source.sourceId
+                        const title = source.title ?? href
+                        return (
+                          <Source
+                            key={`${source.type}-${source.sourceId}`}
+                            href={href}
+                            title={title}
+                            target={href.startsWith('/') ? '_self' : '_blank'}
+                          />
+                        )
+                      })}
+                    </SourcesContent>
+                  </Sources>
+                )}
+                {messageText.trim() && (
+                  <MessageActions className={m.role === 'user' ? 'justify-end' : undefined}>
+                    <MessageAction
+                      tooltip="Copy message"
+                      label="Copy message"
+                      onClick={() => navigator.clipboard.writeText(messageText)
+                        .then(() => toast.success('Message copied'))
+                        .catch(() => toast.error('Could not copy message'))}
+                    >
+                      <Copy className="size-4" />
+                    </MessageAction>
+                  </MessageActions>
+                )}
               </Message>
             )
           })}
@@ -654,29 +768,55 @@ function ModelPicker({
   disabled: boolean
   onChange: (modelId: string) => void
 }) {
+  const [open, setOpen] = useState(false)
   if (!modelId) {
     return <Loader2 className="mx-2 size-3.5 animate-spin text-muted-foreground" />
   }
+  const current = models.find((model) => model.id === modelId)
   return (
-    <PromptInputSelect value={modelId} onValueChange={onChange} disabled={disabled}>
-      <PromptInputSelectTrigger
-        className="h-8 max-w-44 gap-1 px-2 text-xs"
-        aria-label="Assistant model"
-        title={gatewayName ? `Model via ${gatewayName}` : 'Assistant model'}
-      >
-        <PromptInputSelectValue />
-      </PromptInputSelectTrigger>
-      <PromptInputSelectContent>
-        {models.map((model) => (
-          <PromptInputSelectItem key={model.id} value={model.id}>
-            {model.displayName}
-          </PromptInputSelectItem>
-        ))}
-        {!models.some((model) => model.id === modelId) && (
-          <PromptInputSelectItem value={modelId}>{modelId}</PromptInputSelectItem>
-        )}
-      </PromptInputSelectContent>
-    </PromptInputSelect>
+    <ModelSelector open={open} onOpenChange={setOpen}>
+      <ModelSelectorTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-8 max-w-52 gap-1.5 px-2 text-xs font-normal"
+          aria-label="Assistant model"
+          title={gatewayName ? `Model via ${gatewayName}` : 'Assistant model'}
+          disabled={disabled}
+        >
+          <span className="truncate">{current?.displayName ?? modelId}</span>
+          <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
+        </Button>
+      </ModelSelectorTrigger>
+      <ModelSelectorContent title="Choose Assistant model" className="sm:max-w-lg">
+        <ModelSelectorInput placeholder="Search models..." />
+        <ModelSelectorList>
+          <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
+          <ModelSelectorGroup heading={gatewayName ?? 'Available models'}>
+            {models.map((model) => (
+              <ModelSelectorItem
+                key={model.id}
+                value={`${model.displayName} ${model.id}`}
+                onSelect={() => {
+                  onChange(model.id)
+                  setOpen(false)
+                }}
+              >
+                <ModelSelectorName>{model.displayName}</ModelSelectorName>
+                {model.id === modelId && <Check className="size-4" />}
+              </ModelSelectorItem>
+            ))}
+            {!models.some((model) => model.id === modelId) && (
+              <ModelSelectorItem value={modelId} onSelect={() => setOpen(false)}>
+                <ModelSelectorName>{modelId}</ModelSelectorName>
+                <Check className="size-4" />
+              </ModelSelectorItem>
+            )}
+          </ModelSelectorGroup>
+        </ModelSelectorList>
+      </ModelSelectorContent>
+    </ModelSelector>
   )
 }
 
@@ -687,11 +827,23 @@ function isToolPart(part: UIMessage['parts'][number]): part is ToolUIPart {
 function partHasVisibleOutput(part: UIMessage['parts'][number]): boolean {
   if (part.type === 'text') return part.text.trim().length > 0
   if (part.type === 'file') return Boolean((part as FileUIPart).url)
+  if (part.type === 'source-url') return Boolean((part as SourceUrlUIPart).url)
+  if (part.type === 'source-document') return Boolean((part as SourceDocumentUIPart).sourceId)
   return isToolPart(part)
 }
 
 function messageHasVisibleOutput(message: UIMessage): boolean {
   return message.parts.some(partHasVisibleOutput)
+}
+
+type SourcePart = SourceUrlUIPart | SourceDocumentUIPart
+
+function isSourcePart(part: UIMessage['parts'][number]): part is SourcePart {
+  return part.type === 'source-url' || part.type === 'source-document'
+}
+
+function uniqueSources(sources: SourcePart[]) {
+  return [...new Map(sources.map((source) => [source.sourceId, source])).values()]
 }
 
 function ToolWorkflow({ tools }: { tools: ToolUIPart[] }) {
@@ -904,48 +1056,19 @@ async function uploadImage(file: FileUIPart): Promise<FileUIPart> {
   return { ...file, url: fileUrl(meta.id) }
 }
 
-/** Paperclip in the composer footer — opens the image picker (paste and drop also work). */
-function AttachButton() {
-  const attachments = usePromptInputAttachments()
-  return (
-    <Button
-      type="button"
-      size="icon"
-      variant="ghost"
-      className="size-8 rounded-full text-muted-foreground"
-      aria-label="Attach images"
-      title="Attach images"
-      onClick={() => attachments.openFileDialog()}
-    >
-      <Paperclip className="size-4" />
-    </Button>
-  )
-}
-
 /** Thumbnails of images queued for the next message, each removable. */
 function AttachmentStrip() {
   const attachments = usePromptInputAttachments()
   if (attachments.files.length === 0) return null
   return (
-    <div className="flex w-full flex-wrap justify-start gap-2 px-3 pt-3">
+    <Attachments variant="grid" className="ml-0 w-full justify-start px-3 pt-3">
       {attachments.files.map((file) => (
-        <div key={file.id} className="group relative">
-          <img
-            src={file.url}
-            alt={file.filename ?? 'attached image'}
-            className="size-14 rounded-lg border object-cover"
-          />
-          <button
-            type="button"
-            aria-label="Remove image"
-            onClick={() => attachments.remove(file.id)}
-            className="absolute -right-1.5 -top-1.5 rounded-full border bg-background p-0.5 shadow-sm"
-          >
-            <X className="size-3" />
-          </button>
-        </div>
+        <Attachment key={file.id} data={file} onRemove={() => attachments.remove(file.id)} className="size-14">
+          <AttachmentPreview />
+          <AttachmentRemove label={`Remove ${file.filename ?? 'image'}`} className="-right-1.5 -top-1.5" />
+        </Attachment>
       ))}
-    </div>
+    </Attachments>
   )
 }
 

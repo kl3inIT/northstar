@@ -4,6 +4,22 @@ enum AssistantMessageStatus { complete, streaming, failed, stopped }
 
 enum AssistantToolStatus { preparing, running, complete, failed }
 
+enum AssistantSourceKind { url, document }
+
+class AssistantSource {
+  const AssistantSource({
+    required this.id,
+    required this.title,
+    required this.uri,
+    required this.kind,
+  });
+
+  final String id;
+  final String title;
+  final String uri;
+  final AssistantSourceKind kind;
+}
+
 class AssistantModelSelection {
   const AssistantModelSelection({
     required this.gatewayId,
@@ -61,6 +77,7 @@ class AssistantMessage {
     required this.role,
     required this.text,
     this.tools = const [],
+    this.sources = const [],
     this.status = AssistantMessageStatus.complete,
     this.errorMessage,
   });
@@ -69,15 +86,20 @@ class AssistantMessage {
   final AssistantRole role;
   final String text;
   final List<AssistantToolActivity> tools;
+  final List<AssistantSource> sources;
   final AssistantMessageStatus status;
   final String? errorMessage;
 
   bool get hasVisibleOutput =>
-      text.trim().isNotEmpty || tools.isNotEmpty || errorMessage != null;
+      text.trim().isNotEmpty ||
+      tools.isNotEmpty ||
+      sources.isNotEmpty ||
+      errorMessage != null;
 
   AssistantMessage copyWith({
     String? text,
     List<AssistantToolActivity>? tools,
+    List<AssistantSource>? sources,
     AssistantMessageStatus? status,
     String? errorMessage,
   }) {
@@ -86,6 +108,7 @@ class AssistantMessage {
       role: role,
       text: text ?? this.text,
       tools: tools ?? this.tools,
+      sources: sources ?? this.sources,
       status: status ?? this.status,
       errorMessage: errorMessage ?? this.errorMessage,
     );
@@ -107,6 +130,12 @@ final class AssistantToolEvent extends AssistantTurnEvent {
   final String id;
   final String? name;
   final AssistantToolStatus status;
+}
+
+final class AssistantSourceEvent extends AssistantTurnEvent {
+  const AssistantSourceEvent(this.source);
+
+  final AssistantSource source;
 }
 
 final class AssistantTurnFinishedEvent extends AssistantTurnEvent {

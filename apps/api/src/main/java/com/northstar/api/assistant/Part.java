@@ -34,4 +34,10 @@ sealed interface Part {
 
     record ToolOutputError(String toolCallId, String errorText) implements Part {
     }
+
+    record SourceUrl(String sourceId, String url, String title) implements Part {
+    }
+
+    record SourceDocument(String sourceId, String mediaType, String title, String filename) implements Part {
+    }
 }

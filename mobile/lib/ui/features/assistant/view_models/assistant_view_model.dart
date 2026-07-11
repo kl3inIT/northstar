@@ -250,6 +250,17 @@ class AssistantViewModel extends ChangeNotifier {
           tools[toolIndex] = tools[toolIndex].copyWith(status: status);
         }
         _messages[index] = current.copyWith(tools: List.unmodifiable(tools));
+      case AssistantSourceEvent(:final source):
+        final sources = current.sources.toList();
+        final sourceIndex = sources.indexWhere((item) => item.id == source.id);
+        if (sourceIndex < 0) {
+          sources.add(source);
+        } else {
+          sources[sourceIndex] = source;
+        }
+        _messages[index] = current.copyWith(
+          sources: List.unmodifiable(sources),
+        );
       case AssistantTurnFinishedEvent():
         _messages[index] = current.copyWith(
           status: AssistantMessageStatus.complete,
