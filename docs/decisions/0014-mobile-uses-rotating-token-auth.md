@@ -26,8 +26,9 @@ provided through `NORTHSTAR_MOBILE_AUTH_JWT_SECRET`.
 
 Flutter Web remains a Windows development-preview target and keeps its refresh
 token in memory; it does not persist mobile credentials in browser storage.
-When the preview calls a separate local API origin, that exact origin must be
-explicitly configured; Northstar does not enable wildcard CORS.
+When a browser build calls a separate API origin, every trusted origin must be
+listed exactly in `NORTHSTAR_CORS_ALLOWED_ORIGINS`. Northstar does not enable
+wildcard CORS or cross-origin cookies. Native iOS and Android do not use CORS.
 
 ## Consequences
 

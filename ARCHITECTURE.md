@@ -157,6 +157,10 @@ verification in `:core:test` is the boundary check.
 - Flutter holds access tokens in memory and native refresh tokens in platform
   secure storage. `go_router` observes the auth state and guards the Cupertino
   route shell; the Web preview does not persist mobile credentials.
+- Native iOS and Android do not use CORS. Cross-origin browser previews use the
+  exact, comma-separated `NORTHSTAR_CORS_ALLOWED_ORIGINS` allowlist. Cross-origin
+  cookies are disabled; Bearer requests may use standard REST methods with only
+  `Authorization`, `Content-Type`, and `Accept` request headers.
 
 ## Commands
 

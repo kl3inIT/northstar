@@ -33,7 +33,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "northstar.auth.password-hash={bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG",
         "northstar.auth.mobile.enabled=true",
         "northstar.auth.mobile.jwt-secret=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=",
-        "northstar.auth.mobile.web-preview-origin=http://127.0.0.1:7357"
+        "northstar.security.cors.allowed-origins=http://127.0.0.1:7357,https://mobile-preview.example.com"
 })
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -81,6 +81,7 @@ class AuthControllerIntegrationTests {
                 .andReturn();
 
         MockHttpSession session = (MockHttpSession) loggedIn.getRequest().getSession(false);
+        org.assertj.core.api.Assertions.assertThat(session).isNotNull();
         mvc.perform(get("/api/notes").session(session))
                 .andExpect(status().isOk());
 
@@ -164,17 +165,42 @@ class AuthControllerIntegrationTests {
     }
 
     @Test
-    void mobileWebPreviewAllowsOnlyTheConfiguredCorsOrigin() throws Exception {
+    void corsAllowsOnlyExactConfiguredOriginsWithoutCredentials() throws Exception {
         mvc.perform(options("/api/auth/mobile/login")
                         .header("Origin", "http://127.0.0.1:7357")
                         .header("Access-Control-Request-Method", "POST")
                         .header("Access-Control-Request-Headers", "content-type"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:7357"));
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:7357"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Credentials"));
 
         mvc.perform(options("/api/auth/mobile/login")
-                        .header("Origin", "https://untrusted.example")
+                        .header("Origin", "https://mobile-preview.example.com")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://mobile-preview.example.com"));
+
+        mvc.perform(options("/api/auth/mobile/login")
+                        .header("Origin", "https://mobile-preview.example.com.evil.test")
                         .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void corsSupportsRestMethodsAndRejectsUnlistedHeaders() throws Exception {
+        mvc.perform(options("/api/tasks/00000000-0000-0000-0000-000000000000")
+                        .header("Origin", "https://mobile-preview.example.com")
+                        .header("Access-Control-Request-Method", "PUT")
+                        .header("Access-Control-Request-Headers", "authorization,content-type,accept"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Methods", containsString("PUT")))
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("authorization")));
+
+        mvc.perform(options("/api/auth/mobile/login")
+                        .header("Origin", "https://mobile-preview.example.com")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "x-admin-override"))
                 .andExpect(status().isForbidden());
     }
 }

@@ -27,23 +27,24 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
-import org.springframework.util.StringUtils;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @NullMarked
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-@EnableConfigurationProperties({AuthProperties.class, MobileAuthProperties.class})
+@EnableConfigurationProperties({AuthProperties.class, MobileAuthProperties.class, CorsProperties.class})
 class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, AuthProperties auth,
-            MobileAuthProperties mobileAuth, SecurityContextRepository securityContextRepository,
+            MobileAuthProperties mobileAuth, CorsProperties corsProperties,
+            SecurityContextRepository securityContextRepository,
             ObjectProvider<JwtDecoder> jwtDecoderProvider) throws Exception {
         if (mobileAuth.enabled() && !auth.enabled()) {
             throw new IllegalStateException("Mobile auth requires northstar.auth.enabled=true");
         }
+        List<String> allowedOrigins = corsProperties.origins();
         if (!auth.enabled()) {
             return http
                     .csrf(AbstractHttpConfigurer::disable)
@@ -51,11 +52,12 @@ class SecurityConfig {
                     .build();
         }
 
-        if (StringUtils.hasText(mobileAuth.webPreviewOrigin())) {
+        if (!allowedOrigins.isEmpty()) {
             CorsConfiguration corsConfiguration = new CorsConfiguration();
-            corsConfiguration.setAllowedOrigins(List.of(mobileAuth.webPreviewOrigin()));
-            corsConfiguration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
-            corsConfiguration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+            corsConfiguration.setAllowedOrigins(allowedOrigins);
+            corsConfiguration.setAllowedMethods(List.of("GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+            corsConfiguration.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+            corsConfiguration.setAllowCredentials(false);
             corsConfiguration.setMaxAge(3600L);
             UrlBasedCorsConfigurationSource corsSource = new UrlBasedCorsConfigurationSource();
             corsSource.registerCorsConfiguration("/api/**", corsConfiguration);

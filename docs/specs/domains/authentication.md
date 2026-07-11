@@ -31,6 +31,10 @@
   and revoked as a family on replay or logout.
 - Flutter keeps the access token in memory and the native refresh token in
   Keychain/secure storage. The Web preview intentionally uses memory only.
+- Native clients do not use CORS. Cross-origin browser clients are disabled by
+  default and require exact HTTP(S) origins in the comma-separated
+  `NORTHSTAR_CORS_ALLOWED_ORIGINS` environment value. Credentialed CORS and
+  wildcard origins are not supported; browser previews use Bearer tokens.
 
 ## Source Modules
 

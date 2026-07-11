@@ -17,4 +17,4 @@ Reusable testing mechanics live in
 | Refresh rotation and replay response | Automated | A refresh token rotates once; replaying it returns 401 and revokes the replacement token family. |
 | Mobile logout revokes refresh credentials | Automated | Logout returns 204 and the same refresh token can no longer rotate. |
 | Flutter startup, login, route guard, branch navigation, and logout | Automated | `mobile/test/app_test.dart` covers signed-out redirect, successful login, five-branch shell behavior, and logout redirect. |
-| Flutter Web preview CORS is allowlisted | Automated | `AuthControllerIntegrationTests` permits the configured local origin and rejects an untrusted origin. |
+| Cross-origin browser access is production-allowlisted | Automated | `AuthControllerIntegrationTests` permits multiple exact origins, rejects suffix-spoofed origins and unlisted headers, supports standard REST methods, and confirms credentialed CORS is disabled. |

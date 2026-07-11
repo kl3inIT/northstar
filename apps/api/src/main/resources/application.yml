@@ -99,7 +99,12 @@ northstar:
       jwt-secret: ${NORTHSTAR_MOBILE_AUTH_JWT_SECRET:}
       access-ttl: ${NORTHSTAR_MOBILE_AUTH_ACCESS_TTL:15m}
       refresh-ttl: ${NORTHSTAR_MOBILE_AUTH_REFRESH_TTL:30d}
-      web-preview-origin: ${NORTHSTAR_MOBILE_AUTH_WEB_PREVIEW_ORIGIN:}
+  security:
+    cors:
+      # Browser-only allowlist. Native clients do not use CORS. Keep empty when
+      # the web UI and API share an origin; otherwise use exact comma-separated
+      # origins (scheme + host + optional port, without paths or wildcards).
+      allowed-origins: ${NORTHSTAR_CORS_ALLOWED_ORIGINS:}
   assistant:
     title:
       enabled: true

@@ -15,8 +15,7 @@ public record MobileAuthProperties(
         @DefaultValue("northstar-mobile") String audience,
         @DefaultValue("") String jwtSecret,
         @DefaultValue("15m") Duration accessTtl,
-        @DefaultValue("30d") Duration refreshTtl,
-        @DefaultValue("") String webPreviewOrigin) {
+        @DefaultValue("30d") Duration refreshTtl) {
 
     byte[] decodedSecret() {
         if (!StringUtils.hasText(jwtSecret)) {
