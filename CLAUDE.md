@@ -68,7 +68,7 @@ facts here.
 ## Flutter Mobile And AI
 
 - For changes under `mobile/`, read
-  [`.agent/rules/flutter-dart.md`](./.agent/rules/flutter-dart.md) before editing.
+  [`.agents/rules/flutter-dart.md`](.agents/rules/flutter-dart.md) before editing.
 - Use the task-specific Flutter and Dart skills in `.agents/skills/`; compatible
   agents discover that directory through the universal Agent Skills format.
 - For AI-powered mobile features, use the `flutter-build-ai-features` skill and
