@@ -88,6 +88,11 @@ spring:
 # cheaper tier (e.g. a mini/nano model) to cut titling cost — no code change; set
 # `enabled: false` to switch titling off (the list falls back to the first message).
 northstar:
+  speech:
+    provider: ${NORTHSTAR_SPEECH_PROVIDER:azure}
+    azure:
+      key: ${AZURE_SPEECH_KEY:}
+      region: ${AZURE_SPEECH_REGION:}
   auth:
     enabled: ${NORTHSTAR_AUTH_ENABLED:true}
     username: ${NORTHSTAR_AUTH_USERNAME:}

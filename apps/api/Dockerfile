@@ -34,6 +34,7 @@ COPY apps/mcp/build.gradle.kts        apps/mcp/build.gradle.kts
 COPY apps/worker/build.gradle.kts     apps/worker/build.gradle.kts
 COPY integrations/web-openai/build.gradle.kts integrations/web-openai/build.gradle.kts
 COPY integrations/web-firecrawl/build.gradle.kts integrations/web-firecrawl/build.gradle.kts
+COPY integrations/speech-azure/build.gradle.kts integrations/speech-azure/build.gradle.kts
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     chmod +x gradlew && \
@@ -48,6 +49,7 @@ COPY core/src/main/       core/src/main/
 COPY apps/api/src/main/   apps/api/src/main/
 COPY integrations/web-openai/src/main/ integrations/web-openai/src/main/
 COPY integrations/web-firecrawl/src/main/ integrations/web-firecrawl/src/main/
+COPY integrations/speech-azure/src/main/ integrations/speech-azure/src/main/
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     ./gradlew :apps:api:bootJar --no-daemon --parallel --console=plain -x test && \
@@ -65,8 +67,10 @@ RUN java -Djarmode=tools -jar /app/app.jar extract --layers --launcher --destina
 # ============================================================================
 FROM bellsoft/liberica-runtime-container:jre-25-glibc
 
-# tini for PID-1 signal handling, curl for the healthcheck probe.
-RUN apk add --no-cache tini curl
+# tini for PID-1 signal handling, curl for the healthcheck probe. Azure Speech's
+# native layer also requires TLS certificates/OpenSSL and ALSA, even when audio
+# enters through an in-memory PCM stream rather than a device.
+RUN apk add --no-cache tini curl ca-certificates openssl alsa-lib
 
 RUN addgroup -g 1654 -S appgroup && \
     adduser  -u 1654 -S appuser -G appgroup
@@ -81,7 +85,8 @@ COPY --from=builder --chown=1654:1654 /app/extracted/application/           ./
 
 USER 1654:1654
 
-ENV JAVA_TOOL_OPTIONS="-XX:+UseContainerSupport \
+ENV JAVA_TOOL_OPTIONS="--enable-native-access=ALL-UNNAMED \
+  -XX:+UseContainerSupport \
   -XX:MaxRAMPercentage=75.0 \
   -XX:InitialRAMPercentage=50.0 \
   -XX:+UseG1GC \

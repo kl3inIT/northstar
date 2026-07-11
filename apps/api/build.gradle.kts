@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":integrations:web-openai"))
     implementation(project(":integrations:web-firecrawl"))
+    implementation(project(":integrations:speech-azure"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-security")
