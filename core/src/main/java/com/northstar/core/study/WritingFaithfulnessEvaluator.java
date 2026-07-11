@@ -1,6 +1,9 @@
 package com.northstar.core.study;
 
 import java.util.Map;
+import com.northstar.core.ai.AiClientRouter;
+import com.northstar.core.ai.AiRoute;
+import com.northstar.core.ai.AiTask;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.evaluation.EvaluationRequest;
@@ -43,18 +46,17 @@ public class WritingFaithfulnessEvaluator implements Evaluator {
             Claims:
             {claim}""";
 
-    private final ChatClient chat;
-    private final String model;
+    private final AiClientRouter ai;
 
-    public WritingFaithfulnessEvaluator(ChatClient chat, String model) {
-        this.chat = chat;
-        this.model = model;
+    public WritingFaithfulnessEvaluator(AiClientRouter ai) {
+        this.ai = ai;
     }
 
     @Override
     public EvaluationResponse evaluate(EvaluationRequest evaluationRequest) {
-        String verdict = this.chat.prompt()
-                .options(ChatOptions.builder().model(this.model))
+        AiRoute route = ai.route(AiTask.STUDY_GRADER);
+        String verdict = ai.client(route).prompt()
+                .options(ChatOptions.builder().model(route.modelId()))
                 .user(user -> user.text(EVALUATION_PROMPT)
                         .param("document", evaluationRequest.getUserText())
                         .param("claim", evaluationRequest.getResponseContent()))

@@ -2,9 +2,11 @@ package com.northstar.api.assistant;
 
 import com.northstar.core.assistant.MemoryTools;
 import com.northstar.core.assistant.NorthstarTool;
+import com.northstar.core.ai.AiRoute;
 import com.northstar.core.attachment.AttachmentContent;
 import com.northstar.core.attachment.AttachmentService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import io.swagger.v3.oas.annotations.Operation;
 import java.sql.Timestamp;
@@ -24,10 +26,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import java.util.function.Consumer;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.memory.ChatMemory;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.content.Media;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -40,6 +41,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -105,6 +107,9 @@ class AssistantController {
               When they ask to practice grammar ("luyện ngữ pháp"), call
               grammar_weaknesses and run its drill protocol on THEIR recurring errors —
               never drill generic textbook grammar while their own error corpus exists.
+              When they ask to practice speaking ("luyện nói"), point them to the
+              Speaking tab on /study: chat cannot accept practice audio in V1, and
+              completed attempts automatically add spoken errors to grammar drills.
             - Before a delete/cancel/archive: resolve exactly ONE target with a read tool
               first; if several items match what the user said, list them and ask which —
               never guess, never delete more than the user named. Prefer archiving a note
@@ -114,7 +119,8 @@ class AssistantController {
               list when listing items. No headings.
             </behavior>""";
 
-    private final ChatClient chat;
+    private final AssistantChatClientFactory chats;
+    private final AssistantConversationRouteService conversationRoutes;
     private final ChatMemory memory;
     private final List<NorthstarTool> tools;
     private final ObjectMapper json;
@@ -123,11 +129,12 @@ class AssistantController {
     private final MemoryTools longTermMemory;
     private final ConversationTitleService titles;
 
-    AssistantController(@Qualifier(AssistantConfig.ASSISTANT_CHAT_CLIENT) ChatClient chat,
-            ChatMemory memory, List<NorthstarTool> tools,
+    AssistantController(AssistantChatClientFactory chats,
+            AssistantConversationRouteService conversationRoutes, ChatMemory memory, List<NorthstarTool> tools,
             ObjectMapper json, JdbcClient jdbc, AttachmentService attachments, MemoryTools longTermMemory,
             ConversationTitleService titles) {
-        this.chat = chat;
+        this.chats = chats;
+        this.conversationRoutes = conversationRoutes;
         this.memory = memory;
         this.tools = tools;
         this.json = json;
@@ -156,10 +163,13 @@ class AssistantController {
         String stored = message.isBlank() ? markers
                 : markers.isBlank() ? message : message + "\n\n" + markers;
 
+        String conversationId = conversationId(request.conversationId());
+        AiRoute route = conversationRoutes.resolve(conversationId, request.gatewayId(), request.modelId());
         Flux<ServerSentEvent<String>> stream = UiMessageStream.encode(streamTurn(
                 stored,
                 toMedia(images),
-                conversationId(request.conversationId()),
+                conversationId,
+                route,
                 UUID.randomUUID().toString()),
                 json, TURN_TIMEOUT);
         return ResponseEntity.ok()
@@ -168,6 +178,19 @@ class AssistantController {
                 .header(HttpHeaders.CONNECTION, "keep-alive")
                 .header("X-Accel-Buffering", "no")
                 .body(stream);
+    }
+
+    @GetMapping("/conversations/{id}/model")
+    @Operation(operationId = "getAssistantConversationModel")
+    AiRoute conversationModel(@PathVariable String id) {
+        return conversationRoutes.selection(conversationId(id));
+    }
+
+    @PutMapping("/conversations/{id}/model")
+    @Operation(operationId = "updateAssistantConversationModel")
+    AiRoute updateConversationModel(@PathVariable String id,
+            @Valid @RequestBody ModelSelectionRequest request) {
+        return conversationRoutes.resolve(conversationId(id), request.gatewayId(), request.modelId());
     }
 
     /**
@@ -327,6 +350,7 @@ class AssistantController {
         jdbc.sql("DELETE FROM northstar_conversation_title WHERE conversation_id = ?")
                 .param(id)
                 .update();
+        conversationRoutes.delete(id);
         memory.clear(id);
     }
 
@@ -339,7 +363,7 @@ class AssistantController {
     }
 
     private Flux<Part> streamTurn(String userMessage, List<Media> images, String conversationId,
-            String turnId) {
+            AiRoute route, String turnId) {
         Sinks.Many<Part> toolEvents = Sinks.many().unicast().onBackpressureBuffer();
         ToolTraceRecorder trace = new ToolTraceRecorder(conversationId, turnId);
         Consumer<Part> emit = part -> {
@@ -349,7 +373,8 @@ class AssistantController {
 
         ZoneId zone = ZoneId.systemDefault();
         LocalDate today = LocalDate.now(zone);
-        Flux<Part> deltas = chat.prompt()
+        Flux<Part> deltas = chats.client(route).prompt()
+                .options(ChatOptions.builder().model(route.modelId()))
                 // Memory rules + the LIVE index ride the system prompt every
                 // turn, so the model knows what it remembers without a tool call.
                 .system(SYSTEM_PROMPT.formatted(today,
@@ -424,7 +449,10 @@ class AssistantController {
     }
 
     record ChatRequest(@Size(max = 20_000) String message, String conversationId,
-            @Size(max = 3) List<UUID> attachmentIds) {
+            @Size(max = 3) List<UUID> attachmentIds, String gatewayId, String modelId) {
+    }
+
+    record ModelSelectionRequest(@NotBlank String gatewayId, @NotBlank String modelId) {
     }
 
     record HistoryMessage(String role, String text, List<Map<String, Object>> parts) {

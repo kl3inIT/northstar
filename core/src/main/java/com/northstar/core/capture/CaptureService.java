@@ -15,7 +15,11 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import com.northstar.core.ai.AiClientRouter;
+import com.northstar.core.ai.AiRoute;
+import com.northstar.core.ai.AiTask;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -295,16 +299,16 @@ public class CaptureService {
             </user_context>
             """;
 
-    private final ChatClient chat;
+    private final AiClientRouter ai;
     private final NoteService notes;
     private final DisciplineService disciplines;
     private final FinanceService finance;
     private final StudyService study;
     private final ZoneId zone;
 
-    public CaptureService(ChatClient chat, NoteService notes, DisciplineService disciplines,
+    public CaptureService(AiClientRouter ai, NoteService notes, DisciplineService disciplines,
             FinanceService finance, StudyService study, ZoneId zone) {
-        this.chat = chat;
+        this.ai = ai;
         this.notes = notes;
         this.disciplines = disciplines;
         this.finance = finance;
@@ -327,7 +331,9 @@ public class CaptureService {
         // prompt text the model may drift from. Client-side validateSchema() is
         // deliberately NOT added: it is the fallback for providers without native
         // structured output, and its retry loop would just burn tokens here.
-        return chat.prompt()
+        AiRoute route = ai.route(AiTask.CAPTURE);
+        return ai.client(route).prompt()
+                .options(ChatOptions.builder().model(route.modelId()))
                 .system(systemPrompt(forcedKind))
                 .user(rawText)
                 .call()
@@ -351,7 +357,9 @@ public class CaptureService {
                 merchant name. Use the receipt's printed date for occurredOn when
                 visible, else "".
                 """;
-        return chat.prompt()
+        AiRoute route = ai.route(AiTask.CAPTURE);
+        return ai.client(route).prompt()
+                .options(ChatOptions.builder().model(route.modelId()))
                 .system(system)
                 .user(user -> user
                         .text("Extract the expense items from this receipt.")

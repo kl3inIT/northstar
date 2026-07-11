@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.northstar.core.ai.AiClientRouter;
+import com.northstar.core.ai.AiRoute;
+import com.northstar.core.ai.AiTask;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -13,6 +16,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -53,6 +58,9 @@ class AssistantControllerIntegrationTests {
     @MockitoBean
     ChatModel chatModel;
 
+    @MockitoBean
+    AiClientRouter ai;
+
     @org.springframework.beans.factory.annotation.Autowired
     ConversationTitleService titleService;
 
@@ -63,6 +71,14 @@ class AssistantControllerIntegrationTests {
     int port;
 
     private final HttpClient http = HttpClient.newHttpClient();
+
+    @BeforeEach
+    void routeMockModel() {
+        AiRoute route = new AiRoute("test", "test-model");
+        when(ai.route(any(AiTask.class))).thenReturn(route);
+        when(ai.client(any(AiRoute.class))).thenReturn(ChatClient.create(chatModel));
+        when(ai.model(any(AiRoute.class))).thenReturn(chatModel);
+    }
 
     @Test
     void turnStreamsProtocolFramesAndPersistsTheConversation() throws Exception {

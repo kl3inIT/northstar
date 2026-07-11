@@ -23,6 +23,7 @@ include(":core")
 // Reusable provider adapters shared by delivery applications.
 include(":integrations:web-openai")
 include(":integrations:web-firecrawl")
+include(":integrations:ai-openai-compatible")
 include(":integrations:speech-azure")
 
 // Deployable Spring Boot applications (thin bootstraps over :core).

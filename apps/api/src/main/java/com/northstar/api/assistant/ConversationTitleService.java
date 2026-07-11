@@ -1,12 +1,14 @@
 package com.northstar.api.assistant;
 
+import com.northstar.core.ai.AiClientRouter;
+import com.northstar.core.ai.AiRoute;
+import com.northstar.core.ai.AiTask;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -42,20 +44,17 @@ class ConversationTitleService {
     private static final int MAX_TITLE_CHARS = 120;
 
     private final JdbcClient jdbc;
-    private final ChatClient chat;
+    private final AiClientRouter ai;
     private final AsyncTaskExecutor executor;
-    private final String model;
     private final boolean enabled;
 
-    ConversationTitleService(JdbcClient jdbc, ChatClient chat,
+    ConversationTitleService(JdbcClient jdbc, AiClientRouter ai,
             @Qualifier("applicationTaskExecutor") AsyncTaskExecutor executor,
-            @Value("${northstar.assistant.title.model:gpt-5.5}") String model,
-            @Value("${northstar.assistant.title.enabled:true}") boolean enabled) {
+            AssistantTitleProperties properties) {
         this.jdbc = jdbc;
-        this.chat = chat;
+        this.ai = ai;
         this.executor = executor;
-        this.model = model;
-        this.enabled = enabled;
+        this.enabled = properties.enabled();
     }
 
     /** Schedule titling for this conversation without blocking the caller (the chat turn). */
@@ -120,8 +119,9 @@ class ConversationTitleService {
                 : firstMessage;
         // Override only the model (cheaper tier is fine for titling); gpt-5.5 is a
         // reasoning model that rejects any temperature but 1, so none is set.
-        return chat.prompt()
-                .options(ChatOptions.builder().model(model))
+        AiRoute route = ai.route(AiTask.TITLE);
+        return ai.client(route).prompt()
+                .options(ChatOptions.builder().model(route.modelId()))
                 .user(PROMPT.formatted(source))
                 .call()
                 .content();

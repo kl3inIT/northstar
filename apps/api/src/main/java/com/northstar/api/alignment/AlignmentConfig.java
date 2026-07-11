@@ -1,13 +1,13 @@
 package com.northstar.api.alignment;
 
 import com.northstar.core.alignment.AlignmentService;
+import com.northstar.core.ai.AiClientRouter;
 import com.northstar.core.calendar.CalendarEventService;
 import com.northstar.core.finance.FinanceService;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.study.StudyService;
 import com.northstar.core.study.VocabService;
 import com.northstar.core.task.TaskService;
-import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -20,9 +20,9 @@ import org.springframework.context.annotation.Configuration;
 class AlignmentConfig {
 
     @Bean
-    AlignmentService alignmentService(ChatClient chatClient, TaskService tasks,
+    AlignmentService alignmentService(AiClientRouter ai, TaskService tasks,
             CalendarEventService events, NoteService notes, FinanceService finance,
             StudyService study, VocabService vocab) {
-        return new AlignmentService(chatClient, tasks, events, notes, finance, study, vocab);
+        return new AlignmentService(ai, tasks, events, notes, finance, study, vocab);
     }
 }

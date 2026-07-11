@@ -1,16 +1,13 @@
 package com.northstar.api.assistant;
 
 import io.micrometer.observation.ObservationRegistry;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
-import org.springframework.ai.chat.client.advisor.toolsearch.ToolSearchToolCallingAdvisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.ChatMemoryRepository;
 import org.springframework.ai.model.tool.ToolCallingManager;
 import org.springframework.ai.tool.execution.ToolExecutionExceptionProcessor;
 import org.springframework.ai.tool.resolution.ToolCallbackResolver;
-import org.springframework.ai.tool.toolsearch.index.lucene.LuceneToolIndex;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import tools.jackson.databind.ObjectMapper;
@@ -30,9 +27,8 @@ import tools.jackson.databind.ObjectMapper;
  * directly, so the SSE tool events keep flowing unchanged.
  */
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(AssistantTitleProperties.class)
 class AssistantConfig {
-
-    static final String ASSISTANT_CHAT_CLIENT = "assistantChatClient";
 
     /** Recent messages the model sees; the FULL transcript is kept regardless (see WindowedChatMemory). */
     private static final int MODEL_WINDOW_MESSAGES = 30;
@@ -59,22 +55,4 @@ class AssistantConfig {
         return new WindowedChatMemory(repository, MODEL_WINDOW_MESSAGES);
     }
 
-    @Bean(ASSISTANT_CHAT_CLIENT)
-    ChatClient assistantChatClient(ChatClient.Builder builder, ChatMemory chatMemory,
-            ToolCallingManager toolCallingManager) {
-        // Builder defaults are deliberate: sessionIdKeyName = ChatMemory.CONVERSATION_ID
-        // (the advisor param the controller already sets), discovered tools accumulate
-        // per conversation, LRU eviction capped at 1000 sessions.
-        ToolSearchToolCallingAdvisor toolSearch = ToolSearchToolCallingAdvisor.builder()
-                .toolCallingManager(toolCallingManager)
-                .toolIndex(new LuceneToolIndex())
-                .build();
-        return builder
-                // A SimpleLoggerAdvisor is already applied to every builder by
-                // AiConfig.loggingCustomizer — don't add a second, it double-logs.
-                .defaultAdvisors(
-                        MessageChatMemoryAdvisor.builder(chatMemory).build(),
-                        toolSearch)
-                .build();
-    }
 }

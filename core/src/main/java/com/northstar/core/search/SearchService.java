@@ -26,6 +26,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.prompt.ChatOptions;
+import com.northstar.core.ai.AiClientRouter;
+import com.northstar.core.ai.AiRoute;
+import com.northstar.core.ai.AiTask;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
@@ -91,16 +95,19 @@ public class SearchService {
     private final AttachmentService attachments;
     private final ObjectProvider<VectorStore> vectorStore;
     private final ObjectProvider<ChatModel> chatModel;
+    private final ObjectProvider<AiClientRouter> ai;
     private final JdbcClient jdbc;
     private final TokenTextSplitter splitter = TokenTextSplitter.builder().build();
 
     SearchService(NoteService notes, AttachmentService attachments,
             ObjectProvider<VectorStore> vectorStore, ObjectProvider<ChatModel> chatModel,
+            ObjectProvider<AiClientRouter> ai,
             JdbcClient jdbc) {
         this.notes = notes;
         this.attachments = attachments;
         this.vectorStore = vectorStore;
         this.chatModel = chatModel;
+        this.ai = ai;
         this.jdbc = jdbc;
     }
 
@@ -409,12 +416,26 @@ public class SearchService {
 
     /** The vision model's search-oriented description; null when unavailable/failed. */
     private @Nullable String caption(AttachmentContent image) {
-        ChatModel model = chatModel.getIfAvailable();
-        if (model == null) {
+        AiClientRouter router = ai.getIfAvailable();
+        ChatModel fallbackModel = chatModel.getIfAvailable();
+        if (router == null && fallbackModel == null) {
             return null;
         }
         try {
-            String caption = ChatClient.create(model).prompt()
+            AiRoute route = router == null ? null : router.route(AiTask.IMAGE_CAPTION);
+            ChatClient client;
+            if (route != null) {
+                client = router.client(route);
+            } else if (fallbackModel != null) {
+                client = ChatClient.create(fallbackModel);
+            } else {
+                return null;
+            }
+            var request = client.prompt();
+            if (route != null) {
+                request = request.options(ChatOptions.builder().model(route.modelId()));
+            }
+            String caption = request
                     .user(u -> u.text(CAPTION_PROMPT)
                             .media(Media.builder()
                                     .mimeType(MimeTypeUtils.parseMimeType(image.meta().mimeType()))

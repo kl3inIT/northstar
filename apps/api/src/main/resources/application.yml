@@ -88,6 +88,37 @@ spring:
 # cheaper tier (e.g. a mini/nano model) to cut titling cost — no code change; set
 # `enabled: false` to switch titling off (the list falls back to the first message).
 northstar:
+  ai:
+    active-gateway: ${NORTHSTAR_AI_GATEWAY:openai}
+    gateways:
+      openai:
+        type: OPENAI_COMPATIBLE
+        display-name: OpenAI
+        base-url: https://api.openai.com/v1
+        api-key: ${OPENAI_API_KEY:}
+        models:
+          - ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.5}
+          - ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
+          - ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
+        discover-models: false
+        timeout: 60s
+      nine-router:
+        type: OPENAI_COMPATIBLE
+        display-name: 9Router
+        base-url: ${NINEROUTER_URL:}
+        api-key: ${NINEROUTER_KEY:}
+        models: []
+        discover-models: true
+        timeout: 60s
+    routes:
+      assistant: ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.5}
+      capture: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
+      alignment: ${NORTHSTAR_ALIGNMENT_MODEL:gpt-5.5}
+      title: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
+      study-grader: ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
+      image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-5.5}
+    catalog:
+      cache-ttl: 5m
   speech:
     provider: ${NORTHSTAR_SPEECH_PROVIDER:azure}
     azure:
@@ -113,12 +144,11 @@ northstar:
   assistant:
     title:
       enabled: true
-      model: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
-  study:
-    # Writing-grader model, stored on every writing_feedback row: band
-    # estimates from different models are not comparable, so the trend chart
-    # needs to know which produced each one. Change deliberately.
-    grader-model: ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
+  capture:
+    realtime:
+      base-url: https://api.openai.com
+      api-key: ${OPENAI_API_KEY:}
+      model: ${NORTHSTAR_REALTIME_STT_MODEL:gpt-realtime-whisper}
   web:
     enabled: ${NORTHSTAR_WEB_ENABLED:true}
     default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}

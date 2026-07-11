@@ -5,6 +5,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.northstar.core.ai.AiClientRouter;
+import com.northstar.core.ai.AiRoute;
+import com.northstar.core.ai.AiTask;
 import com.northstar.core.capture.CaptureDraft;
 import com.northstar.core.capture.CaptureService;
 import com.northstar.core.capture.VoiceTranscriber;
@@ -15,6 +18,8 @@ import com.northstar.core.finance.TransactionType;
 import java.time.LocalDate;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.ai.chat.client.ChatClient;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.audio.transcription.TranscriptionModel;
 import org.springframework.ai.chat.messages.AssistantMessage;
@@ -52,6 +57,9 @@ class CaptureServiceIntegrationTests {
     ChatModel chatModel;
 
     @MockitoBean
+    AiClientRouter ai;
+
+    @MockitoBean
     TranscriptionModel transcriptionModel;
 
     @Autowired
@@ -62,6 +70,13 @@ class CaptureServiceIntegrationTests {
 
     @Autowired
     VoiceTranscriber transcriber;
+
+    @BeforeEach
+    void routeMockModel() {
+        AiRoute route = new AiRoute("test", "test-model");
+        when(ai.route(any(AiTask.class))).thenReturn(route);
+        when(ai.client(any(AiRoute.class))).thenReturn(ChatClient.create(chatModel));
+    }
 
     private void modelReturns(String json) {
         when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());

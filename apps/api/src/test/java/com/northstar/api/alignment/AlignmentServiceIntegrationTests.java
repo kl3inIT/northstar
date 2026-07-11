@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import com.northstar.core.ai.AiClientRouter;
+import com.northstar.core.ai.AiRoute;
+import com.northstar.core.ai.AiTask;
 import com.northstar.core.alignment.AlignmentService;
 import com.northstar.core.finance.FinanceService;
 import com.northstar.core.finance.NewTransaction;
@@ -16,6 +19,8 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -50,6 +55,9 @@ class AlignmentServiceIntegrationTests {
     @MockitoBean
     ChatModel chatModel;
 
+    @MockitoBean
+    AiClientRouter ai;
+
     @Autowired
     AlignmentService alignment;
 
@@ -60,6 +68,13 @@ class AlignmentServiceIntegrationTests {
     FinanceService finance;
 
     private final ZoneId zone = ZoneId.systemDefault();
+
+    @BeforeEach
+    void routeMockModel() {
+        AiRoute route = new AiRoute("test", "test-model");
+        when(ai.route(any(AiTask.class))).thenReturn(route);
+        when(ai.client(any(AiRoute.class))).thenReturn(ChatClient.create(chatModel));
+    }
 
     private static ChatResponse response(String text) {
         return new ChatResponse(List.of(new Generation(new AssistantMessage(text))));

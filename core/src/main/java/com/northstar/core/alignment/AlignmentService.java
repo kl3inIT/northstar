@@ -36,7 +36,11 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.northstar.core.ai.AiClientRouter;
+import com.northstar.core.ai.AiRoute;
+import com.northstar.core.ai.AiTask;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 
@@ -123,7 +127,7 @@ public class AlignmentService {
             - priority: the ONE item for next week, picked from the numbers.
             """ + COMMENTARY_EXAMPLE;
 
-    private final ChatClient chat;
+    private final AiClientRouter ai;
     private final TaskService tasks;
     private final CalendarEventService events;
     private final NoteService notes;
@@ -131,9 +135,9 @@ public class AlignmentService {
     private final StudyService study;
     private final VocabService vocab;
 
-    public AlignmentService(ChatClient chat, TaskService tasks, CalendarEventService events,
+    public AlignmentService(AiClientRouter ai, TaskService tasks, CalendarEventService events,
             NoteService notes, FinanceService finance, StudyService study, VocabService vocab) {
-        this.chat = chat;
+        this.ai = ai;
         this.tasks = tasks;
         this.events = events;
         this.notes = notes;
@@ -194,7 +198,10 @@ public class AlignmentService {
             user = facts + "\n\n## Observations (pre-extracted)\n" + observations;
         }
         try {
-            ReviewCommentary draft = chat.prompt().system(system).user(user).call()
+            AiRoute route = ai.route(AiTask.ALIGNMENT);
+            ReviewCommentary draft = ai.client(route).prompt()
+                    .options(ChatOptions.builder().model(route.modelId()))
+                    .system(system).user(user).call()
                     .entity(ReviewCommentary.class, ChatClient.EntityParamSpec::useProviderStructuredOutput);
             if (draft != null && draft.commentary() != null && !draft.commentary().isBlank()) {
                 String priority = draft.priority() == null || draft.priority().isBlank()
@@ -210,7 +217,10 @@ public class AlignmentService {
     /** Step-back observations; "" on any failure so the chain degrades to single-call. */
     private String observations(String facts) {
         try {
-            String text = chat.prompt().system(OBSERVATIONS_SYSTEM).user(facts).call().content();
+            AiRoute route = ai.route(AiTask.ALIGNMENT);
+            String text = ai.client(route).prompt()
+                    .options(ChatOptions.builder().model(route.modelId()))
+                    .system(OBSERVATIONS_SYSTEM).user(facts).call().content();
             return text == null ? "" : text.strip();
         } catch (RuntimeException e) {
             log.warn("Alignment observations step failed; writing commentary from raw numbers", e);

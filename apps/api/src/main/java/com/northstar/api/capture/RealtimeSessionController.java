@@ -2,7 +2,6 @@ package com.northstar.api.capture;
 
 import io.swagger.v3.oas.annotations.Operation;
 import java.util.Map;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,14 +23,12 @@ class RealtimeSessionController {
     private final RestClient openai;
     private final String model;
 
-    RealtimeSessionController(
-            @Value("${spring.ai.openai.api-key}") String apiKey,
-            @Value("${northstar.capture.realtime-stt-model:gpt-realtime-whisper}") String model) {
+    RealtimeSessionController(RealtimeCaptureProperties properties) {
         this.openai = RestClient.builder()
-                .baseUrl("https://api.openai.com")
-                .defaultHeader("Authorization", "Bearer " + apiKey)
+                .baseUrl(properties.baseUrl())
+                .defaultHeader("Authorization", "Bearer " + properties.apiKey())
                 .build();
-        this.model = model;
+        this.model = properties.model();
     }
 
     @PostMapping("/realtime-session")

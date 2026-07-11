@@ -30,6 +30,7 @@ COPY apps/mcp/build.gradle.kts        apps/mcp/build.gradle.kts
 COPY apps/worker/build.gradle.kts     apps/worker/build.gradle.kts
 COPY integrations/web-openai/build.gradle.kts integrations/web-openai/build.gradle.kts
 COPY integrations/web-firecrawl/build.gradle.kts integrations/web-firecrawl/build.gradle.kts
+COPY integrations/ai-openai-compatible/build.gradle.kts integrations/ai-openai-compatible/build.gradle.kts
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     chmod +x gradlew && \
@@ -44,6 +45,7 @@ COPY core/src/main/          core/src/main/
 COPY apps/worker/src/main/   apps/worker/src/main/
 COPY integrations/web-openai/src/main/ integrations/web-openai/src/main/
 COPY integrations/web-firecrawl/src/main/ integrations/web-firecrawl/src/main/
+COPY integrations/ai-openai-compatible/src/main/ integrations/ai-openai-compatible/src/main/
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     ./gradlew :apps:worker:bootJar --no-daemon --parallel --console=plain -x test && \

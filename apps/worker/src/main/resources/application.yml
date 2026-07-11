@@ -69,6 +69,37 @@ db-scheduler:
   shutdown-max-wait: 2m
 
 northstar:
+  ai:
+    active-gateway: ${NORTHSTAR_AI_GATEWAY:openai}
+    gateways:
+      openai:
+        type: OPENAI_COMPATIBLE
+        display-name: OpenAI
+        base-url: https://api.openai.com/v1
+        api-key: ${OPENAI_API_KEY:}
+        models:
+          - ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.5}
+          - ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
+          - ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
+        discover-models: false
+        timeout: 60s
+      nine-router:
+        type: OPENAI_COMPATIBLE
+        display-name: 9Router
+        base-url: ${NINEROUTER_URL:}
+        api-key: ${NINEROUTER_KEY:}
+        models: []
+        discover-models: true
+        timeout: 60s
+    routes:
+      assistant: ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.5}
+      capture: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
+      alignment: ${NORTHSTAR_ALIGNMENT_MODEL:gpt-5.5}
+      title: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
+      study-grader: ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
+      image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-5.5}
+    catalog:
+      cache-ttl: 5m
   brief:
     github:
       # Optional. Public releases work anonymously (60 requests/hour); a token

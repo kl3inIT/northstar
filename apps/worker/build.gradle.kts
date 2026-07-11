@@ -5,6 +5,7 @@ plugins {
 dependencies {
     implementation(project(":core"))
     implementation(project(":integrations:web-openai"))
+    implementation(project(":integrations:ai-openai-compatible"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
     // The worker owns search indexing (SearchIndexingWorker): OpenAI for the
