@@ -1,24 +1,39 @@
 import {
   deleteNote as deleteNoteRequest,
+  deleteStudySession,
   deleteTransaction,
+  deleteVocabCard,
   draftCapture,
   draftReceiptCapture,
+  recordStudySessions,
   recordTransactions,
+  recordVocabCards,
 } from './hey-api'
 import { dataOrThrow, voidOrThrow } from './hey-api-result'
-import type { CaptureDraft, CaptureRequest, ExpenseItem, TransactionSummary } from './hey-api'
+import type {
+  CaptureDraft,
+  CaptureRequest,
+  ExpenseItem,
+  StudyItem,
+  StudySessionSummary,
+  TransactionSummary,
+  VocabCardSummary,
+  VocabItem,
+} from './hey-api'
 import { createEvent, deleteEvent } from './calendar-api'
 import { listDisciplines } from './disciplines-api'
 import { createNote } from './notes-api'
 import { createTask, deleteTask } from './tasks-api'
 
-export type CaptureKind = 'TASK' | 'NOTE' | 'EVENT' | 'EXPENSE'
+export type CaptureKind = 'TASK' | 'NOTE' | 'EVENT' | 'EXPENSE' | 'STUDY' | 'VOCAB'
 
 export type CaptureResult =
   | { kind: 'TASK'; id: string; title: string; dueDate: string | null; undo: () => Promise<void> }
   | { kind: 'NOTE'; id: string; title: string; slug: string; folderPath: string; undo: () => Promise<void> }
   | { kind: 'EVENT'; id: string; title: string; startAt: string; undo: () => Promise<void> }
   | { kind: 'EXPENSE'; id: string; title: string; items: TransactionSummary[]; undo: () => Promise<void> }
+  | { kind: 'STUDY'; id: string; title: string; items: StudySessionSummary[]; undo: () => Promise<void> }
+  | { kind: 'VOCAB'; id: string; title: string; items: VocabCardSummary[]; undo: () => Promise<void> }
 
 /** "2026-07-07" + "14:00" in the browser's zone (what the user meant when speaking). */
 function local(date: string, time: string): Date {
@@ -38,6 +53,14 @@ export async function deleteNote(id: string): Promise<void> {
 
 export async function deleteLedgerEntry(id: string): Promise<void> {
   voidOrThrow(await deleteTransaction({ path: { id } }))
+}
+
+export async function deleteStudyEntry(id: string): Promise<void> {
+  voidOrThrow(await deleteStudySession({ path: { id } }))
+}
+
+export async function deleteVocabEntry(id: string): Promise<void> {
+  voidOrThrow(await deleteVocabCard({ path: { id } }))
 }
 
 const VND = new Intl.NumberFormat('vi-VN')
@@ -76,6 +99,90 @@ async function saveExpense(items: ExpenseItem[]): Promise<CaptureResult> {
   }
 }
 
+/**
+ * Save the draft's study items as log entries with the same echo contract:
+ * every activity is named back (skill · duration/score) so the user ratifies
+ * what the AI parsed. Strict structured output writes "" for absent values —
+ * drop those before they reach the API's integer/date fields.
+ */
+async function saveStudy(items: StudyItem[]): Promise<CaptureResult> {
+  const today = new Date()
+  const isoToday = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const disciplineIds = await Promise.all(items.map((i) => resolveDisciplineId(i.disciplineName)))
+  const created = dataOrThrow(await recordStudySessions({
+    body: {
+      items: items.map((i, index) => ({
+        occurredOn: i.occurredOn || isoToday,
+        skill: i.skill || 'Other',
+        kind: i.kind === 'MOCK' ? 'MOCK' as const : 'PRACTICE' as const,
+        durationMinutes: parsePositiveInt(i.durationMinutes),
+        scoreRaw: parsePositiveInt(i.scoreRaw, true),
+        scoreMax: parsePositiveInt(i.scoreMax),
+        notes: i.notes || undefined,
+        disciplineId: disciplineIds[index],
+      })),
+    },
+  })) as StudySessionSummary[]
+  const title = created
+    .map((s) => {
+      const parts = [s.skill]
+      if (s.durationMinutes != null) parts.push(`${s.durationMinutes}m`)
+      if (s.scoreRaw != null && s.scoreMax != null) parts.push(`${s.scoreRaw}/${s.scoreMax}`)
+      return parts.join(' · ')
+    })
+    .join('  |  ')
+  return {
+    kind: 'STUDY',
+    id: created[0]?.id ?? '',
+    title,
+    items: created,
+    undo: async () => {
+      await Promise.all(created.map((s) => deleteStudyEntry(s.id)))
+    },
+  }
+}
+
+function parsePositiveInt(value: string | undefined | null, allowZero = false): number | undefined {
+  if (!value || !value.trim()) return undefined
+  const parsed = Number(value)
+  if (!Number.isInteger(parsed) || (allowZero ? parsed < 0 : parsed <= 0)) return undefined
+  return parsed
+}
+
+/**
+ * Save the draft's vocab cards with the same echo contract — every card named
+ * back (front · back) so the user ratifies what the AI parsed and enriched.
+ * The AI-generated reading/example travel in the card's metadata JSON.
+ */
+async function saveVocab(items: VocabItem[]): Promise<CaptureResult> {
+  const disciplineIds = await Promise.all(items.map((i) => resolveDisciplineId(i.disciplineName)))
+  const created = dataOrThrow(await recordVocabCards({
+    body: {
+      items: items.map((i, index) => {
+        const metadata: Record<string, string> = {}
+        if (i.reading?.trim()) metadata.reading = i.reading.trim()
+        if (i.example?.trim()) metadata.example = i.example.trim()
+        return {
+          front: i.front || '(word)',
+          back: i.back || '(meaning)',
+          metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+          disciplineId: disciplineIds[index],
+        }
+      }),
+    },
+  })) as VocabCardSummary[]
+  const title = created.map((c) => `${c.front} · ${c.back}`).join('  |  ')
+  return {
+    kind: 'VOCAB',
+    id: created[0]?.id ?? '',
+    title,
+    items: created,
+    undo: async () => {
+      await Promise.all(created.map((c) => deleteVocabEntry(c.id)))
+    },
+  }
+}
+
 /** Receipt photo capture: image → expense draft → saved ledger rows, same echo/undo. */
 export async function captureReceipt(image: File): Promise<CaptureResult> {
   const draft = dataOrThrow(await draftReceiptCapture({ body: { image } })) as CaptureDraft
@@ -99,6 +206,14 @@ export async function capture(text: string, kind?: CaptureKind): Promise<Capture
 
   if (draft.kind === 'EXPENSE' && draft.expense?.items?.length) {
     return saveExpense(draft.expense.items)
+  }
+
+  if (draft.kind === 'STUDY' && draft.study?.items?.length) {
+    return saveStudy(draft.study.items)
+  }
+
+  if (draft.kind === 'VOCAB' && draft.vocab?.items?.length) {
+    return saveVocab(draft.vocab.items)
   }
 
   if (draft.kind === 'TASK' && draft.task) {
