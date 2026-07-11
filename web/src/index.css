@@ -183,3 +183,96 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
 }
+
+/* Adapted from the Kibo UI Typography registry and scoped to Briefs. */
+.brief-typography {
+  max-width: 65ch;
+  color: var(--color-foreground);
+}
+
+.brief-typography :is(h1, h2, h3, h4) {
+  scroll-margin-top: 5rem;
+  letter-spacing: 0;
+}
+
+.brief-typography h2 {
+  margin-top: 3rem;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.5rem;
+  font-size: 1.5rem;
+  line-height: 2rem;
+  font-weight: 600;
+}
+
+.brief-typography h3 {
+  margin-top: 2.25rem;
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 650;
+}
+
+.brief-typography :is(h2, h3):first-child,
+.brief-typography :is(h1, h2, h3, h4) + p {
+  margin-top: 0;
+}
+
+.brief-typography p,
+.brief-typography li {
+  line-height: 1.8;
+}
+
+.brief-typography p:not(:first-child),
+.brief-typography :is(ul, ol, blockquote, table) {
+  margin-top: 1.25rem;
+}
+
+.brief-typography a {
+  color: var(--color-primary);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 0.2rem;
+}
+
+.brief-typography blockquote {
+  border-left: 2px solid var(--color-border);
+  padding-left: 1.25rem;
+  color: var(--color-muted-foreground);
+  font-style: italic;
+}
+
+.brief-typography :is(ul, ol) {
+  margin-left: 1.5rem;
+}
+
+.brief-typography ul {
+  list-style: disc;
+}
+
+.brief-typography ol {
+  list-style: decimal;
+}
+
+.brief-typography :is(ul, ol) > li + li {
+  margin-top: 0.5rem;
+}
+
+.brief-typography hr {
+  margin-block: 2.5rem;
+}
+
+.brief-typography table {
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.brief-typography :is(th, td) {
+  border: 1px solid var(--color-border);
+  padding: 0.625rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.brief-typography th {
+  background: color-mix(in oklch, var(--color-muted) 70%, transparent);
+  font-weight: 650;
+}

@@ -8,6 +8,7 @@ import {
   FileText,
   FolderKanban,
   LogOut,
+  Newspaper,
   Settings,
   Sparkles,
   Target,
@@ -41,12 +42,13 @@ import { useStagingCount } from '@/lib/notes-api'
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/notes' | '/tasks' | '/calendar' | '/assistant' | '/disciplines' | '/projects' | '/finance' | '/study' | '/settings'
+  to?: '/notes' | '/tasks' | '/calendar' | '/assistant' | '/briefs' | '/disciplines' | '/projects' | '/finance' | '/study' | '/settings'
   exact?: boolean
 }
 
 const NAV: NavItem[] = [
   { label: 'Assistant', icon: Bot, to: '/assistant' },
+  { label: 'Briefs', icon: Newspaper, to: '/briefs' },
   { label: 'Tasks', icon: CheckSquare, to: '/tasks' },
   { label: 'Calendar', icon: Calendar, to: '/calendar' },
   { label: 'Notes', icon: FileText, to: '/notes' },
