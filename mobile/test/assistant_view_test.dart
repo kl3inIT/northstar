@@ -2,8 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:northstar/data/repositories/assistant_repository.dart';
 import 'package:northstar/domain/models/assistant_models.dart';
+import 'package:northstar/ui/core/design_system/northstar_tokens.dart';
 import 'package:northstar/ui/features/assistant/view_models/assistant_view_model.dart';
 import 'package:northstar/ui/features/assistant/views/assistant_landing_view.dart';
 
@@ -100,6 +102,50 @@ void main() {
     );
     expect(find.text('Weekly planning'), findsOneWidget);
   });
+
+  testWidgets('uses readable Cupertino Markdown colors in dark mode', (
+    tester,
+  ) async {
+    _setWindowSize(tester, const Size(390, 844));
+    final repository = _WidgetAssistantRepository(
+      conversations: [
+        AssistantConversation(
+          id: 'conversation-1',
+          title: 'Dark mode',
+          lastAt: DateTime(2026, 7, 11),
+          messageCount: 1,
+        ),
+      ],
+      historyMessages: const [
+        AssistantMessage(
+          id: 'assistant-response',
+          role: AssistantRole.assistant,
+          text: '**Visible response**',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      CupertinoApp(
+        theme: const CupertinoThemeData(brightness: Brightness.dark),
+        home: AssistantLandingView(viewModel: AssistantViewModel(repository)),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+
+    final markdown = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
+    final markdownContext = tester.element(find.byType(MarkdownBody));
+    final textColor = markdown.styleSheet?.p?.color;
+    final background = NorthstarColors.elevatedSurface.resolveFrom(
+      markdownContext,
+    );
+
+    expect(markdown.styleSheetTheme, MarkdownStyleSheetBaseTheme.cupertino);
+    expect(textColor, isNotNull);
+    expect(textColor, isNot(background));
+    expect(textColor!.computeLuminance(), greaterThan(0.5));
+  });
 }
 
 Widget _testApp(AssistantViewModel viewModel) {
@@ -107,9 +153,13 @@ Widget _testApp(AssistantViewModel viewModel) {
 }
 
 class _WidgetAssistantRepository implements AssistantRepository {
-  _WidgetAssistantRepository({this.conversations = const []});
+  _WidgetAssistantRepository({
+    this.conversations = const [],
+    this.historyMessages = const [],
+  });
 
   final List<AssistantConversation> conversations;
+  final List<AssistantMessage> historyMessages;
   final StreamController<AssistantTurnEvent> stream =
       StreamController<AssistantTurnEvent>();
 
@@ -119,7 +169,7 @@ class _WidgetAssistantRepository implements AssistantRepository {
 
   @override
   Future<List<AssistantMessage>> history(String conversationId) async =>
-      const [];
+      historyMessages;
 
   @override
   Stream<AssistantTurnEvent> streamTurn({

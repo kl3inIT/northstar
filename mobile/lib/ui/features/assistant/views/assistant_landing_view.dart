@@ -272,7 +272,12 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
                         context,
                       ).copyWith(color: CupertinoColors.white),
                     )
-                  : MarkdownBody(data: message.text, selectable: true),
+                  : MarkdownBody(
+                      data: message.text,
+                      selectable: true,
+                      styleSheet: _cupertinoMarkdownStyle(context),
+                      styleSheetTheme: MarkdownStyleSheetBaseTheme.cupertino,
+                    ),
             for (final tool in tools)
               _AssistantToolRow(
                 name: tool['name']?.toString() ?? 'Northstar tool',
@@ -329,6 +334,36 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
       ),
     );
   }
+}
+
+MarkdownStyleSheet _cupertinoMarkdownStyle(BuildContext context) {
+  final theme = CupertinoTheme.of(context);
+  final foreground = NorthstarColors.primaryText.resolveFrom(context);
+  final secondary = NorthstarColors.secondaryText.resolveFrom(context);
+  final accent = NorthstarColors.accent.resolveFrom(context);
+  final base = MarkdownStyleSheet.fromCupertinoTheme(theme);
+  final body = NorthstarTextStyles.body(context).copyWith(color: foreground);
+
+  TextStyle? readable(TextStyle? style) => style?.copyWith(color: foreground);
+
+  return base.copyWith(
+    a: base.a?.copyWith(color: accent),
+    p: body,
+    code: readable(base.code),
+    h1: readable(base.h1),
+    h2: readable(base.h2),
+    h3: readable(base.h3),
+    h4: readable(base.h4),
+    h5: readable(base.h5),
+    h6: readable(base.h6),
+    em: readable(base.em),
+    strong: readable(base.strong),
+    del: readable(base.del),
+    blockquote: base.blockquote?.copyWith(color: secondary),
+    listBullet: readable(base.listBullet),
+    tableHead: readable(base.tableHead),
+    tableBody: readable(base.tableBody),
+  );
 }
 
 class _AssistantComposer extends StatelessWidget {

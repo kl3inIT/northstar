@@ -22,6 +22,7 @@
 | Assistant partial text and tool progress | ViewModel and widget tests with controlled streams | Covered |
 | Assistant failure, retry affordance, and stop | ViewModel and widget tests | Covered |
 | Assistant history and expanded conversation sidebar | Unit test plus widget test at 1024x768 | Covered |
+| Assistant Markdown remains readable on dark Cupertino surfaces | Dark-mode widget contrast assertion plus real Chromium dark-mode render | Covered |
 | Assistant SSE parsing and one-time 401 refresh | Service unit tests with streamed HTTP responses | Covered |
 | Native iOS rendering and VoiceOver | Requires signed build on an iPhone | Gap |
 | Sideloadly install and live production API login | Requires the generated IPA, Apple ID signing, and an iPhone | Gap |
