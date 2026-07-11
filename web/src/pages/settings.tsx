@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Globe2, Loader2, RotateCcw, Save, Search, Waypoints } from 'lucide-react'
+import { CheckCircle2, Clock3, Globe2, Loader2, RotateCcw, Save, Search, Waypoints } from 'lucide-react'
 import { toast } from 'sonner'
+import { AutomationsSection } from '@/components/settings/automations-section'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,11 +22,15 @@ import {
 } from '@/lib/web-research-api'
 import { cn } from '@/lib/utils'
 
-const SECTION = { id: 'web-research', label: 'Web research', icon: Globe2 } as const
+const SECTIONS = [
+  { id: 'web-research', label: 'Web research', icon: Globe2 },
+  { id: 'automations', label: 'Automations', icon: Clock3 },
+] as const
+
+type SectionId = (typeof SECTIONS)[number]['id']
 
 export function SettingsPage() {
-  const settings = useWebResearchSettings()
-  const providers = useWebResearchProviders()
+  const [section, setSection] = useState<SectionId>('web-research')
 
   return (
     <main className="w-full min-w-0 flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
@@ -38,35 +43,41 @@ export function SettingsPage() {
         <div className="grid min-w-0 gap-6 md:grid-cols-[13rem_minmax(0,1fr)] md:gap-10">
           <nav aria-label="Settings sections" className="min-w-0">
             <div className="flex overflow-x-auto pb-1 md:block md:space-y-1 md:overflow-visible md:pb-0">
-              <Button
-                type="button"
-                variant="secondary"
-                className="h-9 min-w-max justify-start md:w-full"
-                aria-current="page"
-              >
-                <SECTION.icon className="size-4" />
-                {SECTION.label}
-              </Button>
+              {SECTIONS.map((item) => (
+                <Button
+                  key={item.id}
+                  type="button"
+                  variant={section === item.id ? 'secondary' : 'ghost'}
+                  className="h-9 min-w-max justify-start md:w-full"
+                  aria-current={section === item.id ? 'page' : undefined}
+                  onClick={() => setSection(item.id)}
+                >
+                  <item.icon className="size-4" />
+                  {item.label}
+                </Button>
+              ))}
             </div>
           </nav>
 
-          <section aria-labelledby="web-research-heading" className="min-w-0">
-            {settings.isLoading || providers.isLoading ? (
-              <div className="flex h-52 items-center justify-center border-y">
-                <Loader2 className="size-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : settings.isError || providers.isError ? (
-              <div className="border-y py-8 text-sm text-destructive">
-                {settings.error?.message ?? providers.error?.message ?? 'Could not load settings.'}
-              </div>
-            ) : settings.data && providers.data ? (
-              <WebResearchSection initial={settings.data} providers={providers.data} />
-            ) : null}
+          <section aria-labelledby={`${section}-heading`} className="min-w-0">
+            {section === 'web-research' ? <WebResearchLoader /> : <AutomationsSection />}
           </section>
         </div>
       </div>
     </main>
   )
+}
+
+function WebResearchLoader() {
+  const settings = useWebResearchSettings()
+  const providers = useWebResearchProviders()
+  if (settings.isLoading || providers.isLoading) {
+    return <div className="flex h-52 items-center justify-center border-y"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>
+  }
+  if (settings.isError || providers.isError) {
+    return <div className="border-y py-8 text-sm text-destructive">{settings.error?.message ?? providers.error?.message ?? 'Could not load settings.'}</div>
+  }
+  return settings.data && providers.data ? <WebResearchSection initial={settings.data} providers={providers.data} /> : null
 }
 
 function WebResearchSection({
