@@ -66,8 +66,8 @@ Modulith modules. Current modules include:
 - `calendar` - calendar events, recurrence, cancelled occurrences, and free-slot
   discovery.
 - `note` - Markdown knowledge base with wiki links and backlinks.
-- `capture` - AI draft generation for notes, tasks, events, and finance entries
-  from text, transcribed voice, and receipt images.
+- `capture` - AI draft generation for notes, tasks, events, finance, study, and
+  vocab entries from text, transcribed voice, and receipt images.
 - `finance` - VND expense/income ledger, aggregate reconciliation, learned
   category corrections, monthly budgets, savings goals, recurring-charge
   definitions/detection, time-series insights, and one-off spending separation.
@@ -76,11 +76,15 @@ Modulith modules. Current modules include:
   provider metadata, bounded caches, and the persisted provider override.
 - `automation` - typed persisted workflow definitions, trigger validation,
   handler discovery, schedule projection versions, and execution history.
-- `brief` - Morning Brief search orchestration, deterministic source rendering,
+- `brief` - Morning Brief public-source orchestration, trust ranking, deterministic rendering,
   and idempotent Staging-note output.
 - `attachment` - stored uploaded content and metadata.
 - `assistant` - tool definitions shared by the in-app assistant and MCP.
-- `alignment`, `habit`, `scholarship`, `study`, `shared` - current or reserved
+- `study` - practice/mock study log with a constrained skill vocabulary,
+  vocabulary memory on an Ebisu recall-probability model (no due dates), and
+  the LLM writing tutor with rubric resources, an evaluator-checked grader,
+  and an append-only feedback history.
+- `alignment`, `habit`, `scholarship`, `shared` - current or reserved
   domain modules.
 
 Cross-module coupling must go through public APIs or events. Modulith
