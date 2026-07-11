@@ -39,7 +39,8 @@ class WritingTools implements NorthstarTool {
 
     private static final String WEAKNESSES = """
             The user's recurring grammar/lexis error patterns, aggregated from \
-            every graded essay: label, how many gradings flagged it, when it \
+            every graded essay and speaking-practice transcript: label, how \
+            many feedback rows flagged it, when it \
             was last seen, and recent verbatim quote→fix examples from their \
             own writing. DRILL PROTOCOL when the user wants grammar practice \
             ("luyện ngữ pháp", "drill grammar"): pick the 1-2 most recent \
@@ -48,7 +49,7 @@ class WritingTools implements NorthstarTool {
             re-drilling what was just practiced, then write 5 NEW short \
             sentences — everyday topics, the user's level, each containing \
             exactly ONE error of the target pattern, never a sentence from \
-            their essays verbatim. Present ONE at a time and wait for the \
+            their essays or transcripts verbatim. Present ONE at a time and wait for the \
             user's correction; after each answer give the verdict, the \
             corrected sentence, and a ONE-line rule explanation of why. \
             Finish with a tally, then log the drill with log_study_sessions \
@@ -56,7 +57,8 @@ class WritingTools implements NorthstarTool {
             kind PRACTICE; scoreRaw = correct answers, scoreMax = items; \
             sessionNotes naming the patterns drilled, e.g. "drill: articles, \
             SVA 4/5"). If this list is empty, say grammar drills unlock after \
-            the first graded essay and offer grade_writing instead — do not \
+            the first writing or speaking feedback and offer grade_writing or \
+            the Speaking tab instead — do not \
             invent weaknesses.""";
 
     private final WritingService writing;

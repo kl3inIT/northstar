@@ -20,7 +20,9 @@ import tools.jackson.databind.ObjectMapper;
 class WritingServiceTests {
 
     private final WritingFeedbackRepository repository = mock(WritingFeedbackRepository.class);
-    private final WritingService service = new WritingService(repository, new ObjectMapper());
+    private final SpeakingFeedbackRepository speakingRepository = mock(SpeakingFeedbackRepository.class);
+    private final WritingService service = new WritingService(repository, speakingRepository,
+            new ObjectMapper());
 
     private static WritingFeedback feedback(Instant submittedAt, String topErrors) {
         return new WritingFeedback(UUID.randomUUID(), submittedAt, "IELTS Task 2", "ielts-writing",
@@ -36,6 +38,7 @@ class WritingServiceTests {
                 feedback(now.minus(3, ChronoUnit.DAYS), """
                         [{"label":"article errors","quote":"the technology","fix":"technology"},
                          {"label":"Subject-verb agreement","quote":"people is","fix":"people are"}]""")));
+        when(speakingRepository.findByOrderBySubmittedAtDesc()).thenReturn(List.of());
 
         List<GrammarWeakness> weaknesses = service.grammarWeaknesses();
 
@@ -57,6 +60,7 @@ class WritingServiceTests {
                 feedback(Instant.now(), "not json at all"),
                 feedback(Instant.now(), """
                         [{"label":"Linking phrases","quote":"In one hand","fix":"On the one hand"}]""")));
+        when(speakingRepository.findByOrderBySubmittedAtDesc()).thenReturn(List.of());
 
         List<GrammarWeakness> weaknesses = service.grammarWeaknesses();
 
@@ -67,6 +71,34 @@ class WritingServiceTests {
     @Test
     void emptyHistoryYieldsEmptyList() {
         when(repository.findByOrderBySubmittedAtDesc()).thenReturn(List.of());
+        when(speakingRepository.findByOrderBySubmittedAtDesc()).thenReturn(List.of());
         assertThat(service.grammarWeaknesses()).isEmpty();
+    }
+
+    @Test
+    void unionsWritingAndSpeakingAndMergesLabelCollisionsByRecency() {
+        Instant now = Instant.now();
+        when(repository.findByOrderBySubmittedAtDesc()).thenReturn(List.of(
+                feedback(now.minus(1, ChronoUnit.DAYS), """
+                        [{"label":"Article errors","quote":"a advice","fix":"advice"}]""")));
+        when(speakingRepository.findByOrderBySubmittedAtDesc()).thenReturn(List.of(
+                speaking(now, """
+                        [{"label":"article errors","quote":"an useful idea","fix":"a useful idea"},
+                         {"label":"Verb tense","quote":"Yesterday I go","fix":"Yesterday I went"}]""")));
+
+        List<GrammarWeakness> weaknesses = service.grammarWeaknesses();
+
+        assertThat(weaknesses).hasSize(2);
+        assertThat(weaknesses.getFirst().label()).isEqualTo("article errors");
+        assertThat(weaknesses.getFirst().occurrences()).isEqualTo(2);
+        assertThat(weaknesses.getFirst().examples()).extracting("quote")
+                .containsExactly("an useful idea", "a advice");
+    }
+
+    private static SpeakingFeedback speaking(Instant submittedAt, String topErrors) {
+        return new SpeakingFeedback(UUID.randomUUID(), submittedAt, "What do you study?",
+                "I study English.", 75.0, 68.0, 70.0,
+                "{\"vocabulary\":60,\"grammar\":55,\"topic\":80}", topErrors,
+                "Unofficial feedback.", "gpt-5.5", "azure", "speech-sdk-1.50.0");
     }
 }

@@ -1,6 +1,7 @@
 package com.northstar.core.study;
 
 import java.time.LocalDate;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -26,10 +27,13 @@ public class WritingService {
     private static final int MAX_EXAMPLES_PER_WEAKNESS = 3;
 
     private final WritingFeedbackRepository feedbacks;
+    private final SpeakingFeedbackRepository speakingFeedbacks;
     private final ObjectMapper json;
 
-    WritingService(WritingFeedbackRepository feedbacks, ObjectMapper json) {
+    WritingService(WritingFeedbackRepository feedbacks, SpeakingFeedbackRepository speakingFeedbacks,
+            ObjectMapper json) {
         this.feedbacks = feedbacks;
+        this.speakingFeedbacks = speakingFeedbacks;
         this.json = json;
     }
 
@@ -68,10 +72,16 @@ public class WritingService {
      */
     public List<GrammarWeakness> grammarWeaknesses() {
         Map<String, Aggregate> byLabel = new LinkedHashMap<>();
-        // Newest first, so the first label casing and examples seen are the freshest.
-        for (WritingFeedback feedback : feedbacks.findByOrderBySubmittedAtDesc()) {
-            LocalDate seen = feedback.getSubmittedAt().atZone(ZoneId.systemDefault()).toLocalDate();
-            for (JsonNode error : parseErrors(feedback.getTopErrors())) {
+        List<ErrorSource> sources = new ArrayList<>();
+        feedbacks.findByOrderBySubmittedAtDesc().forEach(feedback ->
+                sources.add(new ErrorSource(feedback.getSubmittedAt(), feedback.getTopErrors())));
+        speakingFeedbacks.findByOrderBySubmittedAtDesc().forEach(feedback ->
+                sources.add(new ErrorSource(feedback.getSubmittedAt(), feedback.getTopErrors())));
+        sources.sort((left, right) -> right.submittedAt().compareTo(left.submittedAt()));
+        // Newest first across both sources, so fresh label casing/examples win.
+        for (ErrorSource source : sources) {
+            LocalDate seen = source.submittedAt().atZone(ZoneId.systemDefault()).toLocalDate();
+            for (JsonNode error : parseErrors(source.topErrors())) {
                 String label = error.path("label").asString("").strip();
                 if (label.isEmpty()) {
                     continue;
@@ -119,6 +129,9 @@ public class WritingService {
             this.label = label;
             this.lastSeen = lastSeen;
         }
+    }
+
+    private record ErrorSource(Instant submittedAt, String topErrors) {
     }
 
     @Transactional
