@@ -11,6 +11,9 @@
   `NorthstarMcpApplication`, and `NorthstarWorkerApplication`.
 - Prefer existing local helpers and module patterns before adding new
   abstractions.
+- Bind application configuration with immutable `@ConfigurationProperties`
+  records. Put bean creation in a separate configuration class; do not add
+  mutable setters or runtime service state to property objects.
 
 ## Schema
 

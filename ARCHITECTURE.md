@@ -22,6 +22,7 @@ core/                 domain library and Spring Modulith modules
 apps/api/             REST app, web delivery, Flyway owner, OpenAPI emitter
 apps/mcp/             streamable-http MCP server for external agents
 apps/worker/          headless scheduled worker for heavy background indexing
+integrations/         provider adapters shared by delivery apps
 web/                  Vite React SPA
 contracts/            generated OpenAPI contract
 build-logic/          Gradle convention plugins
@@ -41,8 +42,9 @@ Northstar is one domain with three backend deployables:
   `com.northstar.core`, reads the already-migrated schema, and does not run
   Flyway in production.
 - `apps/worker` is a non-web process with scheduling enabled. It owns heavy
-  indexing work such as embeddings and image captions, uses the same schema, and
-  does not run Flyway in production.
+  indexing work such as embeddings and image captions plus durable user
+  automation execution through db-scheduler. It uses the same schema and does
+  not run Flyway in production.
 
 The app classes are explicitly named `NorthstarApiApplication`,
 `NorthstarMcpApplication`, and `NorthstarWorkerApplication`. The package root is
@@ -67,6 +69,10 @@ Modulith modules. Current modules include:
 - `search` - keyword/vector search and attachment text/image indexing support.
 - `web` - provider-neutral web search/page-reading contracts, runtime routing,
   provider metadata, bounded caches, and the persisted provider override.
+- `automation` - typed persisted workflow definitions, trigger validation,
+  handler discovery, schedule projection versions, and execution history.
+- `brief` - Morning Brief search orchestration, deterministic source rendering,
+  and idempotent Staging-note output.
 - `attachment` - stored uploaded content and metadata.
 - `assistant` - tool definitions shared by the in-app assistant and MCP.
 - `alignment`, `habit`, `scholarship`, `study`, `shared` - current or reserved
@@ -88,6 +94,9 @@ verification in `:core:test` is the boundary check.
   search data are derived from that source data.
 - pgvector schema is owned by Flyway; Spring AI vectorstore initialization is
   disabled.
+- User automation definitions and run history are product data. db-scheduler's
+  `scheduled_tasks` table is a worker-owned projection rebuilt by reconciliation
+  through `SchedulerClient`, not a product API.
 
 ## AI And Search
 
