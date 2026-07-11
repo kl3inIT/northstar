@@ -69,6 +69,17 @@ db-scheduler:
   shutdown-max-wait: 2m
 
 northstar:
+  brief:
+    github:
+      # Optional. Public releases work anonymously (60 requests/hour); a token
+      # raises the GitHub REST allowance for larger custom source lists.
+      token: ${GITHUB_TOKEN:}
+    firecrawl:
+      # Search requires a server-side key. Without it, the remaining public
+      # sources still produce a useful partial brief.
+      base-url: https://api.firecrawl.dev
+      api-key: ${FIRECRAWL_API_KEY:}
+      request-timeout: 30s
   web:
     enabled: ${NORTHSTAR_WEB_ENABLED:true}
     default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}
