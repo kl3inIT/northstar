@@ -8,6 +8,8 @@ import com.northstar.core.finance.TransactionNotFoundException;
 import com.northstar.core.note.NoteNotFoundException;
 import com.northstar.core.project.ProjectNotFoundException;
 import com.northstar.core.study.StudySessionNotFoundException;
+import com.northstar.core.study.SpeakingFeedbackNotFoundException;
+import com.northstar.core.study.SpeechAssessmentException;
 import com.northstar.core.study.VocabCardNotFoundException;
 import com.northstar.core.study.WritingFeedbackNotFoundException;
 import com.northstar.core.task.TaskNotFoundException;
@@ -55,7 +57,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             CalendarEventNotFoundException.class, DisciplineNotFoundException.class,
             ProjectNotFoundException.class, TransactionNotFoundException.class,
             FinancePlanningNotFoundException.class, StudySessionNotFoundException.class,
-            VocabCardNotFoundException.class, WritingFeedbackNotFoundException.class})
+            VocabCardNotFoundException.class, WritingFeedbackNotFoundException.class,
+            SpeakingFeedbackNotFoundException.class})
     ProblemDetail notFound(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
@@ -64,6 +67,20 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail badRequest(IllegalArgumentException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(SpeechAssessmentException.class)
+    ProblemDetail speechAssessment(SpeechAssessmentException e) {
+        HttpStatus status = switch (e.failure()) {
+            case BAD_AUDIO -> HttpStatus.BAD_REQUEST;
+            case QUOTA -> HttpStatus.TOO_MANY_REQUESTS;
+            case TIMEOUT -> HttpStatus.GATEWAY_TIMEOUT;
+            case AUTHENTICATION -> HttpStatus.SERVICE_UNAVAILABLE;
+            case PROVIDER -> HttpStatus.BAD_GATEWAY;
+        };
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, e.getMessage());
+        detail.setProperty("code", e.failure().name());
+        return detail;
     }
 
     @ExceptionHandler(WebResearchException.class)

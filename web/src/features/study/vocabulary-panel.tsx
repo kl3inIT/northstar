@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { BookOpenCheck, Ellipsis, Flame, MessageSquareText, Pencil, PauseCircle, PlayCircle, Search, Sparkles, Trash2 } from 'lucide-react'
+import { BookOpenCheck, Ellipsis, Flame, MessageSquareText, Mic, Pencil, PauseCircle, PlayCircle, Search, Sparkles, Trash2 } from 'lucide-react'
+import { AudioRecorder } from './audio-recorder'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -17,11 +18,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import {
   parseVocabMetadata,
+  useAssessVocabPronunciation,
   useDeleteVocabCard,
   useUpdateVocabCard,
   useVocabCards,
   type VocabCard,
+  type PronunciationAssessment,
 } from '@/lib/study-api'
+import { useWavRecorder } from '@/lib/use-wav-recorder'
 
 const EMPTY_CARDS: VocabCard[] = []
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -38,6 +42,7 @@ export function VocabularyPanel() {
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<VocabCard | null>(null)
   const [deleting, setDeleting] = useState<VocabCard | null>(null)
+  const [pronouncing, setPronouncing] = useState<VocabCard | null>(null)
   const update = useUpdateVocabCard()
 
   const active = useMemo(() => cards.filter((c) => !c.suspended), [cards])
@@ -113,12 +118,14 @@ export function VocabularyPanel() {
           isLoading={cardsQuery.isLoading}
           onEdit={setEditing}
           onDelete={setDeleting}
+          onPronounce={setPronouncing}
           onToggleSuspended={toggleSuspended}
         />
       )}
 
       <EditCardDialog key={editing?.id ?? 'none'} card={editing} onClose={() => setEditing(null)} />
       <DeleteCardDialog card={deleting} onClose={() => setDeleting(null)} />
+      <PronunciationDialog key={pronouncing?.id ?? 'no-pronunciation'} card={pronouncing} onClose={() => setPronouncing(null)} />
     </div>
   )
 }
@@ -154,11 +161,12 @@ function VocabStats({ tracked, atRisk, newThisWeek }: { tracked: number; atRisk:
   )
 }
 
-function CardsTable({ rows, isLoading, onEdit, onDelete, onToggleSuspended }: {
+function CardsTable({ rows, isLoading, onEdit, onDelete, onPronounce, onToggleSuspended }: {
   rows: VocabCard[]
   isLoading: boolean
   onEdit: (card: VocabCard) => void
   onDelete: (card: VocabCard) => void
+  onPronounce: (card: VocabCard) => void
   onToggleSuspended: (card: VocabCard) => void
 }) {
   return (
@@ -224,7 +232,11 @@ function CardsTable({ rows, isLoading, onEdit, onDelete, onToggleSuspended }: {
                   <span className="text-xs tabular-nums text-muted-foreground">{card.reviewCount}</span>
                 </TableCell>
                 <TableCell>
-                  <DropdownMenu>
+                  <div className="flex justify-end gap-1">
+                    <Button variant="ghost" size="icon" className="size-8" aria-label={`Practice pronunciation for ${card.front}`} onClick={() => onPronounce(card)}>
+                      <Mic className="size-4" />
+                    </Button>
+                    <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="size-8" aria-label={`Actions for ${card.front}`}>
                         <Ellipsis className="size-4" />
@@ -238,7 +250,8 @@ function CardsTable({ rows, isLoading, onEdit, onDelete, onToggleSuspended }: {
                       </DropdownMenuItem>
                       <DropdownMenuItem variant="destructive" onClick={() => onDelete(card)}><Trash2 className="size-4" /> Delete</DropdownMenuItem>
                     </DropdownMenuContent>
-                  </DropdownMenu>
+                    </DropdownMenu>
+                  </div>
                 </TableCell>
               </TableRow>
             )
@@ -345,4 +358,81 @@ function DeleteCardDialog({ card, onClose }: { card: VocabCard | null; onClose: 
       </DialogContent>
     </Dialog>
   )
+}
+
+function PronunciationDialog({ card, onClose }: { card: VocabCard | null; onClose: () => void }) {
+  const recorder = useWavRecorder(30)
+  const assessment = useAssessVocabPronunciation()
+  const metadata = card ? parseVocabMetadata(card.metadata) : {}
+
+  function submit() {
+    if (!card || !recorder.audio) return
+    assessment.mutate({ id: card.id, audio: recorder.audio }, {
+      onError: (error) => toast.error(error.message),
+    })
+  }
+
+  return (
+    <Dialog open={Boolean(card)} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+        {card && (
+          <>
+            <DialogHeader><DialogTitle>Pronounce “{card.front}”</DialogTitle></DialogHeader>
+            <div className="flex flex-col gap-4">
+              {metadata.reading && <p className="text-sm text-muted-foreground">{metadata.reading}</p>}
+              <AudioRecorder recorder={recorder} maximumSeconds={30} />
+              <Button onClick={submit} disabled={!recorder.audio || assessment.isPending}>
+                {assessment.isPending ? 'Assessing…' : 'Assess pronunciation'}
+              </Button>
+              {assessment.data && <PronunciationResultView result={assessment.data} />}
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function PronunciationResultView({ result }: { result: PronunciationAssessment }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Azure delivery · unofficial</p>
+      <div className="grid grid-cols-2 gap-2">
+        <PronunciationScore label="Accuracy" value={result.accuracy} />
+        <PronunciationScore label="Fluency" value={result.fluency} />
+      </div>
+      {result.recognizedText && <p className="text-xs text-muted-foreground">Heard: “{result.recognizedText}”</p>}
+      {result.words && result.words.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {result.words.map((word, index) => (
+            <details key={`${word.word}-${index}`}>
+              <summary className={cn('cursor-pointer list-none rounded-md border px-2 py-1 text-xs', pronunciationTone(word.accuracy))}>
+                {word.word} {typeof word.accuracy === 'number' ? Math.round(word.accuracy) : '—'}
+              </summary>
+              {word.phonemes && word.phonemes.length > 0 && (
+                <div className="mt-1 rounded-md border bg-popover p-2 text-xs shadow-sm">
+                  {word.phonemes.map((phoneme, phonemeIndex) => (
+                    <p key={`${phoneme.phoneme}-${phonemeIndex}`} className="tabular-nums">
+                      {phoneme.phoneme}: {typeof phoneme.accuracy === 'number' ? Math.round(phoneme.accuracy) : '—'}
+                    </p>
+                  ))}
+                </div>
+              )}
+            </details>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PronunciationScore({ label, value }: { label: string; value: number | undefined }) {
+  return <div className="rounded-lg bg-card p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-semibold tabular-nums">{typeof value === 'number' ? Math.round(value) : '—'}<span className="text-xs font-normal text-muted-foreground"> / 100</span></p></div>
+}
+
+function pronunciationTone(value: number | undefined): string {
+  if (value === undefined) return 'text-muted-foreground'
+  if (value >= 80) return 'border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
+  if (value >= 60) return 'border-amber-500/40 text-amber-700 dark:text-amber-300'
+  return 'border-destructive/40 text-destructive'
 }

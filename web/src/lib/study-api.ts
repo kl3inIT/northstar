@@ -1,10 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  assessSpeakingAttempt,
+  assessVocabPronunciation,
+  deleteSpeakingFeedback,
   deleteStudySession,
   deleteVocabCard,
   deleteWritingFeedback,
+  generateSpeakingQuestion,
   getStudySummary,
   listMockResults,
+  listSpeakingFeedback,
   listStudySessions,
   listStudySkills,
   listVocabCards,
@@ -15,6 +20,9 @@ import {
 } from './hey-api'
 import { dataOrThrow, voidOrThrow } from './hey-api-result'
 import type {
+  PronunciationResult,
+  SpeakingAttemptResult,
+  SpeakingFeedbackSummary,
   StudyItemRequest,
   StudySessionSummary,
   StudySummary,
@@ -28,6 +36,9 @@ export type StudyKind = StudySessionSummary['kind']
 export type StudySessionInput = StudyItemRequest
 export type VocabCard = VocabCardSummary
 export type WritingFeedback = WritingFeedbackSummary
+export type SpeakingFeedback = SpeakingFeedbackSummary
+export type SpeakingAttempt = SpeakingAttemptResult
+export type PronunciationAssessment = PronunciationResult
 export type { StudySummary }
 
 export interface WritingCriterion {
@@ -40,6 +51,25 @@ export interface WritingError {
   label: string
   quote: string
   fix: string
+}
+
+export interface SpeakingContentScores {
+  vocabulary: number
+  grammar: number
+  topic: number
+}
+
+export function parseSpeakingContentScores(value: string | undefined | null): SpeakingContentScores | null {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>
+    if (typeof parsed.vocabulary !== 'number' || typeof parsed.grammar !== 'number' || typeof parsed.topic !== 'number') {
+      return null
+    }
+    return { vocabulary: parsed.vocabulary, grammar: parsed.grammar, topic: parsed.topic }
+  } catch {
+    return null
+  }
 }
 
 /** The feedback's criteria JSON parsed leniently — malformed entries are dropped. */
@@ -155,6 +185,13 @@ export function useDeleteVocabCard() {
   })
 }
 
+export function useAssessVocabPronunciation() {
+  return useMutation({
+    mutationFn: async ({ id, audio }: { id: string; audio: Blob }) =>
+      dataOrThrow(await assessVocabPronunciation({ path: { id }, body: { audio } })),
+  })
+}
+
 /** Every graded essay, newest first. Grading happens in chat, never here. */
 export function useWritingFeedback() {
   return useQuery({
@@ -170,6 +207,43 @@ export function useDeleteWritingFeedback() {
       voidOrThrow(await deleteWritingFeedback({ path: { id } }))
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['study-writing'] }),
+  })
+}
+
+export function useSpeakingFeedback() {
+  return useQuery({
+    queryKey: ['study-speaking'],
+    queryFn: async () => dataOrThrow(await listSpeakingFeedback()),
+  })
+}
+
+export function useGenerateSpeakingQuestion() {
+  return useMutation({
+    mutationFn: async (part: 1 | 2 | 3) =>
+      dataOrThrow(await generateSpeakingQuestion({ body: { part } })),
+  })
+}
+
+export function useAssessSpeakingAttempt() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ question, audio }: { question: string; audio: Blob }) =>
+      dataOrThrow(await assessSpeakingAttempt({ body: { question, audio } })),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['study-speaking'] })
+      queryClient.invalidateQueries({ queryKey: ['study'] })
+      queryClient.invalidateQueries({ queryKey: ['study-summary'] })
+    },
+  })
+}
+
+export function useDeleteSpeakingFeedback() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      voidOrThrow(await deleteSpeakingFeedback({ path: { id } }))
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['study-speaking'] }),
   })
 }
 

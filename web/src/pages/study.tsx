@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { BookOpenCheck, ListChecks, PenLine } from 'lucide-react'
+import { BookOpenCheck, ListChecks, Mic, PenLine } from 'lucide-react'
 import { LogPanel } from '@/features/study/log-panel'
+import { SpeakingPanel } from '@/features/study/speaking-panel'
 import { VocabularyPanel } from '@/features/study/vocabulary-panel'
 import { WritingPanel } from '@/features/study/writing-panel'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -12,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
  * Vocabulary and Writing tabs show the resulting state, never a workflow.
  */
 export function StudyPage() {
-  const [tab, setTab] = useState<'log' | 'vocabulary' | 'writing'>('log')
+  const [tab, setTab] = useState<'log' | 'vocabulary' | 'writing' | 'speaking'>('log')
 
   return (
     <main className="w-full min-w-0 flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
@@ -38,6 +39,10 @@ export function StudyPage() {
               <PenLine className="hidden size-4 sm:block" />
               Writing
             </TabsTrigger>
+            <TabsTrigger value="speaking" className="px-2 text-xs sm:px-3 sm:text-sm">
+              <Mic className="hidden size-4 sm:block" />
+              Speaking
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="log">
@@ -48,6 +53,9 @@ export function StudyPage() {
           </TabsContent>
           <TabsContent value="writing">
             <WritingPanel />
+          </TabsContent>
+          <TabsContent value="speaking">
+            <SpeakingPanel />
           </TabsContent>
         </Tabs>
       </div>
