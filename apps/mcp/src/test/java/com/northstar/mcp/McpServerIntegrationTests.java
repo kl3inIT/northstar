@@ -61,7 +61,9 @@ class McpServerIntegrationTests {
                 "list_budgets", "set_budget", "list_savings_goals",
                 "save_savings_goal", "contribute_savings_goal",
                 "list_subscriptions", "save_subscription", "mark_subscription_paid",
-                "delete_subscription");
+                "delete_subscription", "list_automation_types", "list_automations",
+                "list_automation_runs", "save_morning_brief_automation",
+                "run_automation_now", "set_automation_enabled", "delete_automation");
         assertThat(tools).contains("\"status\"");
         // MCP behavior hints ride along so clients can gate confirmation UX.
         assertThat(tools).contains("\"readOnlyHint\":true", "\"destructiveHint\":false");
@@ -127,6 +129,24 @@ class McpServerIntegrationTests {
                 {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{
                   "name":"list_subscriptions","arguments":{}}} """).body();
         assertThat(subscriptions).contains("MCP cloud subscription", "2026-07-31", "\\\"version\\\":0")
+                .doesNotContain("\"isError\":true");
+
+        String automation = post(session, """
+                {"jsonrpc":"2.0","id":12,"method":"tools/call","params":{
+                  "name":"save_morning_brief_automation","arguments":{
+                    "id":"","version":0,"name":"MCP morning brief","enabled":false,
+                    "localTime":"07:30","daysOfWeek":["MONDAY","WEDNESDAY","FRIDAY"],
+                    "timezone":"Asia/Bangkok","catchUpWindowMinutes":240,
+                    "language":"vi","lookbackHours":24,"maxItems":4,
+                    "topics":["AI agents"],"queries":[],"blockedDomains":[],
+                    "saveAsNote":true}}} """).body();
+        assertThat(automation).contains("MCP morning brief", "morning-brief.v1")
+                .doesNotContain("\"isError\":true");
+
+        String automations = post(session, """
+                {"jsonrpc":"2.0","id":13,"method":"tools/call","params":{
+                  "name":"list_automations","arguments":{}}} """).body();
+        assertThat(automations).contains("MCP morning brief", "Asia/Bangkok")
                 .doesNotContain("\"isError\":true");
     }
 

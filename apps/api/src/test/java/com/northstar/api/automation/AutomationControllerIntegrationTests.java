@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import com.northstar.core.assistant.NorthstarTool;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,6 +38,15 @@ class AutomationControllerIntegrationTests {
 
     @Autowired
     MockMvc mvc;
+
+    @Autowired
+    List<NorthstarTool> tools;
+
+    @Test
+    void inAppAssistantDiscoversAutomationTools() {
+        assertThat(tools).extracting(tool -> tool.getClass().getSimpleName())
+                .contains("AutomationTools");
+    }
 
     @Test
     void createsUpdatesQueuesAndDeletesMorningBrief() throws Exception {

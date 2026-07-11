@@ -67,6 +67,13 @@ editor registry keyed by the same stable type id because typed workflow forms
 need domain-specific controls and validation; adding a backend type makes it
 visible in the catalog, while enabling creation requires its matching editor.
 
+Assistant and MCP expose the same automation tool beans. Generic tools list
+types, definitions, and runs; queue a manual run; pause/enable; and delete with
+the current optimistic version. Creation and full editing are type-specific:
+`save_morning_brief_automation` has a strict schedule/research schema instead of
+accepting an untyped workflow-config map. Future workflow types add their own
+typed save tool while reusing the generic read/control tools.
+
 REST endpoints are:
 
 - `GET/POST /api/automations`;
