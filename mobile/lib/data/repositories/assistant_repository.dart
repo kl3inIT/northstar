@@ -13,10 +13,64 @@ abstract interface class AssistantRepository {
   });
 }
 
-class RemoteAssistantRepository implements AssistantRepository {
+abstract interface class AssistantModelRepository {
+  Future<AssistantModelSelection> conversationModel(String conversationId);
+
+  Future<List<AssistantModelOption>> models(String gatewayId);
+
+  Future<AssistantModelSelection> updateConversationModel(
+    String conversationId,
+    AssistantModelSelection selection,
+  );
+}
+
+class RemoteAssistantRepository
+    implements AssistantRepository, AssistantModelRepository {
   const RemoteAssistantRepository(this._api);
 
   final AssistantApi _api;
+
+  @override
+  Future<AssistantModelSelection> conversationModel(
+    String conversationId,
+  ) async {
+    final value = await _api.conversationModel(conversationId);
+    return AssistantModelSelection(
+      gatewayId: value.gatewayId,
+      modelId: value.modelId,
+    );
+  }
+
+  @override
+  Future<List<AssistantModelOption>> models(String gatewayId) async {
+    final values = await _api.models(gatewayId);
+    return values
+        .map(
+          (value) => AssistantModelOption(
+            id: value.id,
+            displayName: value.displayName,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<AssistantModelSelection> updateConversationModel(
+    String conversationId,
+    AssistantModelSelection selection,
+  ) async {
+    final value = await _api.updateConversationModel(
+      conversationId,
+      AssistantModelSelectionDto(
+        gatewayId: selection.gatewayId,
+        modelId: selection.modelId,
+      ),
+    );
+    return AssistantModelSelection(
+      gatewayId: value.gatewayId,
+      modelId: value.modelId,
+    );
+  }
 
   @override
   Future<List<AssistantConversation>> listConversations() async {

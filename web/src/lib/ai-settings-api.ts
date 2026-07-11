@@ -1,0 +1,144 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  getAiSettings,
+  getAssistantConversationModel,
+  listAiModels,
+  resetAiRoute,
+  updateAiRoute,
+  updateAssistantConversationModel,
+  type AiRoute as ApiAiRoute,
+  type AiRouteSelection as ApiAiRouteSelection,
+  type AiSettingsResponse,
+} from './hey-api'
+import { dataOrThrow } from './hey-api-result'
+
+export const AI_TASKS = [
+  'ASSISTANT',
+  'CAPTURE',
+  'ALIGNMENT',
+  'TITLE',
+  'STUDY_GRADER',
+  'IMAGE_CAPTION',
+] as const
+
+export type AiTask = (typeof AI_TASKS)[number]
+
+export interface AiRoute {
+  gatewayId: string
+  modelId: string
+}
+
+export interface AiRouteSelection {
+  route: AiRoute
+  defaultRoute: AiRoute
+  overridden: boolean
+}
+
+export interface AiGateway {
+  id: string
+  displayName: string
+  configured: boolean
+}
+
+export interface AiModel {
+  gatewayId: string
+  id: string
+  displayName: string
+}
+
+export interface AiSettings {
+  routes: Record<AiTask, AiRouteSelection>
+  gateways: AiGateway[]
+}
+
+function route(value?: ApiAiRoute): AiRoute {
+  if (!value?.gatewayId || !value.modelId) throw new Error('AI route is incomplete')
+  return { gatewayId: value.gatewayId, modelId: value.modelId }
+}
+
+function selection(value?: ApiAiRouteSelection): AiRouteSelection {
+  if (!value) throw new Error('AI route selection is missing')
+  return {
+    route: route(value.route),
+    defaultRoute: route(value.defaultRoute),
+    overridden: value.overridden ?? false,
+  }
+}
+
+function settings(value: AiSettingsResponse): AiSettings {
+  const routes = Object.fromEntries(AI_TASKS.map((task) => [task, selection(value.routes?.[task])])) as Record<AiTask, AiRouteSelection>
+  return {
+    routes,
+    gateways: (value.gateways ?? []).map((gateway) => {
+      if (!gateway.id || !gateway.displayName) throw new Error('AI gateway identity is incomplete')
+      return { id: gateway.id, displayName: gateway.displayName, configured: gateway.configured ?? false }
+    }),
+  }
+}
+
+export function useAiSettings() {
+  return useQuery({
+    queryKey: ['settings', 'ai'],
+    queryFn: async () => settings(dataOrThrow(await getAiSettings())),
+  })
+}
+
+export function useAiModels(gatewayId?: string) {
+  return useQuery({
+    queryKey: ['settings', 'ai', 'models', gatewayId],
+    enabled: Boolean(gatewayId),
+    staleTime: 5 * 60_000,
+    queryFn: async () => dataOrThrow(await listAiModels({ path: { gatewayId: gatewayId! } })).map((model) => {
+      if (!model.gatewayId || !model.id || !model.displayName) throw new Error('AI model identity is incomplete')
+      return { gatewayId: model.gatewayId, id: model.id, displayName: model.displayName }
+    }),
+  })
+}
+
+export function useUpdateAiRoute() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ task, route: value }: { task: AiTask; route: AiRoute }) =>
+      selection(dataOrThrow(await updateAiRoute({ path: { task }, body: value }))),
+    onSuccess: (selection, variables) => queryClient.setQueryData<AiSettings>(
+      ['settings', 'ai'],
+      (current) => current && ({
+        ...current,
+        routes: { ...current.routes, [variables.task]: selection },
+      }),
+    ),
+  })
+}
+
+export function useResetAiRoute() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (task: AiTask) =>
+      selection(dataOrThrow(await resetAiRoute({ path: { task } }))),
+    onSuccess: (selection, task) => queryClient.setQueryData<AiSettings>(
+      ['settings', 'ai'],
+      (current) => current && ({
+        ...current,
+        routes: { ...current.routes, [task]: selection },
+      }),
+    ),
+  })
+}
+
+export function useAssistantConversationModel(conversationId: string) {
+  return useQuery({
+    queryKey: ['assistant-model', conversationId],
+    queryFn: async () => route(dataOrThrow(await getAssistantConversationModel({ path: { id: conversationId } }))),
+  })
+}
+
+export function useUpdateAssistantConversationModel(conversationId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (value: AiRoute) => route(dataOrThrow(await updateAssistantConversationModel({
+      path: { id: conversationId },
+      body: value,
+    }))),
+    onSuccess: (route) => queryClient.setQueryData(['assistant-model', conversationId], route),
+  })
+}

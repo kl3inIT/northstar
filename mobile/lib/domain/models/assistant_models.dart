@@ -4,6 +4,23 @@ enum AssistantMessageStatus { complete, streaming, failed, stopped }
 
 enum AssistantToolStatus { preparing, running, complete, failed }
 
+class AssistantModelSelection {
+  const AssistantModelSelection({
+    required this.gatewayId,
+    required this.modelId,
+  });
+
+  final String gatewayId;
+  final String modelId;
+}
+
+class AssistantModelOption {
+  const AssistantModelOption({required this.id, required this.displayName});
+
+  final String id;
+  final String displayName;
+}
+
 class AssistantConversation {
   const AssistantConversation({
     required this.id,

@@ -109,6 +109,32 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
     await _viewModel.send(prompt);
   }
 
+  Future<void> _showModelPicker() async {
+    if (_viewModel.models.isEmpty || _viewModel.isSending) return;
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (modalContext) => CupertinoActionSheet(
+        title: const Text('Assistant model'),
+        message: Text('Gateway: ${_viewModel.modelSelection?.gatewayId ?? ''}'),
+        actions: [
+          for (final model in _viewModel.models)
+            CupertinoActionSheetAction(
+              isDefaultAction: model.id == _viewModel.modelSelection?.modelId,
+              onPressed: () {
+                Navigator.of(modalContext).pop();
+                unawaited(_viewModel.selectModel(model.id));
+              },
+              child: Text(model.displayName),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          onPressed: () => Navigator.of(modalContext).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _viewModel.removeListener(_handleViewModelChange);
@@ -231,6 +257,11 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
           isSending: _viewModel.isSending,
           onSend: _submit,
           onStop: _viewModel.stop,
+          modelLabel: _viewModel.models
+              .where((model) => model.id == _viewModel.modelSelection?.modelId)
+              .map((model) => model.displayName)
+              .firstOrNull,
+          onSelectModel: _viewModel.models.isEmpty ? null : _showModelPicker,
         ),
       ],
     );
@@ -399,6 +430,8 @@ class _AssistantComposer extends StatelessWidget {
     required this.isSending,
     required this.onSend,
     required this.onStop,
+    required this.modelLabel,
+    required this.onSelectModel,
   });
 
   final TextEditingController controller;
@@ -406,6 +439,8 @@ class _AssistantComposer extends StatelessWidget {
   final bool isSending;
   final VoidCallback onSend;
   final VoidCallback onStop;
+  final String? modelLabel;
+  final VoidCallback? onSelectModel;
 
   @override
   Widget build(BuildContext context) {
@@ -433,6 +468,34 @@ class _AssistantComposer extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (modelLabel != null) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: CupertinoButton(
+                    key: const Key('assistant-model-picker'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
+                    minimumSize: const Size(0, 30),
+                    onPressed: isSending ? null : onSelectModel,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(CupertinoIcons.sparkles, size: 15),
+                        const SizedBox(width: NorthstarSpacing.xs),
+                        Text(
+                          modelLabel!,
+                          style: NorthstarTextStyles.caption(context),
+                        ),
+                        const SizedBox(width: 2),
+                        const Icon(CupertinoIcons.chevron_down, size: 12),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: NorthstarSpacing.xxs),
+              ],
               CupertinoTextField(
                 key: const Key('assistant-composer'),
                 controller: controller,

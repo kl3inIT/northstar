@@ -224,6 +224,35 @@ String _requiredString(Map<String, Object?> json, String key) {
   return value;
 }
 
+class AssistantModelSelectionDto {
+  const AssistantModelSelectionDto({
+    required this.gatewayId,
+    required this.modelId,
+  });
+
+  factory AssistantModelSelectionDto.fromJson(Map<String, Object?> json) =>
+      AssistantModelSelectionDto(
+        gatewayId: _requiredString(json, 'gatewayId'),
+        modelId: _requiredString(json, 'modelId'),
+      );
+
+  final String gatewayId;
+  final String modelId;
+}
+
+class AssistantModelOptionDto {
+  const AssistantModelOptionDto({required this.id, required this.displayName});
+
+  factory AssistantModelOptionDto.fromJson(Map<String, Object?> json) =>
+      AssistantModelOptionDto(
+        id: _requiredString(json, 'id'),
+        displayName: _requiredString(json, 'displayName'),
+      );
+
+  final String id;
+  final String displayName;
+}
+
 int _requiredInt(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is! num) {

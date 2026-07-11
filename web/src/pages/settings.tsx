@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { CheckCircle2, Clock3, Globe2, Loader2, RotateCcw, Save, Search, Waypoints } from 'lucide-react'
+import { BrainCircuit, CheckCircle2, Clock3, Globe2, Loader2, RotateCcw, Save, Search, Waypoints } from 'lucide-react'
 import { toast } from 'sonner'
 import { AutomationsSection } from '@/components/settings/automations-section'
 import { Badge } from '@/components/ui/badge'
@@ -21,8 +21,19 @@ import {
   type WebResearchSettingsInput,
 } from '@/lib/web-research-api'
 import { cn } from '@/lib/utils'
+import {
+  AI_TASKS,
+  useAiModels,
+  useAiSettings,
+  useResetAiRoute,
+  useUpdateAiRoute,
+  type AiGateway,
+  type AiRouteSelection,
+  type AiTask,
+} from '@/lib/ai-settings-api'
 
 const SECTIONS = [
+  { id: 'ai', label: 'AI models', icon: BrainCircuit },
   { id: 'web-research', label: 'Web research', icon: Globe2 },
   { id: 'automations', label: 'Automations', icon: Clock3 },
 ] as const
@@ -30,7 +41,7 @@ const SECTIONS = [
 type SectionId = (typeof SECTIONS)[number]['id']
 
 export function SettingsPage() {
-  const [section, setSection] = useState<SectionId>('web-research')
+  const [section, setSection] = useState<SectionId>('ai')
 
   return (
     <main className="w-full min-w-0 flex-1 overflow-auto px-4 py-6 md:px-10 md:py-8">
@@ -60,11 +71,160 @@ export function SettingsPage() {
           </nav>
 
           <section aria-labelledby={`${section}-heading`} className="min-w-0">
-            {section === 'web-research' ? <WebResearchLoader /> : <AutomationsSection />}
+            {section === 'ai'
+              ? <AiSettingsSection />
+              : section === 'web-research'
+                ? <WebResearchLoader />
+                : <AutomationsSection />}
           </section>
         </div>
       </div>
     </main>
+  )
+}
+
+const AI_TASK_LABELS: Record<AiTask, { title: string; description: string }> = {
+  ASSISTANT: { title: 'Assistant', description: 'Interactive chat, tools, and vision.' },
+  CAPTURE: { title: 'Capture', description: 'Classify text, SMS, voice, and receipts.' },
+  ALIGNMENT: { title: 'Reviews', description: 'Daily and weekly alignment commentary.' },
+  TITLE: { title: 'Chat titles', description: 'Short background conversation titles.' },
+  STUDY_GRADER: { title: 'Study grader', description: 'Writing grading and faithfulness checks.' },
+  IMAGE_CAPTION: { title: 'Image indexing', description: 'Describe images before search indexing.' },
+}
+
+function AiSettingsSection() {
+  const settings = useAiSettings()
+  if (settings.isLoading) {
+    return <div className="flex h-52 items-center justify-center border-y"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>
+  }
+  if (settings.isError || !settings.data) {
+    return <div className="border-y py-8 text-sm text-destructive">{settings.error?.message ?? 'Could not load AI settings.'}</div>
+  }
+  const configured = settings.data.gateways.filter((gateway) => gateway.configured)
+  return (
+    <div>
+      <div className="pb-5">
+        <h2 id="ai-heading" className="text-xl font-semibold">AI models</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Route each workload through a configured OpenAI-compatible gateway.
+        </p>
+      </div>
+      <Separator />
+      <div className="divide-y">
+        {AI_TASKS.map((task) => (
+          <AiRouteRow
+            key={task}
+            task={task}
+            selection={settings.data.routes[task]}
+            gateways={configured}
+          />
+        ))}
+      </div>
+      <Separator />
+      <div className="py-6">
+        <div className="mb-3 flex items-center gap-2 text-sm font-medium">
+          <Waypoints className="size-4 text-muted-foreground" />
+          Configured gateways
+        </div>
+        <div className="divide-y rounded-md border">
+          {settings.data.gateways.map((gateway) => (
+            <div key={gateway.id} className="flex items-center justify-between gap-4 px-3 py-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{gateway.displayName}</p>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">{gateway.id}</p>
+              </div>
+              <Badge variant="outline" className={cn('shrink-0', gateway.configured && 'text-emerald-600 dark:text-emerald-400')}>
+                {gateway.configured ? 'Ready' : 'Not configured'}
+              </Badge>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AiRouteRow({
+  task,
+  selection,
+  gateways,
+}: {
+  task: AiTask
+  selection: AiRouteSelection
+  gateways: AiGateway[]
+}) {
+  const update = useUpdateAiRoute()
+  const reset = useResetAiRoute()
+  const [gatewayId, setGatewayId] = useState(selection.route.gatewayId)
+  const [modelId, setModelId] = useState(selection.route.modelId)
+  const models = useAiModels(gatewayId)
+
+  useEffect(() => {
+    setGatewayId(selection.route.gatewayId)
+    setModelId(selection.route.modelId)
+  }, [selection])
+
+  const gatewayModels = models.data ?? []
+  const dirty = gatewayId !== selection.route.gatewayId || modelId !== selection.route.modelId
+  const label = AI_TASK_LABELS[task]
+
+  return (
+    <div className="grid gap-3 py-5 lg:grid-cols-[minmax(10rem,1fr)_minmax(0,1.45fr)] lg:items-center lg:gap-8">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-medium">{label.title}</p>
+          {selection.overridden && <Badge variant="secondary">Override</Badge>}
+        </div>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{label.description}</p>
+      </div>
+      <div className="grid min-w-0 grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] gap-2">
+        <Select
+          value={gatewayId}
+          onValueChange={(value) => {
+            setGatewayId(value)
+            setModelId('')
+          }}
+        >
+          <SelectTrigger className="min-w-0" aria-label={`${label.title} gateway`}><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {gateways.map((gateway) => <SelectItem key={gateway.id} value={gateway.id}>{gateway.displayName}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={modelId} onValueChange={setModelId} disabled={models.isLoading || gatewayModels.length === 0}>
+          <SelectTrigger className="min-w-0" aria-label={`${label.title} model`}>
+            {models.isLoading ? <Loader2 className="size-4 animate-spin" /> : <SelectValue placeholder="Select model" />}
+          </SelectTrigger>
+          <SelectContent>
+            {gatewayModels.map((model) => <SelectItem key={model.id} value={model.id}>{model.displayName}</SelectItem>)}
+            {modelId && !gatewayModels.some((model) => model.id === modelId) && <SelectItem value={modelId}>{modelId}</SelectItem>}
+          </SelectContent>
+        </Select>
+        <div className="flex items-center gap-1">
+          <Button
+            size="icon"
+            variant="ghost"
+            title={`Restore ${label.title} default`}
+            aria-label={`Restore ${label.title} default`}
+            disabled={!selection.overridden || reset.isPending}
+            onClick={() => reset.mutate(task, { onError: (error) => toast.error(error.message) })}
+          >
+            <RotateCcw className="size-4" />
+          </Button>
+          <Button
+            size="icon"
+            title={`Save ${label.title} route`}
+            aria-label={`Save ${label.title} route`}
+            disabled={!dirty || !modelId || update.isPending}
+            onClick={() => update.mutate({ task, route: { gatewayId, modelId } }, {
+              onSuccess: () => toast.success(`${label.title} route saved`),
+              onError: (error) => toast.error(error.message),
+            })}
+          >
+            {update.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 

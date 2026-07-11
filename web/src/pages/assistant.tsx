@@ -40,6 +40,11 @@ import {
   PromptInput,
   PromptInputBody,
   PromptInputFooter,
+  PromptInputSelect,
+  PromptInputSelectContent,
+  PromptInputSelectItem,
+  PromptInputSelectTrigger,
+  PromptInputSelectValue,
   PromptInputSubmit,
   PromptInputTextarea,
   usePromptInputAttachments,
@@ -68,6 +73,11 @@ import type {
 } from '@/lib/hey-api'
 import { fileUrl, uploadFile } from '@/lib/files-api'
 import { apiFetch } from '@/lib/http'
+import {
+  useAiModels,
+  useAssistantConversationModel,
+  useUpdateAssistantConversationModel,
+} from '@/lib/ai-settings-api'
 import { useStagingCount } from '@/lib/notes-api'
 import { useTodayTasks } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
@@ -438,6 +448,9 @@ function AssistantChat({
 }) {
   const suggestions = useSuggestions()
   const queryClient = useQueryClient()
+  const modelSelection = useAssistantConversationModel(conversationId)
+  const availableModels = useAiModels(modelSelection.data?.gatewayId)
+  const updateModel = useUpdateAssistantConversationModel(conversationId)
   const { messages, sendMessage, status } = useChat({
     messages: initialMessages,
     onFinish: () => {
@@ -467,7 +480,15 @@ function AssistantChat({
           .filter((p): p is FileUIPart => p.type === 'file')
           .map((p) => p.url.split('/').pop())
           .filter(Boolean)
-        return { body: { message: text, conversationId, attachmentIds } }
+        return {
+          body: {
+            message: text,
+            conversationId,
+            attachmentIds,
+            gatewayId: modelSelection.data?.gatewayId,
+            modelId: modelSelection.data?.modelId,
+          },
+        }
       },
     }),
   })
@@ -525,7 +546,22 @@ function AssistantChat({
         />
       </PromptInputBody>
       <PromptInputFooter>
-        <AttachButton />
+        <div className="flex min-w-0 items-center gap-1">
+          <ModelPicker
+            gatewayName={modelSelection.data?.gatewayId}
+            modelId={modelSelection.data?.modelId}
+            models={availableModels.data ?? []}
+            disabled={busy || modelSelection.isLoading || availableModels.isLoading || updateModel.isPending}
+            onChange={(modelId) => {
+              const gatewayId = modelSelection.data?.gatewayId
+              if (!gatewayId) return
+              updateModel.mutate({ gatewayId, modelId }, {
+                onError: (error) => toast.error(error.message),
+              })
+            }}
+          />
+          <AttachButton />
+        </div>
         <div className="flex items-center gap-1">
           <MicButton value={text} onChange={setText} compact />
           <PromptInputSubmit status={status} className="rounded-full" />
@@ -602,6 +638,45 @@ function AssistantChat({
 
       <div className="mx-auto w-full max-w-3xl px-4 pb-6">{input}</div>
     </div>
+  )
+}
+
+function ModelPicker({
+  gatewayName,
+  modelId,
+  models,
+  disabled,
+  onChange,
+}: {
+  gatewayName?: string
+  modelId?: string
+  models: Array<{ id: string; displayName: string }>
+  disabled: boolean
+  onChange: (modelId: string) => void
+}) {
+  if (!modelId) {
+    return <Loader2 className="mx-2 size-3.5 animate-spin text-muted-foreground" />
+  }
+  return (
+    <PromptInputSelect value={modelId} onValueChange={onChange} disabled={disabled}>
+      <PromptInputSelectTrigger
+        className="h-8 max-w-44 gap-1 px-2 text-xs"
+        aria-label="Assistant model"
+        title={gatewayName ? `Model via ${gatewayName}` : 'Assistant model'}
+      >
+        <PromptInputSelectValue />
+      </PromptInputSelectTrigger>
+      <PromptInputSelectContent>
+        {models.map((model) => (
+          <PromptInputSelectItem key={model.id} value={model.id}>
+            {model.displayName}
+          </PromptInputSelectItem>
+        ))}
+        {!models.some((model) => model.id === modelId) && (
+          <PromptInputSelectItem value={modelId}>{modelId}</PromptInputSelectItem>
+        )}
+      </PromptInputSelectContent>
+    </PromptInputSelect>
   )
 }
 

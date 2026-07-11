@@ -73,6 +73,68 @@ class AssistantApi {
         .toList(growable: false);
   }
 
+  Future<AssistantModelSelectionDto> conversationModel(
+    String conversationId,
+  ) async {
+    final response = await _authenticated.send(
+      (token) => _request(
+        'GET',
+        '/api/assistant/conversations/$conversationId/model',
+        token,
+      ),
+    );
+    final decoded = jsonDecode(await _readBody(response));
+    if (decoded is! Map<Object?, Object?>) {
+      throw const FormatException('Assistant model response is not an object.');
+    }
+    return AssistantModelSelectionDto.fromJson(_normalizeMap(decoded));
+  }
+
+  Future<List<AssistantModelOptionDto>> models(String gatewayId) async {
+    final response = await _authenticated.send(
+      (token) =>
+          _request('GET', '/api/settings/ai/gateways/$gatewayId/models', token),
+    );
+    final decoded = jsonDecode(await _readBody(response));
+    if (decoded is! List<Object?>) {
+      throw const FormatException('Assistant model catalog is not a list.');
+    }
+    return decoded
+        .map((item) {
+          if (item is! Map<Object?, Object?>) {
+            throw const FormatException(
+              'Assistant model entry is not an object.',
+            );
+          }
+          return AssistantModelOptionDto.fromJson(_normalizeMap(item));
+        })
+        .toList(growable: false);
+  }
+
+  Future<AssistantModelSelectionDto> updateConversationModel(
+    String conversationId,
+    AssistantModelSelectionDto selection,
+  ) async {
+    final response = await _authenticated.send((token) {
+      final request = _request(
+        'PUT',
+        '/api/assistant/conversations/$conversationId/model',
+        token,
+      );
+      request.headers[HttpHeaders.contentTypeHeader] = 'application/json';
+      request.body = jsonEncode({
+        'gatewayId': selection.gatewayId,
+        'modelId': selection.modelId,
+      });
+      return request;
+    });
+    final decoded = jsonDecode(await _readBody(response));
+    if (decoded is! Map<Object?, Object?>) {
+      throw const FormatException('Assistant model response is not an object.');
+    }
+    return AssistantModelSelectionDto.fromJson(_normalizeMap(decoded));
+  }
+
   Stream<AssistantStreamFrame> streamTurn({
     required String conversationId,
     required String message,

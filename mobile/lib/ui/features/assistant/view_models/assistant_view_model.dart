@@ -21,6 +21,8 @@ class AssistantViewModel extends ChangeNotifier {
   bool _initialized = false;
   bool _isLoading = false;
   bool _isSending = false;
+  AssistantModelSelection? _modelSelection;
+  List<AssistantModelOption> _models = const [];
 
   List<AssistantConversation> get conversations =>
       List.unmodifiable(_conversations);
@@ -30,6 +32,8 @@ class AssistantViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isSending => _isSending;
   bool get canRetry => !_isSending && _lastPrompt != null;
+  AssistantModelSelection? get modelSelection => _modelSelection;
+  List<AssistantModelOption> get models => List.unmodifiable(_models);
 
   Future<void> initialize() async {
     if (_initialized || _isLoading) {
@@ -50,6 +54,7 @@ class AssistantViewModel extends ChangeNotifier {
         _conversationId = conversations.first.id;
         await _loadHistory(conversations.first.id);
       }
+      await _loadModels(_conversationId!);
       _initialized = true;
     } on Object catch (error) {
       _loadError = _messageFor(error);
@@ -70,6 +75,7 @@ class AssistantViewModel extends ChangeNotifier {
     _messages.clear();
     _lastPrompt = null;
     _loadError = null;
+    await _loadModels(_conversationId!);
     notifyListeners();
   }
 
@@ -84,12 +90,48 @@ class AssistantViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       await _loadHistory(id);
+      await _loadModels(id);
     } on Object catch (error) {
       _loadError = _messageFor(error);
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<void> selectModel(String modelId) async {
+    final repository = _repository is AssistantModelRepository
+        ? _repository as AssistantModelRepository
+        : null;
+    final conversationId = _conversationId;
+    final current = _modelSelection;
+    if (repository == null ||
+        conversationId == null ||
+        current == null ||
+        _isSending) {
+      return;
+    }
+    try {
+      _modelSelection = await repository.updateConversationModel(
+        conversationId,
+        AssistantModelSelection(gatewayId: current.gatewayId, modelId: modelId),
+      );
+      notifyListeners();
+    } on Object catch (error) {
+      _loadError = _messageFor(error);
+      notifyListeners();
+    }
+  }
+
+  Future<void> _loadModels(String conversationId) async {
+    final repository = _repository is AssistantModelRepository
+        ? _repository as AssistantModelRepository
+        : null;
+    if (repository == null) return;
+    final selection = await repository.conversationModel(conversationId);
+    final models = await repository.models(selection.gatewayId);
+    _modelSelection = selection;
+    _models = models;
   }
 
   Future<void> send(String rawPrompt) async {
