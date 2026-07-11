@@ -1,16 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  createAiGateway,
+  deleteAiGateway,
   getAiSettings,
   getAssistantConversationModel,
   listAiModels,
   resetAiRoute,
+  testAiGateway,
+  testAiGatewayDraft,
+  updateAiGateway,
   updateAiRoute,
   updateAssistantConversationModel,
   type AiRoute as ApiAiRoute,
   type AiRouteSelection as ApiAiRouteSelection,
   type AiSettingsResponse,
 } from './hey-api'
-import { dataOrThrow } from './hey-api-result'
+import { dataOrThrow, voidOrThrow } from './hey-api-result'
 
 export const AI_TASKS = [
   'ASSISTANT',
@@ -38,6 +43,29 @@ export interface AiGateway {
   id: string
   displayName: string
   configured: boolean
+  source: 'DEPLOYMENT' | 'SETTINGS'
+  editable: boolean
+  baseUrl: string
+  configuredModels: string[]
+  discoverModels: boolean
+  timeoutSeconds: number
+}
+
+export interface AiGatewayInput {
+  id: string
+  displayName: string
+  baseUrl: string
+  apiKey?: string
+  models: string[]
+  discoverModels: boolean
+  timeoutSeconds: number
+}
+
+export interface AiGatewayConnectionTest {
+  success: boolean
+  latencyMillis: number
+  models: AiModel[]
+  message: string
 }
 
 export interface AiModel {
@@ -71,7 +99,44 @@ function settings(value: AiSettingsResponse): AiSettings {
     routes,
     gateways: (value.gateways ?? []).map((gateway) => {
       if (!gateway.id || !gateway.displayName) throw new Error('AI gateway identity is incomplete')
-      return { id: gateway.id, displayName: gateway.displayName, configured: gateway.configured ?? false }
+      return {
+        id: gateway.id,
+        displayName: gateway.displayName,
+        configured: gateway.configured ?? false,
+        source: gateway.source ?? 'DEPLOYMENT',
+        editable: gateway.editable ?? false,
+        baseUrl: gateway.baseUrl ?? '',
+        configuredModels: gateway.configuredModels ?? [],
+        discoverModels: gateway.discoverModels ?? false,
+        timeoutSeconds: gateway.timeoutSeconds ?? 60,
+      }
+    }),
+  }
+}
+
+function gateway(value: import('./hey-api').AiGatewayDescriptor): AiGateway {
+  if (!value.id || !value.displayName) throw new Error('AI gateway identity is incomplete')
+  return {
+    id: value.id,
+    displayName: value.displayName,
+    configured: value.configured ?? false,
+    source: value.source ?? 'DEPLOYMENT',
+    editable: value.editable ?? false,
+    baseUrl: value.baseUrl ?? '',
+    configuredModels: value.configuredModels ?? [],
+    discoverModels: value.discoverModels ?? false,
+    timeoutSeconds: value.timeoutSeconds ?? 60,
+  }
+}
+
+function connectionTest(value: import('./hey-api').AiGatewayTestResult): AiGatewayConnectionTest {
+  return {
+    success: value.success ?? false,
+    latencyMillis: value.latencyMillis ?? 0,
+    message: value.message ?? 'Connection test finished',
+    models: (value.models ?? []).map((model) => {
+      if (!model.gatewayId || !model.id || !model.displayName) throw new Error('AI model identity is incomplete')
+      return { gatewayId: model.gatewayId, id: model.id, displayName: model.displayName }
     }),
   }
 }
@@ -122,6 +187,50 @@ export function useResetAiRoute() {
         routes: { ...current.routes, [task]: selection },
       }),
     ),
+  })
+}
+
+export function useSaveAiGateway() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ input, editing }: { input: AiGatewayInput; editing: boolean }) => gateway(dataOrThrow(
+      editing
+        ? await updateAiGateway({ path: { gatewayId: input.id }, body: input })
+        : await createAiGateway({ body: input }),
+    )),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['settings', 'ai'] })
+      await queryClient.invalidateQueries({ queryKey: ['settings', 'ai', 'models'] })
+    },
+  })
+}
+
+export function useTestAiGatewayDraft() {
+  return useMutation({
+    mutationFn: async (input: AiGatewayInput) => connectionTest(dataOrThrow(
+      await testAiGatewayDraft({ body: input }),
+    )),
+  })
+}
+
+export function useTestAiGateway() {
+  return useMutation({
+    mutationFn: async (gatewayId: string) => connectionTest(dataOrThrow(
+      await testAiGateway({ path: { gatewayId } }),
+    )),
+  })
+}
+
+export function useDeleteAiGateway() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (gatewayId: string) => voidOrThrow(
+      await deleteAiGateway({ path: { gatewayId } }),
+    ),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['settings', 'ai'] })
+      await queryClient.invalidateQueries({ queryKey: ['settings', 'ai', 'models'] })
+    },
   })
 }
 
