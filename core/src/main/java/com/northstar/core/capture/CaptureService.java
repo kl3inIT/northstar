@@ -7,6 +7,7 @@ import com.northstar.core.finance.FinanceService;
 import com.northstar.core.finance.TransactionType;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteSummary;
+import com.northstar.core.study.StudyService;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.TextStyle;
@@ -43,8 +44,8 @@ public class CaptureService {
     // impossible ("omit" a required field) — absence is spelled "" explicitly.
     private static final String SYSTEM_PROMPT = """
             You are the capture inbox of a personal knowledge base + task manager
-            + money ledger. Classify the captured text and shape it, keeping the
-            language of the source.
+            + money ledger + study log + vocabulary trainer. Classify the captured
+            text and shape it, keeping the language of the source.
 
             Today is %s (%s).
 
@@ -52,8 +53,9 @@ public class CaptureService {
             Classify by INTENT, never by surface keywords. The single test (GTD
             "is it actionable?"): after this item is saved, is it WAITING FOR THE
             USER TO ACT (task), BLOCKING A SPAN OF TIME on the calendar (event),
-            WAITING TO BE LOOKED UP (note), or RECORDING MONEY THAT ALREADY
-            MOVED (expense)?
+            WAITING TO BE LOOKED UP (note), RECORDING MONEY THAT ALREADY
+            MOVED (expense), RECORDING STUDYING THAT ALREADY HAPPENED (study),
+            or SAVING WORDS TO MEMORIZE (vocab)?
             - TASK: a commitment or intention to do something that has not
               happened yet — even with no deadline (an undated task is fine).
               A bare verb+topic with no substance is an intention, so a TASK.
@@ -67,6 +69,14 @@ public class CaptureService {
               amount attached to something that happened ("ăn sáng 35k",
               "nhận lương 18tr5"). It records a money fact, in either
               direction (each item's type says EXPENSE or INCOME).
+            - STUDY: the text reports a practice/study activity ALREADY done —
+              what was practiced, optionally how long and with what result
+              ("làm listening HSK4 25p đúng 18/25", "viết task 2 mất 40 phút").
+              It records effort spent, not knowledge content.
+            - VOCAB: the text saves one or more words/phrases to memorize,
+              typically word = meaning pairs ("từ mới: 磨蹭 = lề mề",
+              "meticulous = tỉ mỉ"). It feeds the spaced-repetition trainer,
+              not the notes.
             - Task-vs-event tie-breaker: "do X BY/BEFORE time" -> TASK (deadline);
               "X takes place AT/FROM time" -> EVENT (occupied time).
             - Tie-breaker: intention without content -> TASK; content, even when
@@ -74,6 +84,13 @@ public class CaptureService {
             - Task-vs-expense tie-breaker: an intention to buy — future words,
               "cần/mai/nhớ mua" — is a TASK even when a price is mentioned;
               a completed purchase with an amount is an EXPENSE.
+            - Study-vs-task tie-breaker: an intention to study ("mai ôn
+              listening") is a TASK; studying already done is STUDY.
+            - Study-vs-note tie-breaker: reporting the ACTIVITY ("học 2 tiếng
+              ngữ pháp") is STUDY; recording the LEARNED CONTENT ("cách dùng 把:
+              ...") is a NOTE.
+            - Vocab-vs-note tie-breaker: word = meaning pairs to MEMORIZE are
+              VOCAB; an explanation of grammar/usage in sentences is a NOTE.
             </classification>
 
             <examples>
@@ -110,10 +127,28 @@ public class CaptureService {
             - Two or more banking SMS messages pasted together -> EXPENSE — one
               item per actual debit/credit message, preserving each message's
               own amount and transaction date.
+            - "làm listening HSK4 25 phút đúng 18/25" -> STUDY — one item:
+              skill Listening, durationMinutes 25, scoreRaw 18, scoreMax 25,
+              notes "HSK4".
+            - "sáng viết task 2 topic environment 40p, chiều ôn 20 từ mới"
+              -> STUDY — TWO items (Writing 40 minutes, notes "task 2 topic
+              environment" / Vocabulary, notes "ôn 20 từ mới"); every activity
+              becomes its own item.
+            - "làm mock reading Cam 18 test 2 được 32/40" -> STUDY — kind MOCK
+              (a full practice test), skill Reading, scoreRaw 32, scoreMax 40.
+            - "mai ôn listening 30 phút" -> TASK — future intention to study,
+              nothing happened yet.
+            - "học được cách dùng 把 trong câu chữ Hán" -> NOTE — records the
+              learned content itself, not the effort spent.
+            - "từ mới: 磨蹭 = lề mề, chần chừ" -> VOCAB — one card: front 磨蹭,
+              back "lề mề, chần chừ", reading "mócèng", plus one short example
+              sentence.
+            - "meticulous = tỉ mỉ, subtle = tinh tế" -> VOCAB — TWO cards, one
+              per word = meaning pair.
             </examples>
 
             In `reasoning`, argue the user's intent in one short sentence BEFORE
-            choosing `kind`. Fill only the draft matching `kind`; the other three
+            choosing `kind`. Fill only the draft matching `kind`; the other five
             stay null.
 
             <task_shape>
@@ -186,12 +221,49 @@ public class CaptureService {
               windfall.
             </expense_shape>
 
+            <study_shape>
+            - items: EVERY distinct study activity in the text becomes its own
+              item — never merge two, never drop one.
+            - skill: EXACTLY one value from the skill list in <user_context>;
+              map the source language to it ("nghe" -> Listening, "từ vựng" ->
+              Vocabulary). Use "Other" when nothing fits.
+            - kind: "MOCK" ONLY when the text names a full practice/mock test
+              ("thi thử", "mock", "làm đề Cam 18 test 2"); otherwise "" (a
+              normal practice session).
+            - durationMinutes: integer minutes when stated ("25p" -> "25",
+              "2 tiếng" -> "120"), else "". NEVER estimate one.
+            - scoreRaw/scoreMax: split a stated result ("18/25" -> "18" and
+              "25"; "được 32 trên 40" -> "32" and "40"), else both "". A band
+              score with no denominator stays in notes, not in score fields.
+            - notes: material/topic/detail beyond the skill ("HSK4", "Cam 18
+              test 2", "topic environment"), else "".
+            - occurredOn: ISO date when the text names one ("hôm qua" = resolve
+              against today), else "" (meaning today).
+            - disciplineName: same rule as tasks — exact existing name or "".
+            </study_shape>
+
+            <vocab_shape>
+            - items: EVERY word = meaning pair becomes its own card — never
+              merge two, never drop one.
+            - front: the word/phrase being memorized, exactly as the user wrote
+              it. back: the meaning in the user's language.
+            - reading: pronunciation help you KNOW to be correct — pinyin for
+              Chinese (with tone marks), IPA for English. "" when unsure.
+            - example: ONE short, natural example sentence using the front (in
+              the front's language), with a translation after " — ". Generate
+              it yourself; keep it simple. "" only when an example makes no
+              sense.
+            - disciplineName: same rule as tasks — exact existing name or "".
+            </vocab_shape>
+
             <self_check>
             Before answering, re-scan the source once for: a missed time reference,
             a clock time mistaken for a date, a deadline misread as an event (or
             the reverse), a missed amount (every amount = one expense item), a
-            shorthand expansion error (35k=35000, 2tr5=2500000), a discipline that
-            clearly fits.
+            shorthand expansion error (35k=35000, 2tr5=2500000), a missed study
+            activity (every activity = one study item), an unsplit score
+            (18/25 = raw 18 + max 25), a missed word = meaning pair (every pair =
+            one vocab card), a discipline that clearly fits.
             </self_check>
 
             <user_context>
@@ -213,6 +285,9 @@ public class CaptureService {
             Income categories (pick from these):
             %s
 
+            Study skills (pick from these):
+            %s
+
             Recent category corrections made by this user (description -> exact
             category). Follow these preferences when a new description is
             semantically similar; they override generic merchant assumptions:
@@ -224,14 +299,16 @@ public class CaptureService {
     private final NoteService notes;
     private final DisciplineService disciplines;
     private final FinanceService finance;
+    private final StudyService study;
     private final ZoneId zone;
 
     public CaptureService(ChatClient chat, NoteService notes, DisciplineService disciplines,
-            FinanceService finance, ZoneId zone) {
+            FinanceService finance, StudyService study, ZoneId zone) {
         this.chat = chat;
         this.notes = notes;
         this.disciplines = disciplines;
         this.finance = finance;
+        this.study = study;
         this.zone = zone;
     }
 
@@ -309,6 +386,7 @@ public class CaptureService {
                 bulleted(disciplineNames), bulleted(folders), bulleted(tags), bulleted(titles),
                 bulleted(new LinkedHashSet<>(finance.categories(TransactionType.EXPENSE))),
                 bulleted(new LinkedHashSet<>(finance.categories(TransactionType.INCOME))),
+                bulleted(new LinkedHashSet<>(study.skills())),
                 bulletedCorrections(finance.categoryCorrections()));
         if (forcedKind != null) {
             system += """
