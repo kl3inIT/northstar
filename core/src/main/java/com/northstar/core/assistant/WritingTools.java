@@ -1,5 +1,6 @@
 package com.northstar.core.assistant;
 
+import com.northstar.core.study.GrammarWeakness;
 import com.northstar.core.study.WritingFeedbackSummary;
 import com.northstar.core.study.WritingService;
 import java.util.List;
@@ -36,6 +37,28 @@ class WritingTools implements NorthstarTool {
             explicit user intent, and name the essay you deleted in your \
             reply.""";
 
+    private static final String WEAKNESSES = """
+            The user's recurring grammar/lexis error patterns, aggregated from \
+            every graded essay: label, how many gradings flagged it, when it \
+            was last seen, and recent verbatim quote→fix examples from their \
+            own writing. DRILL PROTOCOL when the user wants grammar practice \
+            ("luyện ngữ pháp", "drill grammar"): pick the 1-2 most recent \
+            patterns (focused practice on few patterns beats covering all), \
+            check recent Grammar entries in find_study_sessions to avoid \
+            re-drilling what was just practiced, then write 5 NEW short \
+            sentences — everyday topics, the user's level, each containing \
+            exactly ONE error of the target pattern, never a sentence from \
+            their essays verbatim. Present ONE at a time and wait for the \
+            user's correction; after each answer give the verdict, the \
+            corrected sentence, and a ONE-line rule explanation of why. \
+            Finish with a tally, then log the drill with log_study_sessions \
+            (skill Vocabulary for word-choice patterns, otherwise Grammar; \
+            kind PRACTICE; scoreRaw = correct answers, scoreMax = items; \
+            sessionNotes naming the patterns drilled, e.g. "drill: articles, \
+            SVA 4/5"). If this list is empty, say grammar drills unlock after \
+            the first graded essay and offer grade_writing instead — do not \
+            invent weaknesses.""";
+
     private final WritingService writing;
 
     WritingTools(WritingService writing) {
@@ -62,5 +85,13 @@ class WritingTools implements NorthstarTool {
         writing.delete(id);
         return "Deleted writing feedback: " + victim.taskLabel() + " (~" + victim.overallMin()
                 + "-" + victim.overallMax() + ")";
+    }
+
+    @Tool(name = "grammar_weaknesses", description = WEAKNESSES)
+    @McpTool(name = "grammar_weaknesses", description = WEAKNESSES,
+            annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false,
+                    openWorldHint = false))
+    List<GrammarWeakness> grammarWeaknesses() {
+        return writing.grammarWeaknesses();
     }
 }

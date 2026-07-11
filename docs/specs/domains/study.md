@@ -75,6 +75,21 @@ the tool description, not a hard wall.
 - Feedback rows are append-only: delete, never edit. Essays are capped at
   18,000 characters and must have at least 30 words.
 
+### Grammar drills
+
+`grammar_weaknesses` aggregates the error patterns across every grading —
+grouped case-insensitively by label, most recently seen first, each with up
+to three recent quote→fix examples from the user's own essays. Its tool
+description carries the drill protocol: the assistant picks the 1-2 most
+recent patterns (focused practice), checks recent Grammar sessions to avoid
+re-drilling, writes five NEW single-error sentences at the user's level,
+presents them one at a time, and after each answer gives the verdict, the
+corrected sentence, and a one-line rule explanation. The finished (or
+stopped) drill is logged as a study session (skill Grammar or Vocabulary,
+score = correct/items, notes naming the patterns). With no graded essays the
+tool returns an empty list and the assistant offers grading instead of
+inventing weaknesses. Malformed stored error JSON is skipped, never fatal.
+
 ## Entry Paths
 
 - Capture classifies `STUDY` (practice already done — multi-item, echo-back,
@@ -85,7 +100,7 @@ the tool description, not a hard wall.
   `update_study_session`, `delete_study_session`, `study_summary`,
   `list_mock_results`, `save_vocab_cards`, `find_vocab_cards`, `quiz_vocab`,
   `record_vocab_review`, `update_vocab_card`, `delete_vocab_card`,
-  `list_writing_feedback`, `delete_writing_feedback`.
+  `list_writing_feedback`, `delete_writing_feedback`, `grammar_weaknesses`.
 - `grade_writing` is in-app only (no MCP annotation): grading needs the LLM
   the mcp app deliberately does not have. The assistant system prompt routes
   "chấm bài" to it — tool discovery is search-based, and without the route

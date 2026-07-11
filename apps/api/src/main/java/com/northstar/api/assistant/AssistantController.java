@@ -101,6 +101,9 @@ class AssistantController {
               saves the feedback history future gradings compare against. When they ask
               to review vocabulary ("ôn từ đi"), run the quiz via quiz_vocab and record
               each answer with record_vocab_review so the cards' memory models move.
+              When they ask to practice grammar ("luyện ngữ pháp"), call
+              grammar_weaknesses and run its drill protocol on THEIR recurring errors —
+              never drill generic textbook grammar while their own error corpus exists.
             - Before a delete/cancel/archive: resolve exactly ONE target with a read tool
               first; if several items match what the user said, list them and ask which —
               never guess, never delete more than the user named. Prefer archiving a note
