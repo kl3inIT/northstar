@@ -18,14 +18,16 @@ import org.springframework.stereotype.Component;
 public class SpringAiClientRouter implements AiClientRouter {
 
     private final AiProperties properties;
+    private final AiGatewayRegistry gateways;
     private final AiRouteSettingsService routes;
     private final OpenAiModelCatalog catalog;
     private final Map<String, ChatModel> models = new ConcurrentHashMap<>();
     private final Map<String, ChatClient> clients = new ConcurrentHashMap<>();
 
-    SpringAiClientRouter(AiProperties properties, AiRouteSettingsService routes,
-            OpenAiModelCatalog catalog) {
+    SpringAiClientRouter(AiProperties properties, AiGatewayRegistry gateways,
+            AiRouteSettingsService routes, OpenAiModelCatalog catalog) {
         this.properties = properties;
+        this.gateways = gateways;
         this.routes = routes;
         this.catalog = catalog;
     }
@@ -69,11 +71,11 @@ public class SpringAiClientRouter implements AiClientRouter {
     }
 
     private void validateGateway(String gatewayId) {
-        properties.requireGateway(gatewayId);
+        gateways.require(gatewayId);
     }
 
     private ChatModel createModel(String gatewayId) {
-        AiProperties.Gateway gateway = properties.requireGateway(gatewayId);
+        AiGatewayDefinition gateway = gateways.require(gatewayId);
         String defaultModel = gateway.models().isEmpty()
                 ? properties.routes().assistant()
                 : gateway.models().getFirst();
@@ -87,5 +89,10 @@ public class SpringAiClientRouter implements AiClientRouter {
                             .build())
                     .build();
         };
+    }
+
+    void invalidate(String gatewayId) {
+        clients.remove(gatewayId);
+        models.remove(gatewayId);
     }
 }

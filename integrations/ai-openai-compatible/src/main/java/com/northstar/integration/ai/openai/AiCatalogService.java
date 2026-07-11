@@ -6,20 +6,16 @@ import org.springframework.stereotype.Service;
 @Service
 public class AiCatalogService {
 
-    private final AiProperties properties;
+    private final AiGatewayRegistry gateways;
     private final OpenAiModelCatalog models;
 
-    AiCatalogService(AiProperties properties, OpenAiModelCatalog models) {
-        this.properties = properties;
+    AiCatalogService(AiGatewayRegistry gateways, OpenAiModelCatalog models) {
+        this.gateways = gateways;
         this.models = models;
     }
 
     public List<AiGatewayDescriptor> gateways() {
-        return properties.gateways().entrySet().stream()
-                .map(entry -> new AiGatewayDescriptor(entry.getKey(), entry.getValue().displayName(),
-                        entry.getValue().configured()))
-                .sorted((left, right) -> left.displayName().compareToIgnoreCase(right.displayName()))
-                .toList();
+        return gateways.descriptors();
     }
 
     public List<AiModelDescriptor> models(String gatewayId) {

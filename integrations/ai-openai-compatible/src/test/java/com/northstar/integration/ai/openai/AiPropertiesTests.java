@@ -15,14 +15,14 @@ class AiPropertiesTests {
     void routesUseTheActiveUserDefinedGateway() {
         var properties = properties();
 
-        assertEquals("nine-router", properties.routeDefaults().get(AiTask.ASSISTANT).gatewayId());
+        assertEquals("custom-router", properties.routeDefaults().get(AiTask.ASSISTANT).gatewayId());
         assertEquals("assistant-combo", properties.routeDefaults().get(AiTask.ASSISTANT).modelId());
         assertEquals("caption-combo", properties.routeDefaults().get(AiTask.IMAGE_CAPTION).modelId());
     }
 
     @Test
     void gatewayToStringNeverLeaksTheSecret() {
-        String rendered = properties().gateways().get("nine-router").toString();
+        String rendered = properties().gateways().get("custom-router").toString();
 
         assertFalse(rendered.contains("secret-key"));
     }
@@ -30,7 +30,7 @@ class AiPropertiesTests {
     private static AiProperties properties() {
         var gateway = new AiProperties.Gateway(
                 AiGatewayType.OPENAI_COMPATIBLE,
-                "9Router",
+                "Custom Router",
                 "https://router.example/v1",
                 "secret-key",
                 List.of("assistant-combo", "caption-combo"),
@@ -43,7 +43,8 @@ class AiPropertiesTests {
                 "fast-combo",
                 "grader-combo",
                 "caption-combo");
-        return new AiProperties("nine-router", Map.of("nine-router", gateway), routes,
-                new AiProperties.Catalog(Duration.ofMinutes(2)));
+        return new AiProperties("custom-router", Map.of("custom-router", gateway), routes,
+                new AiProperties.Catalog(Duration.ofMinutes(2)),
+                new AiProperties.Credentials(""));
     }
 }

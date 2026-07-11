@@ -4,6 +4,10 @@
 
 Accepted on 2026-07-11.
 
+The deployment-only credential paragraph is superseded by
+[0021](./0021-runtime-ai-gateways-are-protocol-instances.md). Task routing and
+adapter boundaries remain accepted.
+
 ## Decision
 
 Model-backed features depend on the `AiClientRouter` port and identify their

@@ -2,14 +2,12 @@ package com.northstar.integration.ai.openai;
 
 import java.util.List;
 
-public record AiGatewayDescriptor(
+public record AiGatewayInput(
         String id,
         String displayName,
-        boolean configured,
-        AiGatewaySource source,
-        boolean editable,
         String baseUrl,
-        List<String> configuredModels,
+        String apiKey,
+        List<String> models,
         boolean discoverModels,
         int timeoutSeconds) {
 }

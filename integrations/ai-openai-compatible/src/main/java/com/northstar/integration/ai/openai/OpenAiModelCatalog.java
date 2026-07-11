@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -19,16 +20,19 @@ class OpenAiModelCatalog {
     private static final Logger log = LoggerFactory.getLogger(OpenAiModelCatalog.class);
 
     private final AiProperties properties;
+    private final AiGatewayRegistry gateways;
     private final RestClient.Builder restClient;
     private final Map<String, CachedModels> cache = new ConcurrentHashMap<>();
 
-    OpenAiModelCatalog(AiProperties properties, RestClient.Builder restClient) {
+    OpenAiModelCatalog(AiProperties properties, AiGatewayRegistry gateways,
+            RestClient.Builder restClient) {
         this.properties = properties;
+        this.gateways = gateways;
         this.restClient = restClient;
     }
 
     List<AiModelDescriptor> models(String gatewayId) {
-        AiProperties.Gateway gateway = properties.requireGateway(gatewayId);
+        AiGatewayDefinition gateway = gateways.require(gatewayId);
         CachedModels current = cache.get(gatewayId);
         if (current != null && current.expiresAt().isAfter(Instant.now())) {
             return current.models();
@@ -39,7 +43,20 @@ class OpenAiModelCatalog {
         return models;
     }
 
-    private List<AiModelDescriptor> load(String gatewayId, AiProperties.Gateway gateway) {
+    List<AiModelDescriptor> probe(AiGatewayDefinition gateway) {
+        return load(gateway.id(), gateway, true);
+    }
+
+    void invalidate(String gatewayId) {
+        cache.remove(gatewayId);
+    }
+
+    private List<AiModelDescriptor> load(String gatewayId, AiGatewayDefinition gateway) {
+        return load(gatewayId, gateway, false);
+    }
+
+    private List<AiModelDescriptor> load(String gatewayId, AiGatewayDefinition gateway,
+            boolean failFast) {
         Map<String, AiModelDescriptor> result = new LinkedHashMap<>();
         gateway.models().forEach(id -> result.put(id,
                 new AiModelDescriptor(gatewayId, id, displayName(id))));
@@ -47,9 +64,12 @@ class OpenAiModelCatalog {
             return sorted(result);
         }
         try {
+            JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
+            requestFactory.setReadTimeout(gateway.timeout());
             ModelsResponse response = restClient.clone()
                     .baseUrl(gateway.baseUrl())
                     .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + gateway.apiKey())
+                    .requestFactory(requestFactory)
                     .build()
                     .get()
                     .uri("/models")
@@ -62,6 +82,9 @@ class OpenAiModelCatalog {
                                 new AiModelDescriptor(gatewayId, model.id(), displayName(model.id()))));
             }
         } catch (RuntimeException exception) {
+            if (failFast) {
+                throw exception;
+            }
             log.warn("Could not refresh model catalog for gateway {}; using configured models",
                     gatewayId, exception);
         }

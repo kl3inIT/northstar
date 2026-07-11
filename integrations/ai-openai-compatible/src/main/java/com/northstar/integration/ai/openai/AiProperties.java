@@ -15,13 +15,15 @@ public record AiProperties(
         String activeGateway,
         Map<String, Gateway> gateways,
         Routes routes,
-        Catalog catalog) {
+        Catalog catalog,
+        Credentials credentials) {
 
     public AiProperties {
         activeGateway = normalize(activeGateway, "openai");
         gateways = gateways == null ? Map.of() : Map.copyOf(gateways);
         routes = routes == null ? Routes.empty() : routes;
         catalog = catalog == null ? new Catalog(Duration.ofMinutes(5)) : catalog;
+        credentials = credentials == null ? new Credentials("") : credentials;
     }
 
     Map<AiTask, AiRoute> routeDefaults() {
@@ -29,17 +31,6 @@ public record AiProperties(
         Map<AiTask, AiRoute> result = new EnumMap<>(AiTask.class);
         models.forEach((task, model) -> result.put(task, new AiRoute(activeGateway, model)));
         return result;
-    }
-
-    Gateway requireGateway(String id) {
-        Gateway gateway = gateways.get(id);
-        if (gateway == null) {
-            throw new IllegalArgumentException("Unknown AI gateway: " + id);
-        }
-        if (!gateway.configured()) {
-            throw new IllegalStateException("AI gateway is not configured: " + id);
-        }
-        return gateway;
     }
 
     public record Gateway(
@@ -104,6 +95,18 @@ public record AiProperties(
     public record Catalog(Duration cacheTtl) {
         public Catalog {
             cacheTtl = cacheTtl == null ? Duration.ofMinutes(5) : cacheTtl;
+        }
+    }
+
+    public record Credentials(String encryptionKeyBase64) {
+        public Credentials {
+            encryptionKeyBase64 = encryptionKeyBase64 == null ? "" : encryptionKeyBase64.strip();
+        }
+
+        @Override
+        public String toString() {
+            return "Credentials[encryptionKeyBase64=%s]"
+                    .formatted(encryptionKeyBase64.isBlank() ? "" : "***");
         }
     }
 

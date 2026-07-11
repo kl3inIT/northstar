@@ -102,14 +102,6 @@ northstar:
           - ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
         discover-models: false
         timeout: 60s
-      nine-router:
-        type: OPENAI_COMPATIBLE
-        display-name: 9Router
-        base-url: ${NINEROUTER_URL:}
-        api-key: ${NINEROUTER_KEY:}
-        models: []
-        discover-models: true
-        timeout: 60s
     routes:
       assistant: ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.5}
       capture: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
@@ -119,6 +111,8 @@ northstar:
       image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-5.5}
     catalog:
       cache-ttl: 5m
+    credentials:
+      encryption-key-base64: ${NORTHSTAR_AI_CREDENTIAL_KEY:}
   speech:
     provider: ${NORTHSTAR_SPEECH_PROVIDER:azure}
     azure:
