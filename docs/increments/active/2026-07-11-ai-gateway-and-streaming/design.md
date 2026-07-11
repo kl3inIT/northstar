@@ -28,8 +28,15 @@ provider types.
 - The Chat model picker lives in Chat and is persisted per conversation. New
   conversations use the most recently selected Assistant model, falling back
   to the Assistant route default.
-- Credentials and base URLs remain server-side. Settings may select among
-  configured gateways and catalog models but never receives an API key.
+- Credentials and base URLs remain server-side. Deployment-defined gateways
+  are read-only defaults; Settings can create runtime OpenAI-compatible gateway
+  instances without introducing vendor-specific code. API keys are encrypted
+  at rest with AES-256-GCM and never returned to clients.
+- Runtime gateway IDs, labels, base URLs, manual models, model discovery, and
+  timeouts are editable. A dedicated connection probe validates credentials and
+  discovers models before a route is changed. Deleting a runtime gateway also
+  removes route overrides that reference it; deployment gateways cannot be
+  edited or deleted through the UI.
 - 9Router `/v1/search` and `/v1/web/fetch` are non-standard extensions and stay
   behind the existing web-research ports. They are not part of the generic
   OpenAI-compatible model gateway.
@@ -47,9 +54,12 @@ SDK chunk parser ignores them.
 
 ## Configuration Model
 
-`northstar.ai` binds to immutable records. It contains configured gateway
-definitions, a default gateway, task route defaults, catalog caching, and
-stream timing. Persisted runtime settings store only gateway/model selections.
+`northstar.ai` binds to immutable records. It contains deployment gateway
+definitions, a default gateway, task route defaults, catalog caching, and the
+base64 AES-256 credential key. Persisted runtime settings store gateway
+definitions, encrypted credentials, and gateway/model selections. The registry
+merges both sources at request time, so adding 9Router, OpenRouter, LiteLLM, or
+another OpenAI-compatible endpoint needs configuration rather than a code path.
 Embedding routes must retain the configured pgvector dimension.
 
 ## Verification

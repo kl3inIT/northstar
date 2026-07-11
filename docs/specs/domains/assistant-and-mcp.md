@@ -27,11 +27,26 @@ Model-backed workloads resolve an `AiTask` route at call time. Each route is a
 configured gateway id plus model id; application YAML supplies defaults and a
 database override from Settings wins without restarting either API or worker.
 OpenAI, 9Router, OpenRouter, and LiteLLM-style connections use the shared
-`OPENAI_COMPATIBLE` integration. Credentials and base URLs never leave the
-server. The web Settings page edits task routes, while web and Flutter Chat
-offer the models exposed by the current conversation's gateway. Chat selection
-is persisted per conversation; a new conversation inherits the most recently
-used Assistant selection before falling back to the Assistant task default.
+`OPENAI_COMPATIBLE` integration. Deployment gateways remain read-only defaults;
+Settings can also create, edit, test, and delete runtime gateway instances from
+OpenAI, 9Router, OpenRouter, LiteLLM, or Custom presets. Presets provide form
+defaults only and never introduce vendor-specific routing code. Runtime API keys
+are encrypted with AES-256-GCM using a deployment key and are never returned to
+clients. The route editor and web/Flutter Chat offer models discovered from the
+selected gateway. Chat selection is persisted per conversation; a new
+conversation inherits the most recently used Assistant selection before falling
+back to the Assistant task default.
+
+The web Assistant composes its transcript from AI Elements primitives. The
+composer and transcript share native attachment tiles; the native Prompt Input
+provides drag/drop, paste, file-picker, screenshot, submit, and stop behavior;
+message text exposes a native copy action; Chat uses the searchable Model
+Selector; and external Markdown citations use Inline Citation hover cards.
+Web-tool results emit Vercel `source-url` parts, while knowledge-search note and
+file hits emit `source-document` parts. Both render in the native Sources
+disclosure and survive transcript rehydration. Tool workflow and Northstar's
+external-link confirmation remain application wrappers because they encode
+product behavior beyond a generic presentation component.
 
 The Flutter client authenticates the same REST/SSE contract with a Bearer access
 token. Its typed service parses known text, tool, error, finish, and done frames;
@@ -87,7 +102,10 @@ The in-app Assistant additionally owns API-only `search_web` and
 is public, while web search can spend provider credits and direct reading would
 otherwise expose a fetch proxy. The Assistant uses web search for current public
 facts, reads ordinary pasted HTTP(S) links before answering about them, cites
-returned sources as Markdown links, and treats fetched text as untrusted data.
+returned sources as Markdown links and structured `source-url` stream parts,
+and treats fetched text as untrusted data. Knowledge search emits note and file
+citations as structured `source-document` parts rather than pretending they are
+external URLs.
 
 The weekly `draft_review` facts include ordinary spending, exceptional
 purchases, and the median of the prior four full weeks when finance data exists.
