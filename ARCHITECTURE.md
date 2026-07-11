@@ -172,7 +172,19 @@ pnpm -C web dev
 pnpm -C web typecheck
 pnpm -C web build
 pnpm -C web gen:api
+
+cd mobile
+flutter pub get
+dart format --output=none --set-exit-if-changed lib test
+flutter analyze
+flutter test
+flutter build web --release
 ```
 
 Use `./gradlew --no-daemon clean test` for the context-load gate. Do not use
 `bootRun` as a terminating verification command.
+
+`.github/workflows/mobile-ci.yml` mirrors the Flutter checks on Linux, builds an
+Android debug APK, and compiles an unsigned iOS release on a GitHub-hosted macOS
+runner. Flutter is pinned and installed from its official repository; reusable
+actions are pinned to full release tags verified against their official repos.

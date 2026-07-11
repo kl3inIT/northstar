@@ -15,5 +15,8 @@
 | Successful login opens the protected Assistant route | Widget interaction test | Covered |
 | Sign out clears state and redirects to login | Widget interaction test | Covered |
 | Flutter static analysis and Web release compilation | `flutter analyze`, `flutter build web --release` | Covered |
-| Native iOS rendering and VoiceOver | Requires macOS/iPhone validation | Gap |
-| Android APK/device rendering and TalkBack | APK build is still blocked by the current Windows toolchain process hang; attached-device validation remains required | Gap |
+| Linux format/analyze/test/Web build | Path-scoped `Mobile CI` workflow on GitHub-hosted Ubuntu | Configured; first hosted run pending push |
+| Android debug APK compilation | `Mobile CI` Ubuntu job uploads a seven-day review artifact | Configured; first hosted run pending push |
+| Unsigned iOS release compilation | `Mobile CI` macOS job uploads `Runner.app` without signing secrets | Configured; first hosted run pending push |
+| Native iOS rendering and VoiceOver | Requires signed build on an iPhone | Gap |
+| Android device rendering and TalkBack | Requires attached emulator/device | Gap |

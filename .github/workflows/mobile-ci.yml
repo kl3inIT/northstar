@@ -1,0 +1,165 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mobile/**"
+      - "apps/api/src/main/java/com/northstar/api/auth/**"
+      - "apps/api/src/test/java/com/northstar/api/auth/**"
+      - "core/src/main/resources/db/migration/*mobile_auth.sql"
+      - ".github/workflows/mobile-ci.yml"
+  pull_request:
+    paths:
+      - "mobile/**"
+      - "apps/api/src/main/java/com/northstar/api/auth/**"
+      - "apps/api/src/test/java/com/northstar/api/auth/**"
+      - "core/src/main/resources/db/migration/*mobile_auth.sql"
+      - ".github/workflows/mobile-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: 3.44.6
+
+jobs:
+  quality-android:
+    name: Quality, Web, Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - uses: actions/setup-java@v5.5.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v6.2.0
+
+      - name: Cache Flutter SDK
+        id: flutter-cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: ${{ runner.tool_cache }}/flutter/${{ env.FLUTTER_VERSION }}
+          key: flutter-${{ runner.os }}-${{ runner.arch }}-${{ env.FLUTTER_VERSION }}
+
+      - name: Install Flutter from the official repository
+        if: steps.flutter-cache.outputs.cache-hit != 'true'
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TOOL_CACHE/flutter"
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git \
+            "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION"
+
+      - name: Configure Flutter
+        shell: bash
+        run: |
+          echo "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION/bin/flutter" config --no-analytics
+          "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION/bin/flutter" precache --web --android
+          "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION/bin/flutter" --version
+
+      - name: Cache Dart packages
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mobile/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze
+        run: flutter analyze --no-pub
+
+      - name: Test
+        run: flutter test --no-pub
+
+      - name: Build Web review
+        run: flutter build web --release --no-pub --no-wasm-dry-run
+
+      - name: Build Android debug APK
+        run: flutter build apk --debug --no-pub
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: northstar-android-debug
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
+
+  ios:
+    name: iOS (unsigned)
+    runs-on: macos-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7.0.0
+
+      - name: Cache Flutter SDK
+        id: flutter-cache
+        uses: actions/cache@v6.1.0
+        with:
+          path: ${{ runner.tool_cache }}/flutter/${{ env.FLUTTER_VERSION }}
+          key: flutter-${{ runner.os }}-${{ runner.arch }}-${{ env.FLUTTER_VERSION }}
+
+      - name: Install Flutter from the official repository
+        if: steps.flutter-cache.outputs.cache-hit != 'true'
+        shell: bash
+        working-directory: ${{ runner.temp }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TOOL_CACHE/flutter"
+          git clone --depth 1 --branch "$FLUTTER_VERSION" \
+            https://github.com/flutter/flutter.git \
+            "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION"
+
+      - name: Configure Flutter
+        shell: bash
+        run: |
+          echo "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION/bin/flutter" config --no-analytics
+          "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION/bin/flutter" precache --ios
+          "$RUNNER_TOOL_CACHE/flutter/$FLUTTER_VERSION/bin/flutter" --version
+
+      - name: Cache Dart packages
+        uses: actions/cache@v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('mobile/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign --no-pub
+
+      - name: Upload unsigned iOS app
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: northstar-ios-unsigned
+          path: mobile/build/ios/iphoneos/Runner.app
+          if-no-files-found: error
+          retention-days: 7

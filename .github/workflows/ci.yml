@@ -26,12 +26,12 @@ jobs:
     name: Backend (Gradle)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7.0.0
+      - uses: actions/setup-java@v5.5.0
         with:
           distribution: temurin
           java-version: "25"
-      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@v6.2.0
       - name: Build & test
         run: ./gradlew build --stacktrace
 
@@ -42,11 +42,11 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v7.0.0
+      - uses: pnpm/action-setup@v6.0.9
         with:
           version: 11
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6.4.0
         with:
           node-version: "24"
           cache: pnpm

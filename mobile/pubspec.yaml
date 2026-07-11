@@ -18,3 +18,8 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+
+flutter:
+  # Some framework navigation metadata references MaterialIcons even though
+  # Northstar's widgets are Cupertino-only. The release build tree-shakes it.
+  uses-material-design: true
