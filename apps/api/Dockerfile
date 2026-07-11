@@ -32,6 +32,7 @@ COPY core/build.gradle.kts            core/build.gradle.kts
 COPY apps/api/build.gradle.kts        apps/api/build.gradle.kts
 COPY apps/mcp/build.gradle.kts        apps/mcp/build.gradle.kts
 COPY apps/worker/build.gradle.kts     apps/worker/build.gradle.kts
+COPY integrations/web-openai/build.gradle.kts integrations/web-openai/build.gradle.kts
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     chmod +x gradlew && \
@@ -44,6 +45,7 @@ FROM deps AS builder
 
 COPY core/src/main/       core/src/main/
 COPY apps/api/src/main/   apps/api/src/main/
+COPY integrations/web-openai/src/main/ integrations/web-openai/src/main/
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     ./gradlew :apps:api:bootJar --no-daemon --parallel --console=plain -x test && \
