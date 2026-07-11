@@ -31,6 +31,7 @@ COPY apps/worker/build.gradle.kts     apps/worker/build.gradle.kts
 COPY integrations/web-openai/build.gradle.kts integrations/web-openai/build.gradle.kts
 COPY integrations/web-firecrawl/build.gradle.kts integrations/web-firecrawl/build.gradle.kts
 COPY integrations/ai-openai-compatible/build.gradle.kts integrations/ai-openai-compatible/build.gradle.kts
+COPY integrations/speech-azure/build.gradle.kts integrations/speech-azure/build.gradle.kts
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     chmod +x gradlew && \
