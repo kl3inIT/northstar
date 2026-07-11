@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts'
 import { CalendarClock, Ellipsis, Hourglass, Pencil, Target, Timer, Trash2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   DropdownMenu,
@@ -18,6 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import {
   useDeleteStudySession,
+  useMockResults,
   useStudySessions,
   useStudySkills,
   useStudySummary,
@@ -71,6 +74,8 @@ export function LogPanel() {
     <div className="flex flex-col gap-4">
       <LogStats summary={summaryQuery.data} />
 
+      <MockTrendSection />
+
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <Select value={skill} onValueChange={setSkill}>
           <SelectTrigger className="w-full sm:w-44" aria-label="Filter by skill">
@@ -116,6 +121,76 @@ export function LogPanel() {
       <EditSessionDialog key={editing?.id ?? 'none'} session={editing} onClose={() => setEditing(null)} />
       <DeleteSessionDialog session={deleting} onClose={() => setDeleting(null)} />
     </div>
+  )
+}
+
+const TREND_COLORS = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)', 'var(--chart-5)']
+
+/**
+ * Score trend across mock tests, one line per skill (percentages from
+ * different skills are not comparable on one line). Hidden until there are
+ * two scored mocks — a single dot is not a trend.
+ */
+function MockTrendSection() {
+  const mocks = useMockResults().data ?? EMPTY_SESSIONS
+
+  const { data, skills } = useMemo(() => {
+    const scored = mocks.filter((m) => m.scoreRaw != null && m.scoreMax != null && m.scoreMax > 0)
+    const skillList = Array.from(new Set(scored.map((m) => m.skill)))
+    const byDate = new Map<string, Record<string, string | number>>()
+    for (const mock of scored) {
+      const point = byDate.get(mock.occurredOn) ?? { date: mock.occurredOn }
+      point[mock.skill] = Math.round((mock.scoreRaw! / mock.scoreMax!) * 100)
+      byDate.set(mock.occurredOn, point)
+    }
+    return { data: [...byDate.values()], skills: skillList }
+  }, [mocks])
+
+  if (mocks.filter((m) => m.scoreRaw != null).length < 2) return null
+
+  const config = Object.fromEntries(
+    skills.map((skill, index) => [skill, { label: skill, color: TREND_COLORS[index % TREND_COLORS.length] }]),
+  ) satisfies ChartConfig
+
+  return (
+    <section className="rounded-lg border bg-card p-4 sm:p-5" aria-labelledby="mock-trend-title">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 id="mock-trend-title" className="text-sm font-semibold">Mock trend</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">Score percentage per mock test, one line per skill.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
+          {skills.map((skill) => (
+            <span key={skill} className="inline-flex items-center gap-1.5">
+              <span className="h-0.5 w-4" style={{ background: config[skill].color }} />
+              {skill}
+            </span>
+          ))}
+        </div>
+      </div>
+      <ChartContainer config={config} className="h-[200px] w-full sm:h-[240px]">
+        <LineChart accessibilityLayer data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <CartesianGrid vertical={false} strokeDasharray="3 3" />
+          <XAxis dataKey="date" tickLine={false} axisLine={false} tickMargin={10} tickFormatter={formatDay} />
+          <YAxis domain={[0, 100]} width={44} tickLine={false} axisLine={false} tickMargin={8} tickFormatter={(value: number) => `${value}%`} />
+          <ChartTooltip
+            cursor={false}
+            content={<ChartTooltipContent labelFormatter={(label) => formatDay(String(label))} formatter={(value, name) => `${name} ${value}%`} />}
+          />
+          {skills.map((skill) => (
+            <Line
+              key={skill}
+              dataKey={skill}
+              type="monotone"
+              connectNulls
+              stroke={config[skill].color}
+              strokeWidth={2}
+              dot={{ r: 3, fill: config[skill].color }}
+            />
+          ))}
+        </LineChart>
+      </ChartContainer>
+    </section>
   )
 }
 
