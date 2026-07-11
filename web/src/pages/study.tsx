@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { BookOpenCheck, ListChecks, PenLine } from 'lucide-react'
 import { LogPanel } from '@/features/study/log-panel'
 import { VocabularyPanel } from '@/features/study/vocabulary-panel'
+import { WritingPanel } from '@/features/study/writing-panel'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 /**
  * Study — read-mostly view over the study log. Entries are captured on the
  * Capture page or in chat; this page answers "how much, what, and is it
- * moving". Vocabulary (SRS) and Writing (tutor feedback) tabs land in the
- * next increments of the study module.
+ * moving". Vocab reviews and essay grading both happen in chat — the
+ * Vocabulary and Writing tabs show the resulting state, never a workflow.
  */
 export function StudyPage() {
   const [tab, setTab] = useState<'log' | 'vocabulary' | 'writing'>('log')
@@ -33,7 +34,7 @@ export function StudyPage() {
               <BookOpenCheck className="hidden size-4 sm:block" />
               Vocabulary
             </TabsTrigger>
-            <TabsTrigger value="writing" disabled className="px-2 text-xs sm:px-3 sm:text-sm">
+            <TabsTrigger value="writing" className="px-2 text-xs sm:px-3 sm:text-sm">
               <PenLine className="hidden size-4 sm:block" />
               Writing
             </TabsTrigger>
@@ -44,6 +45,9 @@ export function StudyPage() {
           </TabsContent>
           <TabsContent value="vocabulary">
             <VocabularyPanel />
+          </TabsContent>
+          <TabsContent value="writing">
+            <WritingPanel />
           </TabsContent>
         </Tabs>
       </div>

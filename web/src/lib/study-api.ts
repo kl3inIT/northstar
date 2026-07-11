@@ -2,11 +2,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   deleteStudySession,
   deleteVocabCard,
+  deleteWritingFeedback,
   getStudySummary,
   listMockResults,
   listStudySessions,
   listStudySkills,
   listVocabCards,
+  listWritingFeedback,
   recordStudySessions,
   updateStudySession,
   updateVocabCard,
@@ -18,13 +20,63 @@ import type {
   StudySummary,
   UpdateVocabCardRequest,
   VocabCardSummary,
+  WritingFeedbackSummary,
 } from './hey-api'
 
 export type StudySession = StudySessionSummary
 export type StudyKind = StudySessionSummary['kind']
 export type StudySessionInput = StudyItemRequest
 export type VocabCard = VocabCardSummary
+export type WritingFeedback = WritingFeedbackSummary
 export type { StudySummary }
+
+export interface WritingCriterion {
+  key: string
+  band: number
+  justification: string
+}
+
+export interface WritingError {
+  label: string
+  quote: string
+  fix: string
+}
+
+/** The feedback's criteria JSON parsed leniently — malformed entries are dropped. */
+export function parseWritingCriteria(criteria: string | undefined | null): WritingCriterion[] {
+  if (!criteria) return []
+  try {
+    const parsed = JSON.parse(criteria) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (c): c is WritingCriterion =>
+        typeof c === 'object' && c !== null
+        && typeof (c as WritingCriterion).key === 'string'
+        && typeof (c as WritingCriterion).band === 'number'
+        && typeof (c as WritingCriterion).justification === 'string',
+    )
+  } catch {
+    return []
+  }
+}
+
+/** The feedback's topErrors JSON parsed leniently — malformed entries are dropped. */
+export function parseWritingErrors(topErrors: string | undefined | null): WritingError[] {
+  if (!topErrors) return []
+  try {
+    const parsed = JSON.parse(topErrors) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (e): e is WritingError =>
+        typeof e === 'object' && e !== null
+        && typeof (e as WritingError).label === 'string'
+        && typeof (e as WritingError).quote === 'string'
+        && typeof (e as WritingError).fix === 'string',
+    )
+  } catch {
+    return []
+  }
+}
 
 /** The card's metadata JSON parsed leniently — unknown keys are ignored. */
 export function parseVocabMetadata(metadata: string | undefined | null): { reading?: string; example?: string } {
@@ -100,6 +152,24 @@ export function useDeleteVocabCard() {
       voidOrThrow(await deleteVocabCard({ path: { id } }))
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['study-vocab'] }),
+  })
+}
+
+/** Every graded essay, newest first. Grading happens in chat, never here. */
+export function useWritingFeedback() {
+  return useQuery({
+    queryKey: ['study-writing'],
+    queryFn: async () => dataOrThrow(await listWritingFeedback()),
+  })
+}
+
+export function useDeleteWritingFeedback() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      voidOrThrow(await deleteWritingFeedback({ path: { id } }))
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['study-writing'] }),
   })
 }
 

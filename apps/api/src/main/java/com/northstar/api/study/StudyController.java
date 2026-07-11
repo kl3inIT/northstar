@@ -8,6 +8,8 @@ import com.northstar.core.study.StudySource;
 import com.northstar.core.study.StudySummary;
 import com.northstar.core.study.VocabCardSummary;
 import com.northstar.core.study.VocabService;
+import com.northstar.core.study.WritingFeedbackSummary;
+import com.northstar.core.study.WritingService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.time.DateTimeException;
@@ -41,10 +43,12 @@ class StudyController {
 
     private final StudyService study;
     private final VocabService vocab;
+    private final WritingService writing;
 
-    StudyController(StudyService study, VocabService vocab) {
+    StudyController(StudyService study, VocabService vocab, WritingService writing) {
         this.study = study;
         this.vocab = vocab;
+        this.writing = writing;
     }
 
     /** The log for a window; defaults to the last 30 days ending today. */
@@ -138,6 +142,20 @@ class StudyController {
     @Operation(operationId = "deleteVocabCard")
     void deleteVocabCard(@PathVariable("id") UUID id) {
         vocab.delete(id);
+    }
+
+    /** Every graded essay, newest first. Grading happens in chat, never here. */
+    @GetMapping("/writing")
+    @Operation(operationId = "listWritingFeedback")
+    List<WritingFeedbackSummary> writingFeedback() {
+        return writing.list();
+    }
+
+    @DeleteMapping("/writing/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "deleteWritingFeedback")
+    void deleteWritingFeedback(@PathVariable("id") UUID id) {
+        writing.delete(id);
     }
 
     private static NewStudySession toNewSession(StudyRequest.StudyItemRequest item) {
