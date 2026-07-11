@@ -23,7 +23,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest(properties = {
         "spring.ai.openai.api-key=test-key",
-        "northstar.web.openai.api-key=test-key"
+        "northstar.web.openai.api-key=test-key",
+        "northstar.web.firecrawl.api-key=test-key"
 })
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -51,6 +52,8 @@ class WebResearchControllerIntegrationTests {
         String providers = mvc.perform(get("/api/settings/web-research/providers"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[?(@.id == 'openai')].configured").value(true))
+                .andExpect(jsonPath("$[?(@.id == 'firecrawl')].configured").value(true))
+                .andExpect(jsonPath("$[?(@.id == 'firecrawl')].capabilities[0]").value("READ_PAGE"))
                 .andReturn().getResponse().getContentAsString();
         assertThat(providers).doesNotContain("test-key", "apiKey", "api-key");
 

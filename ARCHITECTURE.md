@@ -114,9 +114,11 @@ verification in `:core:test` is the boundary check.
   pgvector support for interactive capture, assistant, alignment, and query
   embedding.
 - Public web research is a separate provider layer: `core.web` owns contracts
-  and routing; `apps/api` supplies OpenAI Responses web search and a bounded
-  direct HTML/text reader. Search and page-reader providers can be selected at
-  runtime from Settings without restarting. Credentials stay in server config.
+  and routing; `integrations:web-openai` supplies Responses web search,
+  `apps/api` supplies a bounded direct HTML/text reader, and
+  `integrations:web-firecrawl` supplies optional rendered-page Markdown.
+  Search and page-reader providers can be selected at runtime from Settings
+  without restarting. Credentials stay in server config.
 - `search_web` and `read_web_page` are in-app Assistant tools only. They are not
   published by the public MCP app, so unauthenticated MCP traffic cannot spend
   web-provider credits or use Northstar as a fetch proxy.

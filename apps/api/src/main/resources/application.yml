@@ -120,7 +120,7 @@ northstar:
     default-page-reader: ${NORTHSTAR_WEB_PAGE_READER:direct}
     fallback-enabled: false
     search-fallback-order: []
-    page-reader-fallback-order: []
+    page-reader-fallback-order: [firecrawl]
     cache-ttl: 15m
     cache-max-size: 200
     openai:
@@ -135,6 +135,13 @@ northstar:
       max-redirects: 4
       connect-timeout: 5s
       request-timeout: 10s
+    firecrawl:
+      base-url: https://api.firecrawl.dev
+      api-key: ${FIRECRAWL_API_KEY:}
+      max-response-bytes: 2097152
+      max-characters: 40000
+      connect-timeout: 5s
+      request-timeout: 60s
 
 server:
   port: ${NORTHSTAR_API_PORT:8888}
