@@ -15,8 +15,8 @@
 | Successful login opens the protected Assistant route | Widget interaction test | Covered |
 | Sign out clears state and redirects to login | Widget interaction test | Covered |
 | Flutter static analysis and Web release compilation | `flutter analyze`, `flutter build web --release` | Covered |
-| Linux format/analyze/test/Web build | Path-scoped `Mobile CI` workflow on GitHub-hosted Ubuntu | Configured; first hosted run pending push |
-| Android debug APK compilation | `Mobile CI` Ubuntu job uploads a seven-day review artifact | Configured; first hosted run pending push |
-| Unsigned iOS release compilation | `Mobile CI` macOS job uploads `Runner.app` without signing secrets | Configured; first hosted run pending push |
+| Linux format/analyze/test/Web build | Path-scoped `Mobile CI` workflow on GitHub-hosted Ubuntu | Covered; first hosted run passed in Actions run `29144303486` |
+| Android debug APK compilation | `Mobile CI` Ubuntu job uploads a seven-day review artifact | Covered; `northstar-android-debug` uploaded successfully in run `29144303486` |
+| Unsigned iOS release compilation | `Mobile CI` macOS job uploads `Runner.app` without signing secrets | Covered; `northstar-ios-unsigned` uploaded successfully in run `29144303486` |
 | Native iOS rendering and VoiceOver | Requires signed build on an iPhone | Gap |
 | Android device rendering and TalkBack | Requires attached emulator/device | Gap |

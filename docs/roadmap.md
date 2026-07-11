@@ -19,7 +19,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Mobile app foundation | Done | Flutter 3.44/Dart 3.12 scaffold with Android, iOS, and Web targets plus Cupertino-first platform foundations. |
 | Cupertino mobile shell | Done | Semantic design tokens, Cupertino-only app root, five compact tabs, expanded sidebar, Assistant landing, widget previews, compact/expanded tests, and real Web render validation. |
 | Mobile token authentication and routing | Done | Separate bearer/refresh protocol, hashed rotating refresh families, replay revocation, Keychain/Android secure storage, Cupertino login, and guarded `go_router` branches. Native device accessibility validation remains. |
-| Mobile CI | Ready | Path-scoped Linux quality/Web/Android gate and macOS unsigned iOS build are implemented with pinned official Flutter and current action releases; first hosted run awaits an explicit push. |
+| Mobile CI | Done | Path-scoped Linux quality/Web/Android gate and macOS unsigned iOS build pass on GitHub-hosted runners and publish seven-day review artifacts. |
 | Today dashboard | Deferred | Assistant/chat is the daily cockpit for composing tasks, calendar, projects, finance, and review context. Revisit only if a zero-prompt glance surface becomes necessary. |
 | Repository documentation harness | In progress | Apply repo-as-system-of-record structure and consolidate existing guidance. |
 
