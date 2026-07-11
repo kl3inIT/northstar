@@ -1,5 +1,8 @@
 package com.northstar.api.webresearch;
 
+import com.northstar.integration.web.openai.OpenAiWebSearchProperties;
+import com.northstar.integration.web.openai.OpenAiWebSearchProvider;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -18,9 +21,9 @@ class OpenAiWebSearchProviderTests {
 
     @Test
     void parsesAnswerAndDeduplicatedCitationSources() {
-        WebResearchProperties.OpenAi properties = new WebResearchProperties.OpenAi();
-        properties.setApiKey("test-key");
-        properties.setModel("test-model");
+        OpenAiWebSearchProperties properties = new OpenAiWebSearchProperties(
+                "test-key", "test-model", "medium", java.time.Duration.ofSeconds(5),
+                java.time.Duration.ofSeconds(60));
         RestClient.Builder builder = RestClient.builder().baseUrl("https://api.openai.com");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         OpenAiWebSearchProvider provider = new OpenAiWebSearchProvider(properties, builder.build());

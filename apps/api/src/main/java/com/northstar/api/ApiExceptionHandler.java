@@ -1,6 +1,7 @@
 package com.northstar.api;
 
 import com.northstar.core.calendar.CalendarEventNotFoundException;
+import com.northstar.core.automation.AutomationDefinitionNotFoundException;
 import com.northstar.core.discipline.DisciplineNotFoundException;
 import com.northstar.core.finance.FinancePlanningNotFoundException;
 import com.northstar.core.finance.TransactionNotFoundException;
@@ -47,7 +48,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
-    @ExceptionHandler({NoteNotFoundException.class, TaskNotFoundException.class,
+    @ExceptionHandler({AutomationDefinitionNotFoundException.class, NoteNotFoundException.class, TaskNotFoundException.class,
             CalendarEventNotFoundException.class, DisciplineNotFoundException.class,
             ProjectNotFoundException.class, TransactionNotFoundException.class,
             FinancePlanningNotFoundException.class})

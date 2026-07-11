@@ -10,6 +10,7 @@ springModulith = "2.1.0"
 springdoc = "3.0.3"                 # OpenAPI 3 generation; 3.x is the Spring Boot 4 line (2.8.x = Boot 3.5)
 springAi = "2.0.0"                  # capture extraction now; embeddings + MCP tools later
 lucene = "10.5.0"                   # LuceneToolIndex backend (same pin as spring-ai-starter-tool-search-advisor)
+dbScheduler = "16.12.0"             # Persistent dynamic schedules; Boot 4/Jackson 3 starter
 # Deferred until their features are implemented (kept here as the intended pins):
 # shedlock   -> distributed lock for @Scheduled jobs in :apps:worker
 
@@ -27,6 +28,7 @@ spring-ai-tool-search-advisor = { module = "org.springframework.ai:spring-ai-too
 spring-ai-vector-store = { module = "org.springframework.ai:spring-ai-vector-store" }
 spring-ai-starter-pgvector = { module = "org.springframework.ai:spring-ai-starter-vector-store-pgvector" }
 lucene-core = { module = "org.apache.lucene:lucene-core", version.ref = "lucene" }
+db-scheduler-boot4 = { module = "com.github.kagkarlsson:db-scheduler-spring-boot-4-starter", version.ref = "dbScheduler" }
 
 # Convention-plugin build dependencies (used by :build-logic)
 plugin-spring-boot = { module = "org.springframework.boot:spring-boot-gradle-plugin", version.ref = "springBoot" }

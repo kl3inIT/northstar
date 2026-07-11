@@ -1,4 +1,4 @@
-package com.northstar.api.webresearch;
+package com.northstar.integration.web.openai;
 
 import com.northstar.core.web.WebResearchException;
 import com.northstar.core.web.WebResearchFailureCode;
@@ -23,31 +23,31 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 @Component
-class OpenAiWebSearchProvider implements WebSearchProvider {
+public class OpenAiWebSearchProvider implements WebSearchProvider {
 
-    private final WebResearchProperties.OpenAi properties;
+    private final OpenAiWebSearchProperties properties;
     private final RestClient openai;
 
     @Autowired
-    OpenAiWebSearchProvider(WebResearchProperties properties) {
-        this(properties.getOpenai(), client(properties.getOpenai()));
+    OpenAiWebSearchProvider(OpenAiWebSearchProperties properties) {
+        this(properties, client(properties));
     }
 
-    OpenAiWebSearchProvider(WebResearchProperties.OpenAi properties, RestClient openai) {
+    public OpenAiWebSearchProvider(OpenAiWebSearchProperties properties, RestClient openai) {
         this.properties = properties;
         this.openai = openai;
     }
 
-    private static RestClient client(WebResearchProperties.OpenAi properties) {
+    private static RestClient client(OpenAiWebSearchProperties properties) {
         HttpClient http = HttpClient.newBuilder()
-                .connectTimeout(properties.getConnectTimeout())
+                .connectTimeout(properties.connectTimeout())
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
         JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
-        requests.setReadTimeout(properties.getRequestTimeout());
+        requests.setReadTimeout(properties.requestTimeout());
         return RestClient.builder()
                 .baseUrl("https://api.openai.com")
-                .defaultHeader("Authorization", "Bearer " + properties.getApiKey())
+                .defaultHeader("Authorization", "Bearer " + properties.apiKey())
                 .requestFactory(requests)
                 .build();
     }
@@ -64,7 +64,7 @@ class OpenAiWebSearchProvider implements WebSearchProvider {
 
     @Override
     public boolean configured() {
-        return StringUtils.hasText(properties.getApiKey());
+        return StringUtils.hasText(properties.apiKey());
     }
 
     @Override
@@ -75,23 +75,20 @@ class OpenAiWebSearchProvider implements WebSearchProvider {
         }
         Map<String, Object> tool = new LinkedHashMap<>();
         tool.put("type", "web_search");
-        tool.put("search_context_size", properties.getSearchContextSize());
+        tool.put("search_context_size", properties.searchContextSize());
         if (!request.allowedDomains().isEmpty()) {
             tool.put("filters", Map.of("allowed_domains", request.allowedDomains()));
         }
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", properties.getModel());
+        body.put("model", properties.model());
         body.put("input", searchPrompt(request));
         body.put("tools", List.of(tool));
         body.put("include", List.of("web_search_call.action.sources"));
         body.put("store", false);
 
         try {
-            Map<?, ?> response = openai.post().uri("/v1/responses")
-                    .body(body)
-                    .retrieve()
-                    .body(Map.class);
+            Map<?, ?> response = openai.post().uri("/v1/responses").body(body).retrieve().body(Map.class);
             if (response == null) {
                 throw new WebResearchException(WebResearchFailureCode.UNAVAILABLE,
                         "OpenAI returned an empty web-search response");
@@ -101,8 +98,7 @@ class OpenAiWebSearchProvider implements WebSearchProvider {
             WebResearchFailureCode code = exception.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS
                     ? WebResearchFailureCode.RATE_LIMITED
                     : exception.getStatusCode().is5xxServerError()
-                            ? WebResearchFailureCode.UNAVAILABLE
-                            : WebResearchFailureCode.INVALID_REQUEST;
+                            ? WebResearchFailureCode.UNAVAILABLE : WebResearchFailureCode.INVALID_REQUEST;
             throw new WebResearchException(code,
                     "OpenAI web search failed with HTTP " + exception.getStatusCode().value(), exception);
         } catch (ResourceAccessException exception) {
@@ -152,15 +148,13 @@ class OpenAiWebSearchProvider implements WebSearchProvider {
                 }
             }
         }
-        List<WebSource> limited = sources.values().stream().limit(request.maxResults()).toList();
-        return new WebSearchProviderResult(answer.toString(), limited);
+        return new WebSearchProviderResult(answer.toString(),
+                sources.values().stream().limit(request.maxResults()).toList());
     }
 
     private static void addSource(Map<String, WebSource> sources, Object urlValue, Object titleValue,
             WebSearchRequest request) {
-        if (!(urlValue instanceof String url) || url.isBlank() || isBlocked(url, request.blockedDomains())) {
-            return;
-        }
+        if (!(urlValue instanceof String url) || url.isBlank() || isBlocked(url, request.blockedDomains())) return;
         String title = titleValue instanceof String value && !value.isBlank() ? value : url;
         WebSource existing = sources.get(url);
         if (existing == null || (existing.title().equals(url) && !title.equals(url))) {

@@ -27,9 +27,9 @@ public class McpRateLimiter {
 
     McpRateLimiter(RateLimitProperties props) {
         this.props = props;
-        this.global = new TokenBucket(props.getGlobalCapacity(), props.getGlobalCapacity(),
-                props.getGlobalWindow(), System.nanoTime());
-        this.perIp = Collections.synchronizedMap(new BoundedLru<>(Math.max(1, props.getMaxTrackedIps())));
+        this.global = new TokenBucket(props.globalCapacity(), props.globalCapacity(),
+                props.globalWindow(), System.nanoTime());
+        this.perIp = Collections.synchronizedMap(new BoundedLru<>(Math.max(1, props.maxTrackedIps())));
     }
 
     /** null = allowed; non-null = rejected, with which limit and the retry-after seconds. */
@@ -44,8 +44,7 @@ public class McpRateLimiter {
         synchronized (perIp) {
             bucket = perIp.get(ip);
             if (bucket == null) {
-                bucket = new TokenBucket(props.getIpCapacity(), props.getIpCapacity(),
-                        props.getIpWindow(), now);
+                bucket = new TokenBucket(props.ipCapacity(), props.ipCapacity(), props.ipWindow(), now);
                 perIp.put(ip, bucket);
             }
         }

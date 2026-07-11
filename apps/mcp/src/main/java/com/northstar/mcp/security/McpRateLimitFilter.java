@@ -50,9 +50,9 @@ public class McpRateLimitFilter extends OncePerRequestFilter {
             writeError(response, HttpStatus.LENGTH_REQUIRED, "length_required", 0);
             return;
         }
-        if (length > props.getMaxBodyBytes()) {
+        if (length > props.maxBodyBytes()) {
             log.warn("MCP {} {} ip={} rejected: body {}B over cap {}B",
-                    request.getMethod(), uri, ip, length, props.getMaxBodyBytes());
+                    request.getMethod(), uri, ip, length, props.maxBodyBytes());
             writeError(response, HttpStatus.CONTENT_TOO_LARGE, "request_too_large", 0);
             return;
         }

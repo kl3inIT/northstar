@@ -20,6 +20,9 @@ dependencyResolutionManagement {
 // Shared domain + Spring Modulith modules (one library, used by all apps).
 include(":core")
 
+// Reusable provider adapters shared by delivery applications.
+include(":integrations:web-openai")
+
 // Deployable Spring Boot applications (thin bootstraps over :core).
 include(":apps:api")
 include(":apps:mcp")

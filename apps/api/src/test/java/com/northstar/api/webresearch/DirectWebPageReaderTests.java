@@ -76,7 +76,8 @@ class DirectWebPageReaderTests {
     }
 
     private static DirectWebPageReader reader(DirectWebPageReader.HostResolver resolver) {
-        return new DirectWebPageReader(new WebResearchProperties.Direct(),
+        return new DirectWebPageReader(new DirectWebPageReaderProperties(
+                2 * 1024 * 1024, 40_000, 4, java.time.Duration.ofSeconds(5), java.time.Duration.ofSeconds(10)),
                 HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build(), resolver);
     }
 

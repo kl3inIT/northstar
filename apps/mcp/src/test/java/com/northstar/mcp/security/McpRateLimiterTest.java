@@ -12,12 +12,8 @@ import org.junit.jupiter.api.Test;
 class McpRateLimiterTest {
 
     private static RateLimitProperties props(long globalCapacity, long ipCapacity) {
-        RateLimitProperties p = new RateLimitProperties();
-        p.setGlobalCapacity(globalCapacity);
-        p.setGlobalWindow(Duration.ofMinutes(1));
-        p.setIpCapacity(ipCapacity);
-        p.setIpWindow(Duration.ofHours(1));
-        return p;
+        return new RateLimitProperties(true, globalCapacity, Duration.ofMinutes(1),
+                ipCapacity, Duration.ofHours(1), 256 * 1024, 50_000);
     }
 
     @Test

@@ -38,19 +38,19 @@ class DirectWebPageReader implements WebPageReader {
             "text/plain", "application/json", "application/xml", "text/xml");
     private static final Pattern CHARSET = Pattern.compile("charset=([^;\\s]+)", Pattern.CASE_INSENSITIVE);
 
-    private final WebResearchProperties.Direct properties;
+    private final DirectWebPageReaderProperties properties;
     private final HttpClient http;
     private final HostResolver resolver;
 
     @Autowired
-    DirectWebPageReader(WebResearchProperties properties) {
-        this(properties.getDirect(), HttpClient.newBuilder()
-                .connectTimeout(properties.getDirect().getConnectTimeout())
+    DirectWebPageReader(DirectWebPageReaderProperties properties) {
+        this(properties, HttpClient.newBuilder()
+                .connectTimeout(properties.connectTimeout())
                 .followRedirects(HttpClient.Redirect.NEVER)
                 .build(), InetAddress::getAllByName);
     }
 
-    DirectWebPageReader(WebResearchProperties.Direct properties, HttpClient http, HostResolver resolver) {
+    DirectWebPageReader(DirectWebPageReaderProperties properties, HttpClient http, HostResolver resolver) {
         this.properties = properties;
         this.http = http;
         this.resolver = resolver;
@@ -80,7 +80,7 @@ class DirectWebPageReader implements WebPageReader {
     @Override
     public WebPageProviderResult read(WebPageRequest request) {
         URI current = request.url();
-        for (int redirects = 0; redirects <= properties.getMaxRedirects(); redirects++) {
+        for (int redirects = 0; redirects <= properties.maxRedirects(); redirects++) {
             validatePublicUrl(current);
             HttpResponse<InputStream> response = send(current);
             if (REDIRECTS.contains(response.statusCode())) {
@@ -88,7 +88,7 @@ class DirectWebPageReader implements WebPageReader {
                 String location = response.headers().firstValue("location")
                         .orElseThrow(() -> new WebResearchException(WebResearchFailureCode.UNAVAILABLE,
                                 "Redirect response did not include a Location header"));
-                if (redirects == properties.getMaxRedirects()) {
+                if (redirects == properties.maxRedirects()) {
                     throw new WebResearchException(WebResearchFailureCode.UNAVAILABLE,
                             "Page exceeded the redirect limit");
                 }
@@ -102,7 +102,7 @@ class DirectWebPageReader implements WebPageReader {
 
     private HttpResponse<InputStream> send(URI url) {
         HttpRequest request = HttpRequest.newBuilder(url)
-                .timeout(properties.getRequestTimeout())
+                .timeout(properties.requestTimeout())
                 .header("Accept", "text/html,application/xhtml+xml,text/plain,application/json,application/xml;q=0.8")
                 .header("Accept-Encoding", "identity")
                 .header("User-Agent", "NorthstarWebResearch/1.0")
@@ -129,7 +129,7 @@ class DirectWebPageReader implements WebPageReader {
             throw new WebResearchException(code, "Page returned HTTP " + status);
         }
         long declared = response.headers().firstValueAsLong("content-length").orElse(-1);
-        if (declared > properties.getMaxBytes()) {
+        if (declared > properties.maxBytes()) {
             close(response.body());
             throw new WebResearchException(WebResearchFailureCode.RESPONSE_TOO_LARGE,
                     "Page is larger than the configured byte limit");
@@ -143,12 +143,12 @@ class DirectWebPageReader implements WebPageReader {
         }
         byte[] bytes;
         try (InputStream input = response.body()) {
-            bytes = input.readNBytes(properties.getMaxBytes() + 1);
+            bytes = input.readNBytes(properties.maxBytes() + 1);
         } catch (IOException exception) {
             throw new WebResearchException(WebResearchFailureCode.UNAVAILABLE,
                     "Page body could not be read", exception);
         }
-        if (bytes.length > properties.getMaxBytes()) {
+        if (bytes.length > properties.maxBytes()) {
             throw new WebResearchException(WebResearchFailureCode.RESPONSE_TOO_LARGE,
                     "Page is larger than the configured byte limit");
         }
@@ -172,8 +172,8 @@ class DirectWebPageReader implements WebPageReader {
             content = new String(bytes, charset(rawType));
         }
         content = content.strip().replaceAll("[ \\t]+", " ").replaceAll("\\n{3,}", "\n\n");
-        boolean truncated = content.length() > properties.getMaxCharacters();
-        if (truncated) content = content.substring(0, properties.getMaxCharacters()).stripTrailing();
+        boolean truncated = content.length() > properties.maxCharacters();
+        if (truncated) content = content.substring(0, properties.maxCharacters()).stripTrailing();
         return new WebPageProviderResult(finalUrl, title, content, contentType, truncated);
     }
 

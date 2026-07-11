@@ -33,7 +33,7 @@ class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, AuthProperties auth,
             SecurityContextRepository securityContextRepository) throws Exception {
-        if (!auth.isEnabled()) {
+        if (!auth.enabled()) {
             return http
                     .csrf(AbstractHttpConfigurer::disable)
                     .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
@@ -76,7 +76,7 @@ class SecurityConfig {
 
     @Bean
     UserDetailsService userDetailsService(AuthProperties auth) {
-        if (!auth.isEnabled()) {
+        if (!auth.enabled()) {
             UserDetails disabled = User.withUsername("disabled")
                     .password("{noop}disabled")
                     .roles("USER")
@@ -85,8 +85,8 @@ class SecurityConfig {
         }
 
         auth.requireConfigured();
-        UserDetails user = User.withUsername(auth.getUsername())
-                .password(auth.getPasswordHash())
+        UserDetails user = User.withUsername(auth.username())
+                .password(auth.passwordHash())
                 .roles("USER")
                 .build();
         return new InMemoryUserDetailsManager(user);

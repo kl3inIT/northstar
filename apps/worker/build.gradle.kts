@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":integrations:web-openai"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
 
     // The worker owns search indexing (SearchIndexingWorker): OpenAI for the
@@ -11,6 +12,7 @@ dependencies {
     // This is the heavy LLM/Tika work kept off the api's request threads.
     implementation(libs.spring.ai.starter.openai)
     implementation(libs.spring.ai.starter.pgvector)
+    implementation(libs.db.scheduler.boot4)
 
     runtimeOnly("org.postgresql:postgresql")
 

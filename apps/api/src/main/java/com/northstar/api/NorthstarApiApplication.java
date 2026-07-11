@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
  * {@code :core} ({@code com.northstar.core}); this app scans them explicitly and
  * owns running Flyway migrations at startup.
  */
-@SpringBootApplication(scanBasePackages = {"com.northstar.api", "com.northstar.core"})
+@SpringBootApplication(scanBasePackages = {"com.northstar.api", "com.northstar.core", "com.northstar.integration"})
 @EntityScan("com.northstar.core")
 @EnableJpaRepositories("com.northstar.core")
 public class NorthstarApiApplication {

@@ -59,3 +59,28 @@ spring:
       # complete those publications as no-ops — a note would silently never be
       # embedded. Only the api republishes its own backlog.
       republish-outstanding-events-on-restart: false
+
+db-scheduler:
+  polling-interval: 5s
+  heartbeat-interval: 30s
+  missed-heartbeats-limit: 4
+  threads: 4
+  delay-startup-until-context-ready: true
+  shutdown-max-wait: 2m
+
+northstar:
+  web:
+    enabled: ${NORTHSTAR_WEB_ENABLED:true}
+    default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}
+    default-page-reader: ${NORTHSTAR_WEB_PAGE_READER:direct}
+    fallback-enabled: false
+    search-fallback-order: []
+    page-reader-fallback-order: []
+    cache-ttl: 15m
+    cache-max-size: 200
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: ${NORTHSTAR_WEB_MODEL:gpt-5.5}
+      search-context-size: medium
+      connect-timeout: 5s
+      request-timeout: 60s

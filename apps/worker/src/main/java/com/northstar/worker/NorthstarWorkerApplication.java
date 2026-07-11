@@ -16,7 +16,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * streaks, memory compaction. Reuses {@code :core}; does not run migrations.
  */
 @EnableScheduling
-@SpringBootApplication(scanBasePackages = {"com.northstar.worker", "com.northstar.core"})
+@SpringBootApplication(scanBasePackages = {"com.northstar.worker", "com.northstar.core", "com.northstar.integration"})
 @EntityScan("com.northstar.core")
 @EnableJpaRepositories("com.northstar.core")
 public class NorthstarWorkerApplication {
