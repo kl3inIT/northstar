@@ -41,6 +41,10 @@ history, AI SDK-compatible SSE streaming, visible waiting/tool/partial-text
 states, Markdown messages, stop, retry, and a Cupertino composer. A headless
 chat package owns message-list mechanics while Northstar owns the presentation,
 transport, repository, and ViewModel behavior.
+The Cupertino composer exposes the backend-approved model catalog for the
+current conversation. Selecting a model updates the server-side conversation
+route; mobile never receives gateway credentials and continues to consume the
+same AI SDK-compatible SSE endpoint as web.
 
 Flutter AI Toolkit is not part of the current client. Northstar owns a Cupertino
 chat presentation connected to the existing backend rather than adding a

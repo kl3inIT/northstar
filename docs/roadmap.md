@@ -11,7 +11,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Knowledge base baseline | Done | Markdown notes, folders/tags, links/backlinks, note status, search surface. |
 | AI capture baseline | Done | Capture endpoints and AI-backed note drafting path. |
 | Planning baseline | Done | Disciplines, projects/milestones, tasks, calendar events, recurrence, free-slot lookup. |
-| Assistant and MCP tools | Done | In-app assistant tool definitions and streamable-http MCP tool exposure. |
+| Assistant and MCP tools | Done | In-app assistant tools, reactive Vercel streaming, configurable OpenAI-compatible task routes, per-conversation model selection, and streamable-http MCP exposure. |
 | Web authentication baseline | Done | Single-user Spring Security session login, SPA CSRF, auth guard, logout. |
 | Finance tracking V1.5 | Done | Capture-first VND ledger, balance reconciliation, learned category corrections, budgets, savings goals, subscription auto-post/detection, CSV, Insights, receipt/SMS extraction, assistant/MCP tools, and weekly review facts. |
 | Web research V1 | Done | Provider-neutral runtime routing, OpenAI web search, safe direct page reading, Assistant-only tools, citations, and a general Settings page. YouTube/PDF/browser readers remain deferred. |

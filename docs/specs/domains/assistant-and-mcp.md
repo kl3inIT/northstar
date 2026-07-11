@@ -23,6 +23,16 @@ waiting message until the latest assistant message has visible text, an image,
 or a tool workflow part. This keeps the first turn and pre-tool-call gap from
 looking frozen.
 
+Model-backed workloads resolve an `AiTask` route at call time. Each route is a
+configured gateway id plus model id; application YAML supplies defaults and a
+database override from Settings wins without restarting either API or worker.
+OpenAI, 9Router, OpenRouter, and LiteLLM-style connections use the shared
+`OPENAI_COMPATIBLE` integration. Credentials and base URLs never leave the
+server. The web Settings page edits task routes, while web and Flutter Chat
+offer the models exposed by the current conversation's gateway. Chat selection
+is persisted per conversation; a new conversation inherits the most recently
+used Assistant selection before falling back to the Assistant task default.
+
 The Flutter client authenticates the same REST/SSE contract with a Bearer access
 token. Its typed service parses known text, tool, error, finish, and done frames;
 the repository maps those frames into provider-neutral domain events; and a
@@ -105,3 +115,5 @@ as the API.
 - `core.assistant`
 - `apps/mcp`
 - `apps/api.assistant`
+- `core.ai`
+- `integrations/ai-openai-compatible`

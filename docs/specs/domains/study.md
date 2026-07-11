@@ -70,8 +70,8 @@ the tool description, not a hard wall.
   code (band steps, range width, verbatim quotes) then an LLM faithfulness
   evaluator (a Spring AI `Evaluator` implementation); failures feed one
   corrective re-grade, then the call fails loudly.
-- The grader model id is pinned by configuration
-  (`northstar.study.grader-model`) and stored on every row.
+- The grader resolves the `STUDY_GRADER` AI task route at call time and stores
+  the selected model id on every row.
 - Feedback rows are append-only: delete, never edit. Essays are capped at
   18,000 characters and must have at least 30 words.
 

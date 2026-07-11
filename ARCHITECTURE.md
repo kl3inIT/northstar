@@ -45,8 +45,8 @@ Northstar is one domain with three backend deployables:
 - `core` owns business logic, entities, repositories, services, migrations, and
   module boundaries under `com.northstar.core`.
 - `apps/api` exposes REST endpoints, runs Flyway migrations, serves actuator
-  endpoints, owns web session authentication, wires Spring AI/OpenAI for
-  interactive AI features, emits OpenAPI, and talks to the same PostgreSQL
+  endpoints, owns web session authentication, wires interactive AI delivery,
+  emits OpenAPI, and talks to the same PostgreSQL
   database as the other apps.
 - `apps/mcp` exposes MCP tools over streamable HTTP at `/mcp`. It scans
   `com.northstar.core`, reads the already-migrated schema, and does not run
@@ -55,6 +55,9 @@ Northstar is one domain with three backend deployables:
   indexing work such as embeddings and image captions plus durable user
   automation execution through db-scheduler. It uses the same schema and does
   not run Flyway in production.
+- `integrations/ai-openai-compatible` owns the reusable Spring AI adapter,
+  model-catalog discovery, and runtime task router shared by API and worker.
+  Gateway ids are configuration, not provider-specific feature branches.
 
 The app classes are explicitly named `NorthstarApiApplication`,
 `NorthstarMcpApplication`, and `NorthstarWorkerApplication`. The package root is

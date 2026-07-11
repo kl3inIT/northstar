@@ -24,6 +24,7 @@
 | Assistant history and expanded conversation sidebar | Unit test plus widget test at 1024x768 | Covered |
 | Assistant Markdown remains readable on dark Cupertino surfaces | Dark-mode widget contrast assertion plus real Chromium dark-mode render | Covered |
 | Assistant SSE parsing and one-time 401 refresh | Service unit tests with streamed HTTP responses | Covered |
+| Assistant conversation model selector | Flutter analyzer plus Assistant service/ViewModel/widget suites; real compact UI audit pending native-device validation | Covered |
 | Capture opens from Assistant as a focused route without the tab bar | Widget interaction test | Covered |
 | Capture text draft, edit, explicit save, and undo affordance | Repository, ViewModel, and compact widget tests | Covered |
 | Receipt multipart upload and reviewed batch undo | Service and repository tests | Covered |
