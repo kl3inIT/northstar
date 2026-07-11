@@ -3,10 +3,11 @@
 ## Current Behavior
 
 Study combines a capture-first practice log, a vocabulary memory reviewed
-through chat, and an LLM writing tutor with a persistent error history. There
-is no flashcard UI, no due-date queue, no streaks, and no lesson content:
-entries arrive through Capture or chat, and `/study` is a read-mostly view
-that answers "how much, what, and is it moving".
+through chat, an LLM writing tutor, and measured speech practice with one
+shared grammar-error history. There is no due-date queue, streak system,
+lesson content, or conversational voice agent: entries arrive through
+Capture/chat or the focused speech workflows, and `/study` answers "how much,
+what, and is it moving".
 
 ### Study sessions
 
@@ -48,6 +49,12 @@ the tool description, not a hard wall.
   optimizer to retrain from history.
 - Cards can be suspended (kept with history, excluded from at-risk) and
   deleted (cascades the review log).
+- A card can be read aloud from its row. The browser records raw mic samples,
+  downsamples to 16-kHz mono PCM, wraps a WAV in memory, and sends it with the
+  card id. The server uses the card front as the immutable reference text and
+  chooses `zh-CN` when it contains a Han ideograph, otherwise `en-US`.
+  Provider-measured 0-100 accuracy/fluency/prosody and word/phoneme detail are
+  shown live and are not persisted as card history. Audio is never persisted.
 
 ### Writing tutor
 
@@ -75,20 +82,51 @@ the tool description, not a hard wall.
 - Feedback rows are append-only: delete, never edit. Essays are capped at
   18,000 characters and must have at least 30 words.
 
+### Speaking practice
+
+`/study` provides one-question speaking practice, deliberately not a realtime
+exam simulation. The learner selects Part 1/2/3, the `STUDY_GRADER` route
+generates one concise examiner-style question, and the browser records at most
+60 seconds as a 16-kHz mono PCM WAV. The server accepts at most ~2.5 MB and
+rejects WAVs beyond its 75-second safety ceiling. Audio is decoded in memory
+and never persisted.
+
+- `SpeechAssessor` is a provider-neutral `core.study` port. The current
+  `integrations/speech-azure` adapter uses Microsoft Speech SDK 1.50.0 through
+  an in-memory push stream; only `apps/api` wires it. Core never imports Azure
+  types. Blank configuration leaves the API bootable and speech endpoints
+  return 503.
+- Azure is authoritative only for delivery: transcript, pronunciation,
+  fluency, prosody, and word/phoneme accuracy. These are provider 0-100 values,
+  never an IELTS band and never combined into an overall speaking score.
+- The selected `STUDY_GRADER` AI route scores vocabulary, grammar, and topic on
+  a separate unofficial 0-100 practice scale. It receives the prior writing
+  and speaking error corpus, must quote transcript fragments verbatim, and
+  passes structural plus LLM faithfulness evaluation with one corrective
+  retry. The evidence envelope contains the question, transcript, and measured
+  delivery; the LLM cannot alter provider scores.
+- A successful attempt persists question, transcript, both score groups,
+  exact writing-compatible `topErrors` JSON (`label`, `quote`, `fix`), summary,
+  grader model, delivery provider and provider revision. It also logs one
+  `Speaking` / `PRACTICE` session rounded up to whole minutes.
+- History is newest-first with detail and delete. Provider identity is stored
+  because different vendors' 0-100 scales are not assumed comparable.
+
 ### Grammar drills
 
-`grammar_weaknesses` aggregates the error patterns across every grading —
-grouped case-insensitively by label, most recently seen first, each with up
-to three recent quote→fix examples from the user's own essays. Its tool
+`grammar_weaknesses` aggregates error patterns across writing and speaking
+feedback — grouped case-insensitively by label, most recently seen first,
+each with up to three recent quote→fix examples from the user's own text. Its tool
 description carries the drill protocol: the assistant picks the 1-2 most
 recent patterns (focused practice), checks recent Grammar sessions to avoid
 re-drilling, writes five NEW single-error sentences at the user's level,
 presents them one at a time, and after each answer gives the verdict, the
 corrected sentence, and a one-line rule explanation. The finished (or
 stopped) drill is logged as a study session (skill Grammar or Vocabulary,
-score = correct/items, notes naming the patterns). With no graded essays the
-tool returns an empty list and the assistant offers grading instead of
-inventing weaknesses. Malformed stored error JSON is skipped, never fatal.
+score = correct/items, notes naming the patterns). With no writing or speaking
+feedback the tool returns an empty list and the assistant offers a supported
+practice path instead of inventing weaknesses. Malformed stored error JSON is
+skipped, never fatal.
 
 ## Entry Paths
 
@@ -100,7 +138,9 @@ inventing weaknesses. Malformed stored error JSON is skipped, never fatal.
   `update_study_session`, `delete_study_session`, `study_summary`,
   `list_mock_results`, `save_vocab_cards`, `find_vocab_cards`, `quiz_vocab`,
   `record_vocab_review`, `update_vocab_card`, `delete_vocab_card`,
-  `list_writing_feedback`, `delete_writing_feedback`, `grammar_weaknesses`.
+  `list_writing_feedback`, `delete_writing_feedback`,
+  `list_speaking_feedback`, `delete_speaking_feedback`,
+  `grammar_weaknesses`.
 - `grade_writing` is in-app only (no MCP annotation): grading needs the LLM
   the mcp app deliberately does not have. The assistant system prompt routes
   "chấm bài" to it — tool discovery is search-based, and without the route
@@ -108,19 +148,24 @@ inventing weaknesses. Malformed stored error JSON is skipped, never fatal.
 
 ## Read And Correction Paths
 
-- `/study` has three tabs. Log: weekly stat strip, mock-trend line chart
+- `/study` has four tabs. Log: weekly stat strip, mock-trend line chart
   (score percentage per mock, one line per skill, hidden until two scored
   mocks exist), skill/kind filters, sessions table with edit/delete.
   Vocabulary: tracked/at-risk/new-this-week stats, search across word,
   meaning, and reading, table sorted most-at-risk first with suspended cards
-  last, pause/resume/edit/delete. Writing: essays graded, latest estimate,
+  last, pause/resume/edit/delete plus live pronunciation assessment. Writing: essays graded, latest estimate,
   trend vs previous essay, recurring-error strip, feedback table with a
   detail dialog (per-criterion justifications, quote-to-fix errors, the
-  essay) and delete.
-- Reviews and grading never happen on the page — both tabs point at chat.
+  essay) and delete. Speaking: attempt count and recent delivery trend,
+  question generation, 60-second recorder, separately-labelled delivery and
+  content scores, highlighted transcript errors, history detail, and delete.
+- Vocab reviews and writing grading remain in chat; speech assessment runs on
+  the focused page because chat has no audio attachment/output workflow.
 - REST surface: `/api/study/sessions` (GET/POST/PUT/DELETE), `/summary`,
-  `/mocks`, `/skills`, `/vocab` (GET/POST/PUT/DELETE), `/writing`
-  (GET/DELETE). Week boundaries respect the `X-Timezone` header.
+  `/mocks`, `/skills`, `/vocab` (GET/POST/PUT/DELETE),
+  `/vocab/{id}/pronunciation`, `/writing` (GET/DELETE), and `/speaking`
+  history plus `/speaking/question` and `/speaking/attempts`. Week boundaries
+  respect the `X-Timezone` header.
 
 ## Review Integration
 

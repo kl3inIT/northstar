@@ -1,5 +1,10 @@
 # Speech Assessment — Plan
 
+Status: completed 2026-07-11. Blocks A-D shipped in commits `b2e88ac`,
+`7202584`, `a8f2f3d`, and the final consolidation commit. All local gates,
+mocked Playwright verification, and the dev-only live Azure/LLM/MCP E2E passed;
+synthetic E2E rows were removed after verification.
+
 Execute in four blocks; each block ships compilable and gated
 (compileJava + compileTestJava + :core:test + web typecheck). Read design.md
 fully first — it carries the session decisions and the Azure specifics.

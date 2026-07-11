@@ -20,6 +20,20 @@ guidance is to use a chat model for vocabulary, grammar, and topic relevance.
 Treating retired content fields as an integration contract would make the
 feature depend on undocumented behavior.
 
+Azure was selected for V1 because one service provides credible English word
+and phoneme assessment plus Mandarin pronunciation/tone coverage. General STT
+vendors only provide transcription, while English-first pronunciation APIs
+and self-hosted wav2vec/CAPT stacks either miss Mandarin or add a sidecar with
+lower quality and disproportionate operational cost. The core port remains
+provider-neutral so a future SpeechSuper/Speechace-class adapter can be added
+without importing vendor types into Study.
+
+Azure pronunciation values are provider 0-100 delivery measurements, not an
+IELTS rubric. Microsoft does not define a supported conversion, so presenting
+them as an IELTS band would be a false precision claim. Northstar's useful
+product boundary is measurement plus memory, not rebuilding a realtime voice
+examiner: conversational interruptions and audio output remain out of scope.
+
 ## Decision
 
 - `integrations/speech-azure` uses Microsoft Speech SDK 1.50.0 for both reading
@@ -37,6 +51,9 @@ feature depend on undocumented behavior.
   It may use Azure results to prioritize coaching prose, but never changes the
   measured scores, combines them into a new overall score, or maps them to an
   IELTS band.
+- Speaking is explicitly practice: one generated question, one recording,
+  measured delivery, persistent coaching/history, and grammar-corpus reuse.
+  It is not an official exam simulation or a realtime voice conversation.
 - The web presents "Azure delivery - unofficial" and "AI content feedback -
   unofficial" as separate groups.
 - WAV audio is validated and decoded in memory, then its header-free 16-kHz
