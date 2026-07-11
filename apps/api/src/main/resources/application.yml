@@ -109,6 +109,11 @@ northstar:
     title:
       enabled: true
       model: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
+  study:
+    # Writing-grader model, stored on every writing_feedback row: band
+    # estimates from different models are not comparable, so the trend chart
+    # needs to know which produced each one. Change deliberately.
+    grader-model: ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
   web:
     enabled: ${NORTHSTAR_WEB_ENABLED:true}
     default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}

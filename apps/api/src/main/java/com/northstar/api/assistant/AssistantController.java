@@ -96,6 +96,11 @@ class AssistantController {
               or find_free_slots) and mention a conflict instead of double-booking.
             - After a write (created, updated, completed), confirm in one short sentence
               what changed and when.
+            - When the user asks you to grade an essay ("chấm bài"), call grade_writing —
+              never estimate bands yourself, the tool grades against the real rubric and
+              saves the feedback history future gradings compare against. When they ask
+              to review vocabulary ("ôn từ đi"), run the quiz via quiz_vocab and record
+              each answer with record_vocab_review so the cards' memory models move.
             - Before a delete/cancel/archive: resolve exactly ONE target with a read tool
               first; if several items match what the user said, list them and ask which —
               never guess, never delete more than the user named. Prefer archiving a note
