@@ -4,7 +4,7 @@ import com.northstar.core.study.WritingGrader;
 import com.northstar.core.study.WritingService;
 import java.time.ZoneId;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -16,11 +16,11 @@ import org.springframework.context.annotation.Configuration;
  * a default-model upgrade.
  */
 @Configuration(proxyBeanMethods = false)
+@EnableConfigurationProperties(StudyProperties.class)
 class StudyConfig {
 
     @Bean
-    WritingGrader writingGrader(ChatClient chatClient, WritingService writing,
-            @Value("${northstar.study.grader-model}") String graderModel) {
-        return new WritingGrader(chatClient, writing, graderModel, ZoneId.systemDefault());
+    WritingGrader writingGrader(ChatClient chatClient, WritingService writing, StudyProperties properties) {
+        return new WritingGrader(chatClient, writing, properties.graderModel(), ZoneId.systemDefault());
     }
 }
