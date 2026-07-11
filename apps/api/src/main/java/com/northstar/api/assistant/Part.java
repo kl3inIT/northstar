@@ -8,6 +8,12 @@ package com.northstar.api.assistant;
  */
 sealed interface Part {
 
+    record StartStep() implements Part {
+    }
+
+    record FinishStep() implements Part {
+    }
+
     record TextStart(String id) implements Part {
     }
 
@@ -24,5 +30,8 @@ sealed interface Part {
     }
 
     record ToolOutputAvailable(String toolCallId, Object output) implements Part {
+    }
+
+    record ToolOutputError(String toolCallId, String errorText) implements Part {
     }
 }

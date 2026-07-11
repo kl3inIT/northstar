@@ -4,11 +4,11 @@ import com.northstar.core.assistant.MemoryTools;
 import com.northstar.core.assistant.NorthstarTool;
 import com.northstar.core.attachment.AttachmentContent;
 import com.northstar.core.attachment.AttachmentService;
-import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import io.swagger.v3.oas.annotations.Operation;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -31,6 +31,8 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.util.MimeTypeUtils;
 import org.springframework.util.StringUtils;
@@ -43,7 +45,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import tools.jackson.databind.ObjectMapper;
@@ -67,7 +68,7 @@ class AssistantController {
     // call already allows 60s + 2 retries), so 120s truncated long turns. 240s
     // gives them room while staying under the edge's proxy_read_timeout (300s),
     // so on timeout the api emits its own error frame before NPM cuts the socket.
-    private static final long TURN_TIMEOUT_MILLIS = 240_000L;
+    private static final Duration TURN_TIMEOUT = Duration.ofMinutes(4);
     /** Per-image cap for chat vision input — base64 inflates this ~33% upstream. */
     private static final int MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
@@ -138,10 +139,7 @@ class AssistantController {
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(operationId = "streamAssistantChat")
-    SseEmitter chat(@Valid @RequestBody ChatRequest request, HttpServletResponse response) {
-        response.setHeader(UI_MESSAGE_STREAM_HEADER, "v1");
-        response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform");
-
+    ResponseEntity<Flux<ServerSentEvent<String>>> chat(@Valid @RequestBody ChatRequest request) {
         List<AttachmentContent> images = request.attachmentIds() == null ? List.of()
                 : request.attachmentIds().stream().map(this::imageById).toList();
         String message = request.message() == null ? "" : request.message().strip();
@@ -158,14 +156,18 @@ class AssistantController {
         String stored = message.isBlank() ? markers
                 : markers.isBlank() ? message : message + "\n\n" + markers;
 
-        SseEmitter emitter = new SseEmitter(TURN_TIMEOUT_MILLIS);
-        UiMessageStream.pipe(streamTurn(
+        Flux<ServerSentEvent<String>> stream = UiMessageStream.encode(streamTurn(
                 stored,
                 toMedia(images),
                 conversationId(request.conversationId()),
                 UUID.randomUUID().toString()),
-                emitter, json);
-        return emitter;
+                json, TURN_TIMEOUT);
+        return ResponseEntity.ok()
+                .header(UI_MESSAGE_STREAM_HEADER, "v1")
+                .header(HttpHeaders.CACHE_CONTROL, "no-cache, no-transform")
+                .header(HttpHeaders.CONNECTION, "keep-alive")
+                .header("X-Accel-Buffering", "no")
+                .body(stream);
     }
 
     /**
@@ -368,11 +370,16 @@ class AssistantController {
                     titles.ensureTitleAsync(conversationId);
                 });
 
-        Flux<Part> text = Flux.concat(
-                Flux.just(new Part.TextStart(TEXT_PART_ID)),
-                deltas,
-                Flux.just(new Part.TextEnd(TEXT_PART_ID)));
-        return Flux.merge(text, toolEvents.asFlux());
+        Flux<Part> text = deltas.switchOnFirst((signal, tokens) -> signal.hasValue()
+                ? Flux.concat(
+                        Flux.just(new Part.TextStart(TEXT_PART_ID)),
+                        tokens,
+                        Flux.just(new Part.TextEnd(TEXT_PART_ID)))
+                : tokens);
+        return Flux.concat(
+                Flux.just(new Part.StartStep()),
+                Flux.merge(text, toolEvents.asFlux()),
+                Flux.just(new Part.FinishStep()));
     }
 
     private static String conversationId(String requested) {
@@ -458,6 +465,7 @@ class AssistantController {
                 case Part.ToolInputAvailable tool -> upsert(tool.toolCallId(), tool.toolName(),
                         "input-available", toJson(tool.input()), null, null);
                 case Part.ToolOutputAvailable tool -> recordOutput(tool.toolCallId(), toJson(tool.output()));
+                case Part.ToolOutputError tool -> recordError(tool.toolCallId(), tool.errorText());
                 default -> {
                 }
             }
@@ -517,6 +525,26 @@ class AssistantController {
                     .update();
             if (updated == 0) {
                 upsert(toolCallId, "unknown", "output-available", null, outputJson, null);
+            }
+        }
+
+        private void recordError(String toolCallId, String errorText) {
+            Timestamp now = Timestamp.from(Instant.now());
+            int updated = jdbc.sql("""
+                    UPDATE northstar_assistant_tool_trace
+                       SET state = 'output-error',
+                           error_text = :errorText,
+                           updated_at = :updatedAt
+                     WHERE conversation_id = :conversationId
+                       AND tool_call_id = :toolCallId
+                    """)
+                    .param("conversationId", conversationId)
+                    .param("toolCallId", toolCallId)
+                    .param("errorText", errorText)
+                    .param("updatedAt", now)
+                    .update();
+            if (updated == 0) {
+                upsert(toolCallId, "unknown", "output-error", null, null, errorText);
             }
         }
 

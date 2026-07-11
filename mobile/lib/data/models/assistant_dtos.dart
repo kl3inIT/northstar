@@ -127,7 +127,12 @@ sealed class AssistantStreamFrame {
       'tool-output-available' => AssistantToolOutputAvailableFrame(
         _requiredString(json, 'toolCallId'),
       ),
+      'tool-output-error' => AssistantToolOutputErrorFrame(
+        toolCallId: _requiredString(json, 'toolCallId'),
+        errorText: _requiredString(json, 'errorText'),
+      ),
       'error' => AssistantErrorFrame(_requiredString(json, 'errorText')),
+      'abort' => AssistantAbortFrame(_requiredString(json, 'reason')),
       'finish' => const AssistantFinishFrame(),
       _ => AssistantUnknownFrame(type),
     };
@@ -178,9 +183,24 @@ final class AssistantToolOutputAvailableFrame extends AssistantStreamFrame {
   final String toolCallId;
 }
 
+final class AssistantToolOutputErrorFrame extends AssistantStreamFrame {
+  const AssistantToolOutputErrorFrame({
+    required this.toolCallId,
+    required this.errorText,
+  });
+
+  final String toolCallId;
+  final String errorText;
+}
+
 final class AssistantErrorFrame extends AssistantStreamFrame {
   const AssistantErrorFrame(this.message);
   final String message;
+}
+
+final class AssistantAbortFrame extends AssistantStreamFrame {
+  const AssistantAbortFrame(this.reason);
+  final String reason;
 }
 
 final class AssistantFinishFrame extends AssistantStreamFrame {

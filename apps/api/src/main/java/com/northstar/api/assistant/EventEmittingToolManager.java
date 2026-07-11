@@ -45,22 +45,40 @@ class EventEmittingToolManager implements ToolCallingManager {
         Consumer<Part> emit = sink(prompt);
 
         var generation = chatResponse.getResult();
+        List<AssistantMessage.ToolCall> calls = generation == null
+                ? List.of()
+                : generation.getOutput().getToolCalls();
         if (emit != null && generation != null) {
-            for (AssistantMessage.ToolCall call : generation.getOutput().getToolCalls()) {
+            for (AssistantMessage.ToolCall call : calls) {
                 emit.accept(new Part.ToolInputStart(call.id(), call.name()));
                 emit.accept(new Part.ToolInputAvailable(call.id(), call.name(), parse(call.arguments())));
             }
         }
 
-        ToolExecutionResult result = delegate.executeToolCalls(prompt, chatResponse);
+        ToolExecutionResult result;
+        try {
+            result = delegate.executeToolCalls(prompt, chatResponse);
+        } catch (RuntimeException failure) {
+            if (emit != null) {
+                for (AssistantMessage.ToolCall call : calls) {
+                    emit.accept(new Part.ToolOutputError(call.id(), "Tool execution failed."));
+                }
+                emit.accept(new Part.FinishStep());
+            }
+            throw failure;
+        }
 
-        if (emit != null) {
+        if (emit != null && !calls.isEmpty()) {
             List<Message> history = result.conversationHistory();
             if (!history.isEmpty() && history.getLast() instanceof ToolResponseMessage toolResponse) {
                 for (ToolResponseMessage.ToolResponse r : toolResponse.getResponses()) {
                     emit.accept(new Part.ToolOutputAvailable(r.id(), parse(r.responseData())));
                 }
             }
+            // The model call and its server-side tool executions form one AI SDK
+            // step. The advisor will call the model again with the tool results.
+            emit.accept(new Part.FinishStep());
+            emit.accept(new Part.StartStep());
         }
         return result;
     }

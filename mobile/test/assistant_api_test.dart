@@ -12,8 +12,11 @@ void main() {
       capturedRequest = request;
       return _response(
         '''data: {"type":"start","messageId":"message-1"}\n\n'''
+        ''': ping\n\n'''
+        '''data: {"type":"start-step"}\n\n'''
         '''data: {"type":"text-delta","id":"text-1","delta":"Hello"}\n\n'''
         '''data: {"type":"tool-input-start","toolCallId":"tool-1","toolName":"today_tasks"}\n\n'''
+        '''data: {"type":"tool-output-error","toolCallId":"tool-1","errorText":"Tool execution failed."}\n\n'''
         '''data: [DONE]\n\n''',
       );
     });
@@ -31,10 +34,35 @@ void main() {
 
     expect(capturedRequest.headers['authorization'], 'Bearer access-token');
     expect(capturedRequest.url.path, '/api/assistant/chat');
-    expect(frames, hasLength(4));
-    expect(frames[1], isA<AssistantTextDeltaFrame>());
-    expect((frames[1] as AssistantTextDeltaFrame).delta, 'Hello');
-    expect(frames[2], isA<AssistantToolInputStartFrame>());
+    expect(frames, hasLength(6));
+    expect(frames[1], isA<AssistantUnknownFrame>());
+    expect(frames[2], isA<AssistantTextDeltaFrame>());
+    expect((frames[2] as AssistantTextDeltaFrame).delta, 'Hello');
+    expect(frames[3], isA<AssistantToolInputStartFrame>());
+    expect(frames[4], isA<AssistantToolOutputErrorFrame>());
+    expect(frames.last, isA<AssistantDoneFrame>());
+  });
+
+  test('parses an abort frame', () async {
+    final api = AssistantApi(
+      client: _HandlerClient(
+        (_) async => _response(
+          '''data: {"type":"abort","reason":"Assistant turn timed out."}\n\n'''
+          '''data: [DONE]\n\n''',
+        ),
+      ),
+      baseUrl: Uri.parse('https://northstar.example'),
+      accessToken: () => 'access-token',
+      refreshAccessToken: () async => null,
+      onUnauthorized: () {},
+    );
+
+    final frames = await api
+        .streamTurn(conversationId: 'conversation-1', message: 'Hello')
+        .toList();
+
+    expect(frames.first, isA<AssistantAbortFrame>());
+    expect((frames.first as AssistantAbortFrame).reason, 'Assistant turn timed out.');
     expect(frames.last, isA<AssistantDoneFrame>());
   });
 

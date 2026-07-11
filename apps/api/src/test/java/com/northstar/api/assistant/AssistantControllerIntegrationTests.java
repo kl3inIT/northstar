@@ -81,12 +81,17 @@ class AssistantControllerIntegrationTests {
 
         assertThat(turn.statusCode()).isEqualTo(200);
         assertThat(turn.headers().firstValue("x-vercel-ai-ui-message-stream")).hasValue("v1");
+        assertThat(turn.headers().firstValue("x-accel-buffering")).hasValue("no");
+        assertThat(turn.headers().firstValue("cache-control")).hasValue("no-cache, no-transform");
         assertThat(turn.body())
                 .contains("\"type\":\"start\"")
+                .contains("\"type\":\"start-step\"")
                 .contains("\"type\":\"text-start\"")
                 .contains("\"type\":\"text-delta\"")
                 .contains("You have nothing due today.")
+                .contains("\"type\":\"finish-step\"")
                 .contains("\"type\":\"finish\"")
+                .contains("\"finishReason\":\"stop\"")
                 .contains("[DONE]");
 
         // The JDBC memory saw both sides of the turn — a reload can rehydrate.

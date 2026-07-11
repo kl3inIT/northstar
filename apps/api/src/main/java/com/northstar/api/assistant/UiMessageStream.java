@@ -1,105 +1,113 @@
 package com.northstar.api.assistant;
 
-import java.io.IOException;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import reactor.core.Disposable;
+import org.springframework.http.codec.ServerSentEvent;
 import reactor.core.publisher.Flux;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Encodes a {@link Part} flux as AI SDK UI Message Stream v1 frames over an
- * {@link SseEmitter}: start → text/tool parts → finish → [DONE]. Any stream
- * error still ends the response with a protocol-level error frame so the UI
- * shows a message instead of hanging.
+ * Encodes assistant parts as AI SDK UI Message Stream v1 frames. Heartbeats are
+ * SSE comments, so strict UI-message parsers ignore them while proxies still
+ * see traffic during a quiet model or tool call.
  */
 final class UiMessageStream {
+
+    static final Duration HEARTBEAT_INTERVAL = Duration.ofSeconds(15);
 
     private UiMessageStream() {
     }
 
-    static void pipe(Flux<Part> source, SseEmitter emitter, ObjectMapper json) {
-        Encoder encoder = new Encoder(emitter, json);
-        Disposable subscription = source.subscribe(
-                encoder::write,
-                _ -> {
-                    encoder.error();
-                    encoder.done();
-                    emitter.complete();
-                },
-                () -> {
-                    encoder.finish();
-                    encoder.done();
-                    emitter.complete();
-                });
-        emitter.onCompletion(subscription::dispose);
-        emitter.onTimeout(() -> {
-            // A long multi-tool turn ran past the emitter deadline. Don't leave the
-            // UI hanging on a half-written message: surface a protocol error frame
-            // (best-effort — the response may already be closing) then finish.
-            try {
-                encoder.error();
-                encoder.done();
-            } catch (RuntimeException ignored) {
-                // response half-committed; nothing more we can send
-            }
-            subscription.dispose();
-            emitter.complete();
+    static Flux<ServerSentEvent<String>> encode(Flux<Part> source, ObjectMapper json,
+            Duration turnTimeout) {
+        return encode(source, json, HEARTBEAT_INTERVAL, turnTimeout);
+    }
+
+    static Flux<ServerSentEvent<String>> encode(Flux<Part> source, ObjectMapper json,
+            Duration heartbeatInterval, Duration turnTimeout) {
+        if (heartbeatInterval.isNegative() || heartbeatInterval.isZero()) {
+            throw new IllegalArgumentException("heartbeatInterval must be positive");
+        }
+        if (turnTimeout.isNegative() || turnTimeout.isZero()) {
+            throw new IllegalArgumentException("turnTimeout must be positive");
+        }
+        return Flux.defer(() -> {
+            Encoder encoder = new Encoder(json);
+            Flux<ServerSentEvent<String>> live = withHeartbeat(
+                    limitDuration(source, turnTimeout).map(encoder::part),
+                    heartbeatInterval);
+            return Flux.concat(
+                    Flux.just(encoder.start()),
+                    live,
+                    Flux.just(encoder.finish(), encoder.done()))
+                    .onErrorResume(AssistantStreamAbortedException.class,
+                            error -> Flux.just(encoder.abort(error.getMessage()), encoder.done()))
+                    .onErrorResume(_ -> Flux.just(encoder.error(), encoder.done()));
         });
-        emitter.onError(_ -> subscription.dispose());
+    }
+
+    private static Flux<Part> limitDuration(Flux<Part> source, Duration timeout) {
+        AtomicBoolean completed = new AtomicBoolean();
+        return source
+                .doOnComplete(() -> completed.set(true))
+                .take(timeout)
+                .concatWith(Flux.defer(() -> completed.get()
+                        ? Flux.empty()
+                        : Flux.error(new AssistantStreamAbortedException("Assistant turn timed out."))));
+    }
+
+    private static Flux<ServerSentEvent<String>> withHeartbeat(
+            Flux<ServerSentEvent<String>> source, Duration interval) {
+        return source.publish(shared -> {
+            Flux<ServerSentEvent<String>> heartbeat = Flux.interval(interval)
+                    .map(_ -> ServerSentEvent.<String>builder().comment("ping").build())
+                    .takeUntilOther(shared.ignoreElements());
+            return Flux.merge(shared, heartbeat);
+        });
     }
 
     private static final class Encoder {
 
-        private final SseEmitter emitter;
         private final ObjectMapper json;
         private final String messageId = UUID.randomUUID().toString();
-        private final AtomicBoolean started = new AtomicBoolean(false);
 
-        private Encoder(SseEmitter emitter, ObjectMapper json) {
-            this.emitter = emitter;
+        private Encoder(ObjectMapper json) {
             this.json = json;
         }
 
-        void write(Part part) {
-            startIfNeeded();
-            frame(json.writeValueAsString(payload(part)));
+        ServerSentEvent<String> start() {
+            return event(json.writeValueAsString(fields("type", "start", "messageId", messageId)));
         }
 
-        void finish() {
-            startIfNeeded();
-            frame(json.writeValueAsString(Map.of("type", "finish")));
+        ServerSentEvent<String> part(Part part) {
+            return event(json.writeValueAsString(payload(part)));
         }
 
-        void error() {
-            startIfNeeded();
-            frame(json.writeValueAsString(
+        ServerSentEvent<String> finish() {
+            return event(json.writeValueAsString(fields(
+                    "type", "finish", "finishReason", "stop")));
+        }
+
+        ServerSentEvent<String> error() {
+            return event(json.writeValueAsString(
                     fields("type", "error", "errorText", "The assistant stream failed.")));
         }
 
-        void done() {
-            frame("[DONE]");
+        ServerSentEvent<String> abort(String reason) {
+            return event(json.writeValueAsString(fields("type", "abort", "reason", reason)));
         }
 
-        private void startIfNeeded() {
-            if (started.compareAndSet(false, true)) {
-                frame(json.writeValueAsString(fields("type", "start", "messageId", messageId)));
-            }
-        }
-
-        private void frame(String data) {
-            try {
-                emitter.send(SseEmitter.event().data(data));
-            } catch (IOException e) {
-                throw new IllegalStateException("could not send SSE frame", e);
-            }
+        ServerSentEvent<String> done() {
+            return event("[DONE]");
         }
 
         private static Map<String, Object> payload(Part part) {
             return switch (part) {
+                case Part.StartStep _ -> fields("type", "start-step");
+                case Part.FinishStep _ -> fields("type", "finish-step");
                 case Part.TextStart p -> fields("type", "text-start", "id", p.id());
                 case Part.TextDelta p -> fields("type", "text-delta", "id", p.id(),
                         "delta", p.delta() == null ? "" : p.delta());
@@ -110,7 +118,13 @@ final class UiMessageStream {
                         "toolCallId", p.toolCallId(), "toolName", p.toolName(), "input", p.input());
                 case Part.ToolOutputAvailable p -> fields("type", "tool-output-available",
                         "toolCallId", p.toolCallId(), "output", p.output());
+                case Part.ToolOutputError p -> fields("type", "tool-output-error",
+                        "toolCallId", p.toolCallId(), "errorText", p.errorText());
             };
+        }
+
+        private static ServerSentEvent<String> event(String data) {
+            return ServerSentEvent.builder(data).build();
         }
 
         private static Map<String, Object> fields(Object... keyValues) {
@@ -119,6 +133,13 @@ final class UiMessageStream {
                 map.put((String) keyValues[i], keyValues[i + 1]);
             }
             return map;
+        }
+    }
+
+    private static final class AssistantStreamAbortedException extends RuntimeException {
+
+        private AssistantStreamAbortedException(String message) {
+            super(message);
         }
     }
 }

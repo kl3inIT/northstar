@@ -97,8 +97,15 @@ class RemoteAssistantRepository implements AssistantRepository {
             id: toolCallId,
             status: AssistantToolStatus.complete,
           );
+        case AssistantToolOutputErrorFrame(:final toolCallId):
+          yield AssistantToolEvent(
+            id: toolCallId,
+            status: AssistantToolStatus.failed,
+          );
         case AssistantErrorFrame(:final message):
           throw AssistantApiException(message, statusCode: 502);
+        case AssistantAbortFrame(:final reason):
+          throw AssistantApiException(reason, statusCode: 408);
         case AssistantDoneFrame():
           yield const AssistantTurnFinishedEvent();
         case AssistantStartFrame() ||

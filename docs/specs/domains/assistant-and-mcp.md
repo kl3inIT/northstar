@@ -7,6 +7,13 @@ where possible.
 
 The in-app assistant streams AI SDK UI Message Stream frames to the web and
 Flutter chats.
+The API returns a reactive Spring MVC SSE stream rather than manually bridging
+to `SseEmitter`. It emits the AI SDK v1 response headers, disables Nginx
+buffering, sends comment heartbeats every 15 seconds while a model or tool is
+quiet, and preserves message/step/text/tool/finish boundaries through `[DONE]`.
+Tool failures end their tool row with `tool-output-error`; a server-side turn
+timeout emits `abort` and `[DONE]` instead of leaving the client busy. Client
+disconnect cancellation propagates upstream through the reactive subscription.
 Conversation text is stored in Spring AI's `spring_ai_chat_memory` table, while
 tool workflow parts are stored in `northstar_assistant_tool_trace` and replayed
 from `/api/assistant/history` so completed workflow steps survive page reloads
