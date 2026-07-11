@@ -22,4 +22,4 @@
       screenshot, drag/drop, tools, submit, and stop controls.
 - [x] Update durable specs, tests, roadmap, and the Northstar behavior note.
 - [x] Run static, context-load, web/mobile, runtime, and browser verification.
-- [ ] Commit scoped parts, push `main`, and inspect GitHub Actions.
+- [x] Commit scoped parts, push `main`, and inspect GitHub Actions.
