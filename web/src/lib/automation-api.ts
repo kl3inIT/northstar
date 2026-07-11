@@ -4,24 +4,41 @@ import {
   deleteAutomation,
   listAutomationRuns,
   listAutomations,
+  listAutomationTypes,
   runAutomationNow,
   updateAutomation,
 } from './hey-api'
 import type {
   AutomationDefinitionSummary,
   AutomationRunSummary,
+  AutomationTypeDescriptor,
   CreateAutomationRequest,
   UpdateAutomationRequest,
 } from './hey-api'
-import { zListAutomationRunsResponse, zListAutomationsResponse } from './hey-api/zod.gen'
+import {
+  zListAutomationRunsResponse,
+  zListAutomationsResponse,
+  zListAutomationTypesResponse,
+} from './hey-api/zod.gen'
 import { dataOrThrow, voidOrThrow } from './hey-api-result'
 
 export type AutomationDefinition = AutomationDefinitionSummary
 export type AutomationRun = AutomationRunSummary
+export type AutomationType = AutomationTypeDescriptor
 export type AutomationCreateInput = CreateAutomationRequest
 export type AutomationUpdateInput = UpdateAutomationRequest
 
 const automationsKey = ['settings', 'automations'] as const
+const automationTypesKey = [...automationsKey, 'types'] as const
+
+export function useAutomationTypes() {
+  return useQuery({
+    queryKey: automationTypesKey,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async (): Promise<AutomationType[]> => zListAutomationTypesResponse
+      .parse(dataOrThrow(await listAutomationTypes())),
+  })
+}
 
 export function useAutomations() {
   return useQuery({
@@ -83,9 +100,11 @@ export function useRunAutomationNow() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => dataOrThrow(await runAutomationNow({ path: { id } })),
-    onSuccess: (run) => {
-      client.invalidateQueries({ queryKey: automationsKey })
-      client.invalidateQueries({ queryKey: [...automationsKey, run.automationId, 'runs'] })
+    onSuccess: async (run) => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: automationsKey }),
+        client.invalidateQueries({ queryKey: [...automationsKey, run.automationId, 'runs'] }),
+      ])
     },
   })
 }

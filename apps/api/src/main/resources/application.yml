@@ -92,6 +92,14 @@ northstar:
     enabled: ${NORTHSTAR_AUTH_ENABLED:true}
     username: ${NORTHSTAR_AUTH_USERNAME:}
     password-hash: ${NORTHSTAR_AUTH_PASSWORD_HASH:}
+    mobile:
+      enabled: ${NORTHSTAR_MOBILE_AUTH_ENABLED:false}
+      issuer: ${NORTHSTAR_MOBILE_AUTH_ISSUER:northstar-api}
+      audience: ${NORTHSTAR_MOBILE_AUTH_AUDIENCE:northstar-mobile}
+      jwt-secret: ${NORTHSTAR_MOBILE_AUTH_JWT_SECRET:}
+      access-ttl: ${NORTHSTAR_MOBILE_AUTH_ACCESS_TTL:15m}
+      refresh-ttl: ${NORTHSTAR_MOBILE_AUTH_REFRESH_TTL:30d}
+      web-preview-origin: ${NORTHSTAR_MOBILE_AUTH_WEB_PREVIEW_ORIGIN:}
   assistant:
     title:
       enabled: true

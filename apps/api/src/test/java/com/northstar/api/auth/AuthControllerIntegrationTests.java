@@ -1,12 +1,16 @@
 package com.northstar.api.auth;
 
 import static org.hamcrest.Matchers.containsString;
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,7 +30,10 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "spring.ai.openai.api-key=test-key",
         "northstar.auth.enabled=true",
         "northstar.auth.username=datph",
-        "northstar.auth.password-hash={bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG"
+        "northstar.auth.password-hash={bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG",
+        "northstar.auth.mobile.enabled=true",
+        "northstar.auth.mobile.jwt-secret=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=",
+        "northstar.auth.mobile.web-preview-origin=http://127.0.0.1:7357"
 })
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -96,5 +103,78 @@ class AuthControllerIntegrationTests {
         Cookie cookie = result.getResponse().getCookie("XSRF-TOKEN");
         org.assertj.core.api.Assertions.assertThat(cookie).isNotNull();
         org.assertj.core.api.Assertions.assertThat(cookie.isHttpOnly()).isFalse();
+    }
+
+    @Test
+    void mobileLoginIssuesBearerAndRotatesRefreshTokensWithoutCsrf() throws Exception {
+        MvcResult login = mvc.perform(post("/api/auth/mobile/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"datph\",\"password\":\"password\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.username").value("datph"))
+                .andExpect(jsonPath("$.accessToken").isNotEmpty())
+                .andExpect(jsonPath("$.refreshToken").isNotEmpty())
+                .andReturn();
+
+        String accessToken = JsonPath.read(login.getResponse().getContentAsString(), "$.accessToken");
+        String refreshToken = JsonPath.read(login.getResponse().getContentAsString(), "$.refreshToken");
+
+        mvc.perform(get("/api/auth/mobile/me").header(AUTHORIZATION, "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.username").value("datph"));
+
+        MvcResult refreshed = mvc.perform(post("/api/auth/mobile/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String replacement = JsonPath.read(refreshed.getResponse().getContentAsString(), "$.refreshToken");
+        org.assertj.core.api.Assertions.assertThat(replacement).isNotEqualTo(refreshToken);
+
+        mvc.perform(post("/api/auth/mobile/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+
+        mvc.perform(post("/api/auth/mobile/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + replacement + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void mobileLogoutRevokesTheRefreshFamily() throws Exception {
+        MvcResult login = mvc.perform(post("/api/auth/mobile/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"datph\",\"password\":\"password\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String refreshToken = JsonPath.read(login.getResponse().getContentAsString(), "$.refreshToken");
+
+        mvc.perform(post("/api/auth/mobile/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isNoContent());
+
+        mvc.perform(post("/api/auth/mobile/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"" + refreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void mobileWebPreviewAllowsOnlyTheConfiguredCorsOrigin() throws Exception {
+        mvc.perform(options("/api/auth/mobile/login")
+                        .header("Origin", "http://127.0.0.1:7357")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "content-type"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:7357"));
+
+        mvc.perform(options("/api/auth/mobile/login")
+                        .header("Origin", "https://untrusted.example")
+                        .header("Access-Control-Request-Method", "POST"))
+                .andExpect(status().isForbidden());
     }
 }

@@ -55,9 +55,17 @@ overwrite one another.
 
 `Settings > Automations` lists jobs with active/paused and projection-sync
 status, a human-readable local schedule, enable switch, run-now, edit, delete,
-and the five most recent runs. The Morning Brief editor configures all V1
-trigger and workflow fields without exposing raw cron or secrets. The layout is
-responsive and the editor scrolls independently on mobile.
+and the five most recent runs. Creation begins with a workflow-type catalog
+loaded from `GET /api/automations/types`; choosing a supported type opens its
+type-specific editor with defaults supplied by the handler descriptor. The
+Morning Brief editor configures all V1 trigger and workflow fields without
+exposing raw cron or secrets. The layout is responsive and the editor scrolls
+independently on mobile.
+
+The backend handler registry is runtime-discovered. The web keeps a small
+editor registry keyed by the same stable type id because typed workflow forms
+need domain-specific controls and validation; adding a backend type makes it
+visible in the catalog, while enabling creation requires its matching editor.
 
 REST endpoints are:
 

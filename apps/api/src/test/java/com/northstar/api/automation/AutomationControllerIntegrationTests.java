@@ -42,6 +42,7 @@ class AutomationControllerIntegrationTests {
         mvc.perform(get("/api/automations/types"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type").value("morning-brief.v1"))
+                .andExpect(jsonPath("$[0].displayName").value("Morning Brief"))
                 .andExpect(jsonPath("$[0].defaultConfig.maxItems").value(6));
 
         String created = mvc.perform(post("/api/automations")

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import {
   CalendarClock,
   ChevronDown,
@@ -7,11 +7,13 @@ import {
   FileText,
   History,
   Loader2,
+  Newspaper,
   Pencil,
   Play,
   Plus,
   Save,
   Trash2,
+  Workflow,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -38,6 +40,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import {
   useAutomationRuns,
+  useAutomationTypes,
   useAutomations,
   useCreateAutomation,
   useDeleteAutomation,
@@ -45,6 +48,7 @@ import {
   useUpdateAutomation,
   type AutomationDefinition,
   type AutomationRun,
+  type AutomationType,
 } from '@/lib/automation-api'
 import type { AutomationTrigger } from '@/lib/hey-api'
 
@@ -65,6 +69,15 @@ interface MorningBriefForm {
   saveAsNote: boolean
 }
 
+interface NewAutomationTarget {
+  kind: 'new'
+  descriptor: AutomationType
+}
+
+type AutomationEditorTarget = AutomationDefinition | NewAutomationTarget
+
+const MORNING_BRIEF_TYPE = 'morning-brief.v1'
+
 const DAYS: Array<{ value: Day; short: string }> = [
   { value: 'MONDAY', short: 'Mon' },
   { value: 'TUESDAY', short: 'Tue' },
@@ -79,11 +92,17 @@ const DEFAULT_DAYS = DAYS.map((day) => day.value)
 
 export function AutomationsSection() {
   const automations = useAutomations()
+  const types = useAutomationTypes()
   const create = useCreateAutomation()
   const update = useUpdateAutomation()
   const remove = useDeleteAutomation()
   const runNow = useRunAutomationNow()
-  const [editing, setEditing] = useState<AutomationDefinition | 'new' | null>(null)
+  const [editing, setEditing] = useState<AutomationEditorTarget | null>(null)
+  const [typePickerOpen, setTypePickerOpen] = useState(false)
+  const typeById = useMemo(
+    () => new Map(types.data?.map((descriptor) => [descriptor.type, descriptor]) ?? []),
+    [types.data],
+  )
 
   function toggle(definition: AutomationDefinition, enabled: boolean) {
     update.mutate({
@@ -103,7 +122,7 @@ export function AutomationsSection() {
 
   function execute(definition: AutomationDefinition) {
     runNow.mutate(definition.id, {
-      onSuccess: () => toast.success('Morning Brief queued'),
+      onSuccess: () => toast.success('Automation queued'),
       onError: (error) => toast.error(error.message),
     })
   }
@@ -123,7 +142,7 @@ export function AutomationsSection() {
           <h2 id="automations-heading" className="text-xl font-semibold">Automations</h2>
           <p className="mt-1 text-sm text-muted-foreground">Scheduled workflows that run without opening Northstar.</p>
         </div>
-        <Button type="button" onClick={() => setEditing('new')}>
+        <Button type="button" onClick={() => setTypePickerOpen(true)}>
           <Plus className="size-4" />
           New automation
         </Button>
@@ -147,6 +166,7 @@ export function AutomationsSection() {
               onRun={execute}
               onEdit={setEditing}
               onDelete={deleteDefinition}
+              typeName={typeById.get(definition.type)?.displayName ?? definition.type}
             />
           ))}
         </div>
@@ -155,27 +175,41 @@ export function AutomationsSection() {
           <CalendarClock className="mb-3 size-7 text-muted-foreground" />
           <p className="text-sm font-medium">No scheduled workflows</p>
           <p className="mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-            Create a Morning Brief to collect current research into a reviewable note.
+            Create a scheduled workflow to run recurring work in the background.
           </p>
         </div>
       )}
 
+      <AutomationTypePicker
+        open={typePickerOpen}
+        types={types.data ?? []}
+        loading={types.isLoading}
+        error={types.isError ? types.error.message : null}
+        onOpenChange={setTypePickerOpen}
+        onSelect={(descriptor) => {
+          setTypePickerOpen(false)
+          setEditing({ kind: 'new', descriptor })
+        }}
+      />
+
       <AutomationEditor
-        key={editing === 'new' ? 'new' : editing?.id ?? 'closed'}
-        definition={editing}
+        key={editing && isNewTarget(editing) ? `new-${editing.descriptor.type}` : editing?.id ?? 'closed'}
+        target={editing}
+        descriptor={editing && !isNewTarget(editing) ? typeById.get(editing.type) : undefined}
         open={editing !== null}
         busy={create.isPending || update.isPending}
         onOpenChange={(open) => !open && setEditing(null)}
         onSubmit={(form) => {
           const body = request(form)
+          const creating = editing !== null && isNewTarget(editing)
           const options = {
             onSuccess: () => {
-              toast.success(editing === 'new' ? 'Automation created' : 'Automation saved')
+              toast.success(creating ? 'Automation created' : 'Automation saved')
               setEditing(null)
             },
             onError: (error: Error) => toast.error(error.message),
           }
-          if (editing === 'new') create.mutate(body, options)
+          if (creating) create.mutate({ ...body, type: editing.descriptor.type }, options)
           else if (editing) update.mutate({
             id: editing.id,
             body: { ...body, version: editing.version },
@@ -193,6 +227,7 @@ function AutomationRow({
   onRun,
   onEdit,
   onDelete,
+  typeName,
 }: {
   definition: AutomationDefinition
   busy: boolean
@@ -200,6 +235,7 @@ function AutomationRow({
   onRun: (definition: AutomationDefinition) => void
   onEdit: (definition: AutomationDefinition) => void
   onDelete: (definition: AutomationDefinition) => void
+  typeName: string
 }) {
   const [historyOpen, setHistoryOpen] = useState(false)
   const runs = useAutomationRuns(definition.id, historyOpen)
@@ -214,6 +250,7 @@ function AutomationRow({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="truncate text-sm font-semibold">{definition.name}</p>
+              <Badge variant="outline">{typeName}</Badge>
               {!definition.scheduleSynced && <Badge variant="outline">Syncing</Badge>}
               <Badge variant={definition.enabled ? 'secondary' : 'outline'}>
                 {definition.enabled ? 'Active' : 'Paused'}
@@ -237,7 +274,7 @@ function AutomationRow({
             <Play className="size-4" />
             <span className="sr-only">Run now</span>
           </Button>
-          <Button type="button" variant="ghost" size="icon" title="Edit" disabled={busy} onClick={() => onEdit(definition)}>
+          <Button type="button" variant="ghost" size="icon" title="Edit" disabled={busy || !hasEditor(definition.type)} onClick={() => onEdit(definition)}>
             <Pencil className="size-4" />
             <span className="sr-only">Edit</span>
           </Button>
@@ -272,6 +309,69 @@ function AutomationRow({
   )
 }
 
+function AutomationTypePicker({
+  open,
+  types,
+  loading,
+  error,
+  onOpenChange,
+  onSelect,
+}: {
+  open: boolean
+  types: AutomationType[]
+  loading: boolean
+  error: string | null
+  onOpenChange: (open: boolean) => void
+  onSelect: (descriptor: AutomationType) => void
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>New automation</DialogTitle>
+          <DialogDescription>Choose a workflow type.</DialogDescription>
+        </DialogHeader>
+        {loading ? (
+          <div className="grid h-32 place-items-center">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <p className="py-8 text-sm text-destructive">{error}</p>
+        ) : types.length ? (
+          <div className="grid gap-2">
+            {types.map((descriptor) => {
+              const available = hasEditor(descriptor.type)
+              const Icon = descriptor.type === MORNING_BRIEF_TYPE ? Newspaper : Workflow
+              return (
+                <button
+                  key={descriptor.type}
+                  type="button"
+                  disabled={!available}
+                  className="flex min-h-20 w-full items-center gap-4 rounded-md border p-4 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => onSelect(descriptor)}
+                >
+                  <span className="grid size-10 shrink-0 place-items-center rounded-md bg-muted">
+                    <Icon className="size-5 text-muted-foreground" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{descriptor.displayName}</span>
+                      <Badge variant="outline">v{descriptor.configVersion}</Badge>
+                    </span>
+                    <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">{descriptor.description}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-muted-foreground">No automation types are available.</p>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function RunRow({ run }: { run: AutomationRun }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -285,22 +385,26 @@ function RunRow({ run }: { run: AutomationRun }) {
 }
 
 function AutomationEditor({
-  definition,
+  target,
+  descriptor,
   open,
   busy,
   onOpenChange,
   onSubmit,
 }: {
-  definition: AutomationDefinition | 'new' | null
+  target: AutomationEditorTarget | null
+  descriptor?: AutomationType
   open: boolean
   busy: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (form: MorningBriefForm) => void
 }) {
-  const initial = useMemo(() => formFrom(definition), [definition])
+  const initial = useMemo(() => formFrom(target), [target])
   const [form, setForm] = useState(initial)
+  const creating = target !== null && isNewTarget(target)
+  const type = creating ? target.descriptor : descriptor
 
-  function submit(event: React.FormEvent) {
+  function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!form.name.trim()) return toast.error('Name is required')
     if (!form.time) return toast.error('Schedule time is required')
@@ -314,13 +418,24 @@ function AutomationEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl">
+      <DialogContent
+        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+      >
         <DialogHeader>
-          <DialogTitle>{definition === 'new' ? 'New Morning Brief' : 'Edit Morning Brief'}</DialogTitle>
-          <DialogDescription>Research current topics on a schedule and save the result as a reviewable note.</DialogDescription>
+          <DialogTitle>{creating ? `New ${type?.displayName ?? 'automation'}` : `Edit ${type?.displayName ?? 'automation'}`}</DialogTitle>
+          <DialogDescription>{type?.description ?? 'Configure this scheduled workflow.'}</DialogDescription>
         </DialogHeader>
 
         <form id="automation-form" className="space-y-6" onSubmit={submit}>
+          <div className="flex items-center gap-3 rounded-md border px-3 py-2.5">
+            <Newspaper className="size-4 text-muted-foreground" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-muted-foreground">Type</p>
+              <p className="truncate text-sm font-medium">{type?.displayName ?? MORNING_BRIEF_TYPE}</p>
+            </div>
+            {type && <Badge variant="outline">v{type.configVersion}</Badge>}
+          </div>
           <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <Field label="Name" htmlFor="automation-name">
               <Input
@@ -431,7 +546,7 @@ function AutomationEditor({
   )
 }
 
-function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: string; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-2">
       <Label htmlFor={htmlFor}>{label}</Label>
@@ -441,28 +556,31 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: str
   )
 }
 
-function formFrom(definition: AutomationDefinition | 'new' | null): MorningBriefForm {
-  if (!definition || definition === 'new') return {
-    name: 'Morning Brief',
-    enabled: true,
-    time: '07:00',
-    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Bangkok',
-    days: DEFAULT_DAYS,
-    language: 'vi',
-    lookbackHours: 24,
-    maxItems: 6,
-    topics: 'AI agents\nJava\nSpring AI',
-    queries: '',
-    blockedDomains: '',
-    saveAsNote: true,
+function formFrom(target: AutomationEditorTarget | null): MorningBriefForm {
+  if (!target || isNewTarget(target)) {
+    const config = target?.descriptor.defaultConfig ?? {}
+    return {
+      name: target?.descriptor.displayName ?? 'Morning Brief',
+      enabled: true,
+      time: '07:00',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Bangkok',
+      days: DEFAULT_DAYS,
+      language: stringValue(config.language, 'vi'),
+      lookbackHours: numberValue(config.lookbackHours, 24),
+      maxItems: numberValue(config.maxItems, 6),
+      topics: stringList(config.topics).join('\n'),
+      queries: stringList(config.queries).join('\n'),
+      blockedDomains: stringList(config.blockedDomains).join('\n'),
+      saveAsNote: typeof config.saveAsNote === 'boolean' ? config.saveAsNote : true,
+    }
   }
-  const config = definition.workflowConfig
+  const config = target.workflowConfig
   return {
-    name: definition.name,
-    enabled: definition.enabled,
-    time: definition.trigger.localTime.slice(0, 5),
-    timezone: definition.trigger.timezone,
-    days: definition.trigger.daysOfWeek,
+    name: target.name,
+    enabled: target.enabled,
+    time: target.trigger.localTime.slice(0, 5),
+    timezone: target.trigger.timezone,
+    days: target.trigger.daysOfWeek,
     language: stringValue(config.language, 'vi'),
     lookbackHours: numberValue(config.lookbackHours, 24),
     maxItems: numberValue(config.maxItems, 6),
@@ -475,7 +593,6 @@ function formFrom(definition: AutomationDefinition | 'new' | null): MorningBrief
 
 function request(form: MorningBriefForm) {
   return {
-    type: 'morning-brief.v1',
     name: form.name.trim(),
     enabled: form.enabled,
     trigger: {
@@ -495,6 +612,14 @@ function request(form: MorningBriefForm) {
       saveAsNote: form.saveAsNote,
     },
   }
+}
+
+function isNewTarget(target: AutomationEditorTarget): target is NewAutomationTarget {
+  return 'kind' in target && target.kind === 'new'
+}
+
+function hasEditor(type: string) {
+  return type === MORNING_BRIEF_TYPE
 }
 
 function lines(value: string) {

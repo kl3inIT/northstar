@@ -29,6 +29,8 @@ web/.vite/
 
 # --- Tooling scratch / MCP output ---
 .playwright-mcp/
+.playwright-cli/
+output/
 tmp/
 
 # --- OS ---

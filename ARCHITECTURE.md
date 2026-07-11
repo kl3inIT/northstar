@@ -10,6 +10,10 @@ active increment, not here.
   Spring Security 7, Spring Data JPA, PostgreSQL, pgvector, Flyway, Spring AI.
 - Frontend: Vite, React 19, TypeScript, Tailwind v4, shadcn/ui, TanStack Router,
   TanStack Query.
+- Mobile: Flutter 3.44, Dart 3.12, with Android, iOS, and Web targets. The app
+  is Cupertino-first on every target during mobile development so the iPhone
+  experience can be reviewed from Windows. Compact windows use five native-style
+  tabs; windows at least 600 logical pixels wide use a Cupertino-styled sidebar.
 - Contract: the API emits `contracts/openapi.json`; Hey API generates the web
   fetch client, SDK functions, and DTO types from that contract.
 - Build config: dependency versions live in `gradle/libs.versions.toml`; shared
@@ -24,6 +28,7 @@ apps/mcp/             streamable-http MCP server for external agents
 apps/worker/          headless scheduled worker for heavy background indexing
 integrations/         provider adapters shared by delivery apps
 web/                  Vite React SPA
+mobile/               adaptive Flutter client for Android, iOS, and Web
 contracts/            generated OpenAPI contract
 build-logic/          Gradle convention plugins
 ```
@@ -145,9 +150,13 @@ verification in `:core:test` is the boundary check.
 - State-changing same-origin web requests use Spring Security SPA CSRF tokens
   (`XSRF-TOKEN` cookie, `X-XSRF-TOKEN` request header).
 - `GET /api/auth/me`, `GET /api/auth/csrf`, `POST /api/auth/login`, and
-  `POST /api/auth/logout` are the current auth endpoints.
-- Mobile authentication is intentionally not implemented yet. A future Flutter
-  client should use a separate token flow instead of browser local storage.
+  `POST /api/auth/logout` own browser authentication.
+- Native mobile authentication uses separate `/api/auth/mobile/*` endpoints,
+  short-lived access JWTs, rotating opaque refresh tokens, and refresh-family
+  revocation on replay. It is disabled until its environment secret is set.
+- Flutter holds access tokens in memory and native refresh tokens in platform
+  secure storage. `go_router` observes the auth state and guards the Cupertino
+  route shell; the Web preview does not persist mobile credentials.
 
 ## Commands
 

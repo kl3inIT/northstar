@@ -24,12 +24,22 @@
 - In tests, auth is disabled by default through `apps/api/src/test/resources`
   so existing domain integration tests can exercise business behavior without
   login boilerplate. Dedicated auth tests enable it explicitly.
+- Native mobile clients use `/api/auth/mobile/login`, `/refresh`, `/logout`, and
+  `/me`. Mobile auth is opt-in through `northstar.auth.mobile.enabled`.
+- Mobile access JWTs are short-lived and validated for issuer, audience, expiry,
+  and token use. Refresh tokens are opaque, stored hashed, rotated on every use,
+  and revoked as a family on replay or logout.
+- Flutter keeps the access token in memory and the native refresh token in
+  Keychain/secure storage. The Web preview intentionally uses memory only.
 
 ## Source Modules
 
 - `apps/api` auth delivery and Spring Security configuration
 - `web` login page, session guard, and CSRF-aware API fetch wrapper
+- `mobile` route guard, auth view model, repository, HTTP service, and secure
+  refresh-token store
 
 ## Related Decisions
 
 - [0006 - Web Uses Session Auth First](../../decisions/0006-web-uses-session-auth-first.md)
+- [0014 - Mobile Uses Rotating Token Auth](../../decisions/0014-mobile-uses-rotating-token-auth.md)

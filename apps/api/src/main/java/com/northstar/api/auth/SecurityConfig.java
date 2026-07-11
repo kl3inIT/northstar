@@ -1,7 +1,10 @@
 package com.northstar.api.auth;
+
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,20 +22,28 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.factory.PasswordEncoderFactories;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.util.StringUtils;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @NullMarked
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-@EnableConfigurationProperties(AuthProperties.class)
+@EnableConfigurationProperties({AuthProperties.class, MobileAuthProperties.class})
 class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, AuthProperties auth,
-            SecurityContextRepository securityContextRepository) throws Exception {
+            MobileAuthProperties mobileAuth, SecurityContextRepository securityContextRepository,
+            ObjectProvider<JwtDecoder> jwtDecoderProvider) throws Exception {
+        if (mobileAuth.enabled() && !auth.enabled()) {
+            throw new IllegalStateException("Mobile auth requires northstar.auth.enabled=true");
+        }
         if (!auth.enabled()) {
             return http
                     .csrf(AbstractHttpConfigurer::disable)
@@ -40,12 +51,27 @@ class SecurityConfig {
                     .build();
         }
 
+        if (StringUtils.hasText(mobileAuth.webPreviewOrigin())) {
+            CorsConfiguration corsConfiguration = new CorsConfiguration();
+            corsConfiguration.setAllowedOrigins(List.of(mobileAuth.webPreviewOrigin()));
+            corsConfiguration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+            corsConfiguration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+            corsConfiguration.setMaxAge(3600L);
+            UrlBasedCorsConfigurationSource corsSource = new UrlBasedCorsConfigurationSource();
+            corsSource.registerCorsConfiguration("/api/**", corsConfiguration);
+            http.cors(cors -> cors.configurationSource(corsSource));
+        }
+
         http
-                .csrf(csrf -> csrf.spa())
+                .csrf(csrf -> csrf
+                        .spa()
+                        .ignoringRequestMatchers("/api/auth/mobile/**"))
                 .securityContext(securityContext -> securityContext.securityContextRepository(securityContextRepository))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/auth/csrf").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/auth/mobile/login", "/api/auth/mobile/refresh",
+                                "/api/auth/mobile/logout").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/v3/api-docs", "/v3/api-docs/**")
                         .permitAll()
                         .requestMatchers("/", "/index.html", "/assets/**", "/logo.png", "/favicon.ico").permitAll()
@@ -58,6 +84,14 @@ class SecurityConfig {
                                 writeProblem(response, HttpStatus.UNAUTHORIZED, "Authentication required"))
                         .accessDeniedHandler((request, response, exception) ->
                                 writeProblem(response, HttpStatus.FORBIDDEN, "Access denied")));
+
+        if (mobileAuth.enabled()) {
+            JwtDecoder decoder = jwtDecoderProvider.getIfAvailable();
+            if (decoder == null) {
+                throw new IllegalStateException("Mobile auth is enabled but no JwtDecoder is configured");
+            }
+            http.oauth2ResourceServer(resourceServer -> resourceServer.jwt(jwt -> jwt.decoder(decoder)));
+        }
 
         return http.build();
     }

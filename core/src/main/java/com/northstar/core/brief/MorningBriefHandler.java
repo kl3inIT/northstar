@@ -50,7 +50,7 @@ public class MorningBriefHandler implements AutomationHandler<MorningBriefConfig
 
     @Override
     public String displayName() {
-        return "Morning brief";
+        return "Morning Brief";
     }
 
     @Override

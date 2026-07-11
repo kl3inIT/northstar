@@ -64,3 +64,16 @@ facts here.
 - Before typing unfamiliar symbols on the current stack, follow
   [docs/guidelines/agent-safety.md](./docs/guidelines/agent-safety.md).
 - For current library/framework documentation, use Context7 instead of memory.
+
+## Flutter Mobile And AI
+
+- For changes under `mobile/`, read
+  [`.agent/rules/flutter-dart.md`](./.agent/rules/flutter-dart.md) before editing.
+- Use the task-specific Flutter and Dart skills in `.agents/skills/`; compatible
+  agents discover that directory through the universal Agent Skills format.
+- For AI-powered mobile features, use the `flutter-build-ai-features` skill and
+  keep provider keys, model orchestration, authorization, and action tools on
+  the Northstar backend.
+- The project-local Dart and Flutter MCP server is configured in `.mcp.json` for
+  Claude-compatible clients and `.codex/config.toml` for Codex. Restart or open
+  a new agent session after changing MCP configuration.

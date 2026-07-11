@@ -26,9 +26,10 @@ The single user is configured by environment:
 
 The repository never stores plaintext passwords.
 
-Flutter/mobile authentication is deferred. When the mobile client starts, it
-should get a separate token flow with short-lived access tokens and refresh
-rotation instead of reusing browser storage patterns.
+Flutter/mobile authentication is a separate concern. Its short-lived access
+tokens and refresh rotation are specified by
+[0014 - Mobile Uses Rotating Token Auth](0014-mobile-uses-rotating-token-auth.md),
+without changing this browser decision.
 
 ## Consequences
 
@@ -37,4 +38,4 @@ deployment operations for a personal system. API tests can disable auth by
 default and keep focused domain coverage, while auth behavior is covered in its
 own integration test.
 
-Mobile remains a future design decision rather than a half-built token system.
+Mobile credentials never enter the browser session or browser storage model.

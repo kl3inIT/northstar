@@ -1,0 +1,4 @@
+interface:
+  display_name: "Flutter AI Best Practices"
+  short_description: "Build guarded AI features in Flutter apps"
+  default_prompt: "Use $flutter-build-ai-features to design a reliable AI-powered Flutter feature with structured output and guardrails."
