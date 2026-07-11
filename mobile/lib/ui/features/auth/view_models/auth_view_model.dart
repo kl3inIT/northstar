@@ -74,4 +74,11 @@ class AuthViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void expireSession() {
+    _session = null;
+    _errorMessage = null;
+    _status = AuthStatus.signedOut;
+    notifyListeners();
+  }
 }

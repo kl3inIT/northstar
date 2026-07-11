@@ -110,7 +110,7 @@ inventing weaknesses. Malformed stored error JSON is skipped, never fatal.
 
 - `/study` has three tabs. Log: weekly stat strip, mock-trend line chart
   (score percentage per mock, one line per skill, hidden until two scored
-  mocks exist), skill/kind filters, sessions table with edit/delete. 
+  mocks exist), skill/kind filters, sessions table with edit/delete.
   Vocabulary: tracked/at-risk/new-this-week stats, search across word,
   meaning, and reading, table sorted most-at-risk first with suspended cards
   last, pause/resume/edit/delete. Writing: essays graded, latest estimate,

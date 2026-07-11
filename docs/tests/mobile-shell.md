@@ -17,6 +17,18 @@
 | Flutter static analysis and Web release compilation | `flutter analyze`, `flutter build web --release` | Covered |
 | Linux format/analyze/test/Web build | Path-scoped `Mobile CI` workflow on GitHub-hosted Ubuntu | Covered; first hosted run passed in Actions run `29144303486` |
 | Android debug APK compilation | `Mobile CI` Ubuntu job uploads a seven-day review artifact | Covered; `northstar-android-debug` uploaded successfully in run `29144303486` |
-| Unsigned iOS release compilation | `Mobile CI` macOS job uploads `Runner.app` without signing secrets | Covered; `northstar-ios-unsigned` uploaded successfully in run `29144303486` |
+| Sideloadly IPA packaging | macOS job validates `Payload/Runner.app`, bundle ID, ZIP integrity, and SHA-256 then uploads `northstar-ios-sideloadly` without signing secrets | Covered locally by workflow lint; hosted run pending this commit |
+| Assistant waiting state before first SSE frame | ViewModel and compact widget tests | Covered |
+| Assistant partial text and tool progress | ViewModel and widget tests with controlled streams | Covered |
+| Assistant failure, retry affordance, and stop | ViewModel and widget tests | Covered |
+| Assistant history and expanded conversation sidebar | Unit test plus widget test at 1024x768 | Covered |
+| Assistant Markdown remains readable on dark Cupertino surfaces | Dark-mode widget contrast assertion plus real Chromium dark-mode render | Covered |
+| Assistant SSE parsing and one-time 401 refresh | Service unit tests with streamed HTTP responses | Covered |
+| Capture opens from Assistant as a focused route without the tab bar | Widget interaction test | Covered |
+| Capture text draft, edit, explicit save, and undo affordance | Repository, ViewModel, and compact widget tests | Covered |
+| Receipt multipart upload and reviewed batch undo | Service and repository tests | Covered |
+| Receipt finance fields remain visible in dark mode | Widget test at 390x844 | Covered |
+| Capture against a real local API | Chromium walkthrough at 390x844: draft `200`, note create `201`, undo `204` | Covered |
 | Native iOS rendering and VoiceOver | Requires signed build on an iPhone | Gap |
+| Sideloadly install and live production API login | Requires the generated IPA, Apple ID signing, and an iPhone | Gap |
 | Android device rendering and TalkBack | Requires attached emulator/device | Gap |

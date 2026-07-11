@@ -20,6 +20,8 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Cupertino mobile shell | Done | Semantic design tokens, Cupertino-only app root, five compact tabs, expanded sidebar, Assistant landing, widget previews, compact/expanded tests, and real Web render validation. |
 | Mobile token authentication and routing | Done | Separate bearer/refresh protocol, hashed rotating refresh families, replay revocation, Keychain/Android secure storage, Cupertino login, and guarded `go_router` branches. Native device accessibility validation remains. |
 | Mobile CI | Done | Path-scoped Linux quality/Web/Android gate and macOS unsigned iOS build pass on GitHub-hosted runners and publish seven-day review artifacts. |
+| iOS Sideload IPA and mobile Assistant | Done | CI packages a checksum-verified unsigned IPA for Sideloadly; Flutter provides authenticated SSE chat with Cupertino builders, history, waiting, partial text, tool progress, stop, failure, and retry. Native install validation remains. |
+| Reviewed Mobile Capture | Done | Focused Cupertino flow for text and receipt-image drafts, editable review, explicit note/task/event/expense writes, batch-safe undo, shared token refresh, compact/dark tests, and a real local API walkthrough. Voice capture and native-device validation remain. |
 | Study tutor V1 | Done | Capture-first study log with weekly summary and mock trend, vocab SRS on Ebisu recall probability reviewed through chat, writing tutor with sourced anchored grading + evaluator loop + error corpus, `/study` page, assistant/MCP tools, weekly review facts. Brief section, speaking assessment, and bulk imports remain deferred. |
 | Today dashboard | Deferred | Assistant/chat is the daily cockpit for composing tasks, calendar, projects, finance, and review context. Revisit only if a zero-prompt glance surface becomes necessary. |
 | Repository documentation harness | In progress | Apply repo-as-system-of-record structure and consolidate existing guidance. |
@@ -34,6 +36,6 @@ This file tracks delivery status. Increment descriptions and rationale live in
 - Scholarship/university research workflows.
 - Habit tracking and streaks.
 - Couple/shared workspace with privacy.
-- Mobile product API integration, Assistant streaming, and production flows.
+- Remaining mobile product API integrations and production device flows.
 - Stronger automated/live UI coverage matrix.
 - More complete per-domain specs and tests as future increments touch them.

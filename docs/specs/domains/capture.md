@@ -23,6 +23,15 @@
 - Receipt images follow a forced multimodal expense path and are not stored.
 - The web persists the shaped entity and shows an undo action. Expense items are
   written in one batch and the echo names every amount and category.
+- Mobile opens Capture as a focused route from Assistant instead of adding a
+  permanent tab. Text and a system-picked receipt image produce an untrusted,
+  editable draft; no entity is written before kind-specific confirmation.
+- Mobile shows the consequential expense fields before saving, writes all
+  receipt items as one reviewed action, and can undo every entity created by
+  that action. A failed undo remains visible and retryable.
+- Mobile voice capture is deferred until its recording, permission,
+  interruption, and transcription lifecycle can be delivered as a separate
+  increment.
 - The `core.capture` module stays provider-agnostic; the delivering app wires
   the `ChatClient` and transcription model.
 
@@ -36,6 +45,8 @@ without adding per-domain entry forms.
 - `core.capture`
 - `apps/api.capture`
 - `web/src/pages/capture.tsx`
+- `mobile/lib/ui/features/capture`
+- `mobile/lib/data/repositories/capture_repository.dart`
 
 ## Related Specs
 
