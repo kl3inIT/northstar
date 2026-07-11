@@ -7,6 +7,7 @@ import rehypeSlug from 'rehype-slug'
 import { defaultRehypePlugins, defaultRemarkPlugins, Streamdown } from 'streamdown'
 import { remarkHighlight } from '@/lib/remark-highlight'
 import type { NoteRef } from '@/lib/notes-types'
+import { cn } from '@/lib/utils'
 
 const WIKI = /\[\[\s*([^\]|]+?)\s*(?:\|\s*([^\]]*?)\s*)?\]\]/g
 
@@ -74,16 +75,18 @@ export function MarkdownBody({
   content,
   links,
   suppressFirstHeading,
+  className,
 }: {
   content: string
   links: NoteRef[]
   suppressFirstHeading?: string
+  className?: string
 }) {
   const byTitle = new Map(links.map((link) => [link.title.toLowerCase(), link]))
   const renderedContent = withoutDuplicateFirstHeading(content, suppressFirstHeading)
 
   return (
-    <div className="northstar-markdown text-[0.95rem] leading-7 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_:is(h1,h2,h3,h4)]:scroll-mt-4">
+    <div className={cn('northstar-markdown text-[0.95rem] leading-7 [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_mark]:rounded [&_mark]:bg-primary/20 [&_mark]:px-0.5 [&_:is(h1,h2,h3,h4)]:scroll-mt-4', className)}>
       <Streamdown
         plugins={plugins}
         parseIncompleteMarkdown={false}

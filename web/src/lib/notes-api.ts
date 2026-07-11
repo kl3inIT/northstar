@@ -94,6 +94,17 @@ export function useNoteIndex() {
   })
 }
 
+/** Morning Brief artifacts across all MFI states, newest issue first. */
+export function useBriefNotes() {
+  return useQuery({
+    queryKey: ['notes', 'briefs'],
+    queryFn: async () => (await listNotes())
+      .filter((note) => note.folderPath === 'Briefs' && note.tags.includes('morning-brief'))
+      .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt)),
+    staleTime: 30_000,
+  })
+}
+
 /** Badge count for the staging review queue (sidebar + tab) — total only, not the rows. */
 export function useStagingCount(enabled = true) {
   return useQuery({

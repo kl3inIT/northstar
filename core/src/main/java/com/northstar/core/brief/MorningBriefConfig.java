@@ -9,18 +9,62 @@ public record MorningBriefConfig(
         List<String> topics,
         List<String> queries,
         List<String> blockedDomains,
-        boolean saveAsNote) {
+        boolean saveAsNote,
+        List<String> sourceIds,
+        List<String> githubRepositories,
+        List<String> feedUrls,
+        List<String> blueskyHandles,
+        Integer firecrawlCreditBudget) {
+
+    private static final List<String> DEFAULT_SOURCES = List.of(
+            "github", "rss", "hacker-news", "bluesky", "firecrawl");
+    private static final List<String> DEFAULT_REPOSITORIES = List.of(
+            "openai/codex",
+            "anthropics/claude-code",
+            "flutter/flutter",
+            "dart-lang/sdk",
+            "spring-projects/spring-ai",
+            "facebook/react");
+    private static final List<String> DEFAULT_FEEDS = List.of(
+            "https://openai.com/news/rss.xml",
+            "https://simonwillison.net/atom/everything/",
+            "https://github.blog/feed/",
+            "https://spring.io/blog.atom",
+            "https://react.dev/rss.xml",
+            "https://inside.java/feed.xml");
+    private static final List<String> DEFAULT_BLUESKY_HANDLES = List.of(
+            "bcherny.bsky.social",
+            "simonwillison.net",
+            "gergely.pragmaticengineer.com",
+            "addyosmani.bsky.social");
 
     public MorningBriefConfig {
         language = language == null ? "" : language.strip();
         topics = clean(topics);
         queries = clean(queries);
         blockedDomains = clean(blockedDomains).stream().map(String::toLowerCase).toList();
+        sourceIds = sourceIds == null ? DEFAULT_SOURCES : clean(sourceIds).stream()
+                .map(String::toLowerCase).toList();
+        githubRepositories = githubRepositories == null ? DEFAULT_REPOSITORIES : clean(githubRepositories);
+        feedUrls = feedUrls == null ? DEFAULT_FEEDS : clean(feedUrls);
+        blueskyHandles = blueskyHandles == null ? DEFAULT_BLUESKY_HANDLES : clean(blueskyHandles).stream()
+                .map(String::toLowerCase).toList();
+        firecrawlCreditBudget = firecrawlCreditBudget == null || firecrawlCreditBudget == 0
+                ? 25 : firecrawlCreditBudget;
+    }
+
+    /** Compatibility constructor for persisted V1 configs and focused tests. */
+    public MorningBriefConfig(String language, int lookbackHours, int maxItems, List<String> topics,
+            List<String> queries, List<String> blockedDomains, boolean saveAsNote) {
+        this(language, lookbackHours, maxItems, topics, queries, blockedDomains, saveAsNote,
+                null, null, null, null, 25);
     }
 
     public static MorningBriefConfig defaults() {
         return new MorningBriefConfig("vi", 24, 6,
-                List.of("AI agents", "Java", "Spring AI"), List.of(), List.of(), true);
+                List.of("AI agents", "Claude Code", "Codex", "Flutter", "Dart", "Java", "Spring AI", "React"),
+                List.of(), List.of(), true, DEFAULT_SOURCES, DEFAULT_REPOSITORIES,
+                DEFAULT_FEEDS, DEFAULT_BLUESKY_HANDLES, 25);
     }
 
     private static List<String> clean(List<String> values) {

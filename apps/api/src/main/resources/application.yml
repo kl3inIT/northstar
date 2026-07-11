@@ -109,13 +109,18 @@ northstar:
     title:
       enabled: true
       model: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
+  study:
+    # Writing-grader model, stored on every writing_feedback row: band
+    # estimates from different models are not comparable, so the trend chart
+    # needs to know which produced each one. Change deliberately.
+    grader-model: ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
   web:
     enabled: ${NORTHSTAR_WEB_ENABLED:true}
     default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}
     default-page-reader: ${NORTHSTAR_WEB_PAGE_READER:direct}
     fallback-enabled: false
     search-fallback-order: []
-    page-reader-fallback-order: []
+    page-reader-fallback-order: [firecrawl]
     cache-ttl: 15m
     cache-max-size: 200
     openai:
@@ -130,6 +135,13 @@ northstar:
       max-redirects: 4
       connect-timeout: 5s
       request-timeout: 10s
+    firecrawl:
+      base-url: https://api.firecrawl.dev
+      api-key: ${FIRECRAWL_API_KEY:}
+      max-response-bytes: 2097152
+      max-characters: 40000
+      connect-timeout: 5s
+      request-timeout: 60s
 
 server:
   port: ${NORTHSTAR_API_PORT:8888}

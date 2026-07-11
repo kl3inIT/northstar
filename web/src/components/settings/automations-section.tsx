@@ -1,9 +1,11 @@
+import { Link } from '@tanstack/react-router'
 import { useMemo, useState, type ReactNode, type SyntheticEvent } from 'react'
 import {
   CalendarClock,
   ChevronDown,
   ChevronUp,
   Clock3,
+  ExternalLink,
   FileText,
   History,
   Loader2,
@@ -22,7 +24,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
@@ -36,7 +37,16 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import {
   useAutomationRuns,
@@ -67,6 +77,11 @@ interface MorningBriefForm {
   queries: string
   blockedDomains: string
   saveAsNote: boolean
+  sourceIds: string[]
+  githubRepositories: string
+  feedUrls: string
+  blueskyHandles: string
+  firecrawlCreditBudget: number
 }
 
 interface NewAutomationTarget {
@@ -89,6 +104,19 @@ const DAYS: Array<{ value: Day; short: string }> = [
 ]
 
 const DEFAULT_DAYS = DAYS.map((day) => day.value)
+
+const BRIEF_SOURCES = [
+  { id: 'github', label: 'GitHub' },
+  { id: 'rss', label: 'RSS / Atom' },
+  { id: 'hacker-news', label: 'Hacker News' },
+  { id: 'bluesky', label: 'Bluesky' },
+  { id: 'firecrawl', label: 'Firecrawl' },
+] as const
+
+const DEFAULT_BRIEF_SOURCE_IDS = BRIEF_SOURCES.map((source) => source.id)
+const DEFAULT_REPOSITORIES = ['openai/codex', 'anthropics/claude-code', 'flutter/flutter', 'dart-lang/sdk', 'spring-projects/spring-ai', 'facebook/react']
+const DEFAULT_FEEDS = ['https://openai.com/news/rss.xml', 'https://simonwillison.net/atom/everything/', 'https://github.blog/feed/', 'https://spring.io/blog.atom', 'https://react.dev/rss.xml', 'https://inside.java/feed.xml']
+const DEFAULT_BLUESKY_HANDLES = ['bcherny.bsky.social', 'simonwillison.net', 'gergely.pragmaticengineer.com', 'addyosmani.bsky.social']
 
 export function AutomationsSection() {
   const automations = useAutomations()
@@ -356,7 +384,6 @@ function AutomationTypePicker({
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{descriptor.displayName}</span>
-                      <Badge variant="outline">v{descriptor.configVersion}</Badge>
                     </span>
                     <span className="mt-1 block text-sm leading-relaxed text-muted-foreground">{descriptor.description}</span>
                   </span>
@@ -379,6 +406,14 @@ function RunRow({ run }: { run: AutomationRun }) {
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground">{run.runKind === 'MANUAL' ? 'Manual' : 'Scheduled'}</span>
         <Badge variant={run.status === 'FAILED' ? 'destructive' : 'outline'}>{statusLabel(run.status)}</Badge>
+        {run.outputType === 'NOTE' && run.outputId && (
+          <Button asChild variant="ghost" size="xs">
+            <Link to="/briefs">
+              Open
+              <ExternalLink className="size-3" />
+            </Link>
+          </Button>
+        )}
       </div>
     </div>
   )
@@ -401,148 +436,203 @@ function AutomationEditor({
 }) {
   const initial = useMemo(() => formFrom(target), [target])
   const [form, setForm] = useState(initial)
+  const [tab, setTab] = useState('schedule')
   const creating = target !== null && isNewTarget(target)
   const type = creating ? target.descriptor : descriptor
 
   function submit(event: SyntheticEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form.name.trim()) return toast.error('Name is required')
-    if (!form.time) return toast.error('Schedule time is required')
-    if (!form.timezone.trim()) return toast.error('Timezone is required')
-    if (!form.days.length) return toast.error('Choose at least one day')
-    if (!lines(form.topics).length && !lines(form.queries).length) {
-      return toast.error('Add at least one topic or search query')
+    if (!form.name.trim()) {
+      setTab('schedule')
+      return toast.error('Name is required')
+    }
+    if (!form.time || !form.timezone.trim() || !form.days.length) {
+      setTab('schedule')
+      return toast.error('Complete the schedule')
+    }
+    if (!form.sourceIds.length) {
+      setTab('sources')
+      return toast.error('Enable at least one source')
     }
     onSubmit(form)
   }
 
+  function toggleSource(sourceId: string, enabled: boolean) {
+    setForm({
+      ...form,
+      sourceIds: enabled
+        ? [...form.sourceIds, sourceId]
+        : form.sourceIds.filter((value) => value !== sourceId),
+    })
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-2xl"
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        className="w-full gap-0 p-0 sm:max-w-3xl"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
-        <DialogHeader>
-          <DialogTitle>{creating ? `New ${type?.displayName ?? 'automation'}` : `Edit ${type?.displayName ?? 'automation'}`}</DialogTitle>
-          <DialogDescription>{type?.description ?? 'Configure this scheduled workflow.'}</DialogDescription>
-        </DialogHeader>
-
-        <form id="automation-form" className="space-y-6" onSubmit={submit}>
-          <div className="flex items-center gap-3 rounded-md border px-3 py-2.5">
-            <Newspaper className="size-4 text-muted-foreground" />
-            <div className="min-w-0 flex-1">
-              <p className="text-xs text-muted-foreground">Type</p>
-              <p className="truncate text-sm font-medium">{type?.displayName ?? MORNING_BRIEF_TYPE}</p>
-            </div>
-            {type && <Badge variant="outline">v{type.configVersion}</Badge>}
-          </div>
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-            <Field label="Name" htmlFor="automation-name">
-              <Input
-                id="automation-name"
-                value={form.name}
-                maxLength={160}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-              />
-            </Field>
-            <div className="flex h-9 items-center gap-2">
-              <Switch checked={form.enabled} onCheckedChange={(enabled) => setForm({ ...form, enabled })} id="automation-enabled" />
-              <Label htmlFor="automation-enabled">Enabled</Label>
+        <SheetHeader className="border-b px-5 py-4 sm:px-6">
+          <div className="flex items-center gap-3 pr-8">
+            <span className="grid size-9 shrink-0 place-items-center rounded-md bg-muted">
+              <Newspaper className="size-4 text-muted-foreground" />
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <SheetTitle>{creating ? `New ${type?.displayName ?? 'automation'}` : `Edit ${type?.displayName ?? 'automation'}`}</SheetTitle>
+              </div>
+              <SheetDescription>{type?.description ?? 'Configure this scheduled workflow.'}</SheetDescription>
             </div>
           </div>
+        </SheetHeader>
 
-          <div>
-            <p className="mb-3 text-sm font-medium">Schedule</p>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Time" htmlFor="automation-time">
-                <Input id="automation-time" type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} />
-              </Field>
-              <Field label="Timezone" htmlFor="automation-timezone">
-                <Input id="automation-timezone" value={form.timezone} onChange={(event) => setForm({ ...form, timezone: event.target.value })} />
-              </Field>
-            </div>
-            <div className="mt-4">
-              <Label>Days</Label>
-              <div className="mt-2 grid grid-cols-4 gap-1 sm:grid-cols-7">
-                {DAYS.map((day) => {
-                  const selected = form.days.includes(day.value)
-                  return (
-                    <Button
-                      key={day.value}
-                      type="button"
-                      size="sm"
-                      variant={selected ? 'secondary' : 'outline'}
-                      aria-pressed={selected}
-                      onClick={() => setForm({
+        <Tabs value={tab} onValueChange={setTab} className="min-h-0 flex-1 gap-0">
+          <div className="border-b px-5 sm:px-6">
+            <TabsList variant="line" className="h-11 w-full justify-start">
+              <TabsTrigger value="schedule">Schedule</TabsTrigger>
+              <TabsTrigger value="content">Content</TabsTrigger>
+              <TabsTrigger value="sources">Sources</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <form id="automation-form" className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6" onSubmit={submit}>
+            <TabsContent value="schedule" className="space-y-6">
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <Field label="Name" htmlFor="automation-name">
+                  <Input id="automation-name" value={form.name} maxLength={160} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+                </Field>
+                <div className="flex h-9 items-center gap-2">
+                  <Switch checked={form.enabled} onCheckedChange={(enabled) => setForm({ ...form, enabled })} id="automation-enabled" />
+                  <Label htmlFor="automation-enabled">Enabled</Label>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Time" htmlFor="automation-time">
+                  <Input id="automation-time" type="time" value={form.time} onChange={(event) => setForm({ ...form, time: event.target.value })} />
+                </Field>
+                <Field label="Timezone" htmlFor="automation-timezone">
+                  <Input id="automation-timezone" value={form.timezone} onChange={(event) => setForm({ ...form, timezone: event.target.value })} />
+                </Field>
+              </div>
+
+              <div>
+                <Label>Days</Label>
+                <div className="mt-2 grid grid-cols-4 gap-1 sm:grid-cols-7">
+                  {DAYS.map((day) => {
+                    const selected = form.days.includes(day.value)
+                    return (
+                      <Button key={day.value} type="button" size="sm" variant={selected ? 'secondary' : 'outline'} aria-pressed={selected} onClick={() => setForm({
                         ...form,
                         days: selected ? form.days.filter((value) => value !== day.value) : [...form.days, day.value],
-                      })}
-                    >
-                      {day.short}
-                    </Button>
-                  )
-                })}
+                      })}>
+                        {day.short}
+                      </Button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          </div>
 
-          <Separator />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Topics" htmlFor="automation-topics" hint="One per line. Used to generate search queries.">
-              <Textarea id="automation-topics" rows={5} value={form.topics} onChange={(event) => setForm({ ...form, topics: event.target.value })} placeholder={'AI agents\nJava\nSpring AI'} />
-            </Field>
-            <Field label="Exact search queries" htmlFor="automation-queries" hint="Optional. When present, these replace topic-generated queries.">
-              <Textarea id="automation-queries" rows={5} value={form.queries} onChange={(event) => setForm({ ...form, queries: event.target.value })} placeholder="Latest Java platform announcements" />
-            </Field>
-          </div>
+              <div className="flex items-center justify-between gap-4 border-y py-4">
+                <div>
+                  <Label htmlFor="automation-save-note">Save as note</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">Store each completed brief in the review queue.</p>
+                </div>
+                <Switch id="automation-save-note" checked={form.saveAsNote} onCheckedChange={(saveAsNote) => setForm({ ...form, saveAsNote })} />
+              </div>
+            </TabsContent>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Language" htmlFor="automation-language">
-              <Select value={form.language} onValueChange={(language) => setForm({ ...form, language })}>
-                <SelectTrigger id="automation-language"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="vi">Vietnamese</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Lookback" htmlFor="automation-lookback">
-              <Select value={String(form.lookbackHours)} onValueChange={(value) => setForm({ ...form, lookbackHours: Number(value) })}>
-                <SelectTrigger id="automation-lookback"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="24">Past 24 hours</SelectItem>
-                  <SelectItem value="72">Past 3 days</SelectItem>
-                  <SelectItem value="168">Past week</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Maximum sources" htmlFor="automation-max-items">
-              <Input id="automation-max-items" type="number" min={1} max={10} value={form.maxItems} onChange={(event) => setForm({ ...form, maxItems: Number(event.target.value) })} />
-            </Field>
-          </div>
+            <TabsContent value="content" className="space-y-6">
+              <Field label="Topics" htmlFor="automation-topics" hint="One topic per line.">
+                <Textarea id="automation-topics" rows={10} value={form.topics} onChange={(event) => setForm({ ...form, topics: event.target.value })} placeholder={'AI agents\nJava\nSpring AI'} />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="Language" htmlFor="automation-language">
+                  <Select value={form.language} onValueChange={(language) => setForm({ ...form, language })}>
+                    <SelectTrigger id="automation-language"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="vi">Vietnamese</SelectItem><SelectItem value="en">English</SelectItem></SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Lookback" htmlFor="automation-lookback">
+                  <Select value={String(form.lookbackHours)} onValueChange={(value) => setForm({ ...form, lookbackHours: Number(value) })}>
+                    <SelectTrigger id="automation-lookback"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="24">Past 24 hours</SelectItem><SelectItem value="72">Past 3 days</SelectItem><SelectItem value="168">Past week</SelectItem></SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Maximum items" htmlFor="automation-max-items">
+                  <Input id="automation-max-items" type="number" min={1} max={20} value={form.maxItems} onChange={(event) => setForm({ ...form, maxItems: Number(event.target.value) })} />
+                </Field>
+              </div>
+            </TabsContent>
 
-          <Field label="Blocked domains" htmlFor="automation-blocked" hint="Optional, one domain per line.">
-            <Textarea id="automation-blocked" rows={2} value={form.blockedDomains} onChange={(event) => setForm({ ...form, blockedDomains: event.target.value })} placeholder={'example.com\nspam.example'} />
-          </Field>
+            <TabsContent value="sources" className="space-y-3">
+              <SourcePanel label="GitHub releases" enabled={form.sourceIds.includes('github')} onEnabledChange={(enabled) => toggleSource('github', enabled)}>
+                <Field label="Repositories" htmlFor="automation-repositories" hint="owner/repository, one per line">
+                  <Textarea id="automation-repositories" rows={6} value={form.githubRepositories} onChange={(event) => setForm({ ...form, githubRepositories: event.target.value })} />
+                </Field>
+              </SourcePanel>
+              <SourcePanel label="RSS / Atom" enabled={form.sourceIds.includes('rss')} onEnabledChange={(enabled) => toggleSource('rss', enabled)}>
+                <Field label="Feed URLs" htmlFor="automation-feeds" hint="Public HTTPS URL, one per line">
+                  <Textarea id="automation-feeds" rows={7} value={form.feedUrls} onChange={(event) => setForm({ ...form, feedUrls: event.target.value })} />
+                </Field>
+              </SourcePanel>
+              <SourcePanel label="Hacker News" enabled={form.sourceIds.includes('hacker-news')} onEnabledChange={(enabled) => toggleSource('hacker-news', enabled)} />
+              <SourcePanel label="Bluesky people" enabled={form.sourceIds.includes('bluesky')} onEnabledChange={(enabled) => toggleSource('bluesky', enabled)}>
+                <Field label="Handles" htmlFor="automation-bluesky" hint="Verified handle, one per line">
+                  <Textarea id="automation-bluesky" rows={5} value={form.blueskyHandles} onChange={(event) => setForm({ ...form, blueskyHandles: event.target.value })} />
+                </Field>
+              </SourcePanel>
+              <SourcePanel label="Firecrawl fallback" enabled={form.sourceIds.includes('firecrawl')} onEnabledChange={(enabled) => toggleSource('firecrawl', enabled)}>
+                <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_12rem]">
+                  <Field label="Exact queries" htmlFor="automation-queries" hint="Leave empty to generate queries from topics.">
+                    <Textarea id="automation-queries" rows={5} value={form.queries} onChange={(event) => setForm({ ...form, queries: event.target.value })} />
+                  </Field>
+                  <Field label="Credit estimate" htmlFor="automation-firecrawl-budget" hint="5–50 per run">
+                    <Input id="automation-firecrawl-budget" type="number" min={5} max={50} value={form.firecrawlCreditBudget} onChange={(event) => setForm({ ...form, firecrawlCreditBudget: Number(event.target.value) })} />
+                  </Field>
+                </div>
+              </SourcePanel>
+              <div className="pt-3">
+                <Field label="Blocked domains" htmlFor="automation-blocked" hint="Optional, one domain per line.">
+                  <Textarea id="automation-blocked" rows={3} value={form.blockedDomains} onChange={(event) => setForm({ ...form, blockedDomains: event.target.value })} placeholder={'example.com\nspam.example'} />
+                </Field>
+              </div>
+            </TabsContent>
+          </form>
+        </Tabs>
 
-          <div className="flex items-center justify-between gap-4 border-y py-4">
-            <div>
-              <Label htmlFor="automation-save-note">Save as note</Label>
-              <p className="mt-1 text-xs text-muted-foreground">Adds each brief to Briefs in Staging for review.</p>
-            </div>
-            <Switch id="automation-save-note" checked={form.saveAsNote} onCheckedChange={(saveAsNote) => setForm({ ...form, saveAsNote })} />
-          </div>
-        </form>
-
-        <DialogFooter>
+        <SheetFooter className="border-t px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button type="submit" form="automation-form" disabled={busy}>
             {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             Save automation
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+function SourcePanel({
+  label,
+  enabled,
+  onEnabledChange,
+  children,
+}: {
+  label: string
+  enabled: boolean
+  onEnabledChange: (enabled: boolean) => void
+  children?: ReactNode
+}) {
+  const id = `source-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+  return (
+    <section className="rounded-md border">
+      <div className="flex min-h-14 items-center justify-between gap-4 px-4 py-3">
+        <Label htmlFor={id} className="font-medium">{label}</Label>
+        <Switch id={id} checked={enabled} onCheckedChange={onEnabledChange} />
+      </div>
+      {enabled && children && <div className="border-t px-4 py-4">{children}</div>}
+    </section>
   )
 }
 
@@ -572,6 +662,11 @@ function formFrom(target: AutomationEditorTarget | null): MorningBriefForm {
       queries: stringList(config.queries).join('\n'),
       blockedDomains: stringList(config.blockedDomains).join('\n'),
       saveAsNote: typeof config.saveAsNote === 'boolean' ? config.saveAsNote : true,
+      sourceIds: stringListOr(config.sourceIds, DEFAULT_BRIEF_SOURCE_IDS),
+      githubRepositories: stringListOr(config.githubRepositories, DEFAULT_REPOSITORIES).join('\n'),
+      feedUrls: stringListOr(config.feedUrls, DEFAULT_FEEDS).join('\n'),
+      blueskyHandles: stringListOr(config.blueskyHandles, DEFAULT_BLUESKY_HANDLES).join('\n'),
+      firecrawlCreditBudget: numberValue(config.firecrawlCreditBudget, 25),
     }
   }
   const config = target.workflowConfig
@@ -588,6 +683,11 @@ function formFrom(target: AutomationEditorTarget | null): MorningBriefForm {
     queries: stringList(config.queries).join('\n'),
     blockedDomains: stringList(config.blockedDomains).join('\n'),
     saveAsNote: typeof config.saveAsNote === 'boolean' ? config.saveAsNote : true,
+    sourceIds: stringListOr(config.sourceIds, DEFAULT_BRIEF_SOURCE_IDS),
+    githubRepositories: stringListOr(config.githubRepositories, DEFAULT_REPOSITORIES).join('\n'),
+    feedUrls: stringListOr(config.feedUrls, DEFAULT_FEEDS).join('\n'),
+    blueskyHandles: stringListOr(config.blueskyHandles, DEFAULT_BLUESKY_HANDLES).join('\n'),
+    firecrawlCreditBudget: numberValue(config.firecrawlCreditBudget, 25),
   }
 }
 
@@ -610,6 +710,11 @@ function request(form: MorningBriefForm) {
       queries: lines(form.queries),
       blockedDomains: lines(form.blockedDomains),
       saveAsNote: form.saveAsNote,
+      sourceIds: form.sourceIds,
+      githubRepositories: lines(form.githubRepositories),
+      feedUrls: lines(form.feedUrls),
+      blueskyHandles: lines(form.blueskyHandles),
+      firecrawlCreditBudget: form.firecrawlCreditBudget,
     },
   }
 }
@@ -628,6 +733,10 @@ function lines(value: string) {
 
 function stringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+}
+
+function stringListOr(value: unknown, fallback: readonly string[]): string[] {
+  return value === undefined || value === null ? [...fallback] : stringList(value)
 }
 
 function stringValue(value: unknown, fallback: string) {

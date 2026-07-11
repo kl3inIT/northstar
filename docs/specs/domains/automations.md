@@ -32,24 +32,46 @@ The API owns automation CRUD and run-now requests. The worker owns execution:
 `scheduled_tasks` is an infrastructure projection and application code accesses
 it only through `SchedulerClient`.
 
-## Morning Brief V1
+## Morning Brief V2
 
-`morning-brief.v1` is the first registered automation handler. Its runtime
-configuration contains language, lookback hours, maximum sources, topics,
-exact queries, blocked domains, and whether to save the result as a note.
-Credentials and provider selection never enter workflow JSON; each run uses the
-effective provider from Web Research Settings.
+`morning-brief.v1` remains the stable type id; its configuration schema is now
+version 2. Runtime configuration contains language, lookback hours, maximum
+items, topics, exact Firecrawl queries, blocked domains, output preference,
+enabled source ids, GitHub repositories, RSS/Atom feeds, Bluesky handles, and a
+Firecrawl credit budget. Credentials never enter workflow JSON.
 
-A run executes at most six searches with at most three concurrent virtual
-threads. Exact queries replace topic-generated queries. Individual query
-failures do not discard successful sections, but the run fails if every search
-fails. Sources are canonicalized, tracking parameters removed for identity,
-deduplicated in deterministic order, and capped before rendering.
+Each run collects GitHub releases, RSS/Atom entries, Hacker News stories,
+Bluesky author feeds, and bounded Firecrawl search results concurrently. Source
+adapters fail independently, and successful sources still produce a brief. The
+run fails only if every enabled source fails. Candidate URLs are canonicalized,
+tracking parameters removed for identity, deduplicated, ranked by trust tier,
+freshness, and community signal, then selected fairly across sources within
+each trust tier before the item cap is applied. Persisted V1 configurations
+that omit new V2 fields receive server defaults during deserialization.
+
+Firecrawl is a discovery fallback rather than the default for every page. It
+runs at most two requests concurrently, uses up to four searches and three
+scraped Markdown results per query, selects the basic proxy, disables PDF
+parsers, and refuses an estimated workflow budget outside 5–50 credits. Actual
+usage is read from Firecrawl's `creditsUsed` response field. It does not use
+Agent, Crawl, JSON extraction, enhanced proxy, or browser interaction. The
+default 25-credit cap keeps one daily automation below 750 estimated credits
+per 30-day month.
+
+Default sources cover Codex, Claude Code, Flutter, Dart, Java, Spring AI, and
+React. X and OpenClaw are not sources. Reddit scraping is not implemented;
+future Reddit access requires its approved OAuth Data API.
 
 The handler renders Markdown itself and optionally upserts a `STAGING` note in
 `Briefs` titled `Morning Brief - <automation name> - <local date>`. Re-running
 the same automation/day updates that note; distinct automation names do not
 overwrite one another.
+
+`/briefs` is the dedicated single-column reading surface for these output
+notes. A compact issue selector sits above a Kibo Typography-derived article
+layout; note working-state labels remain visible and Automation Settings stays
+one action away. Successful run-history entries also link to the Briefs
+surface.
 
 ## Settings Contract
 
@@ -58,9 +80,12 @@ status, a human-readable local schedule, enable switch, run-now, edit, delete,
 and the five most recent runs. Creation begins with a workflow-type catalog
 loaded from `GET /api/automations/types`; choosing a supported type opens its
 type-specific editor with defaults supplied by the handler descriptor. The
-Morning Brief editor configures all V1 trigger and workflow fields without
-exposing raw cron or secrets. The layout is responsive and the editor scrolls
-independently on mobile.
+Morning Brief editor is a full-height Sheet with Schedule, Content, and Sources
+tabs. It configures trigger and workflow fields without exposing raw cron or
+secrets. Each source is enabled with a Switch and reveals a full-width
+repository/feed/person editor; the Firecrawl key and optional GitHub token stay
+in worker environment configuration. The layout is responsive and the Sheet
+body scrolls independently while its actions remain available.
 
 The backend handler registry is runtime-discovered. The web keeps a small
 editor registry keyed by the same stable type id because typed workflow forms
@@ -88,5 +113,7 @@ REST endpoints are:
 - `core.brief`
 - `apps.api.automation`
 - `apps.worker.automation`
+- `apps.worker.brief`
 - `integrations.web-openai`
 - `web/components/settings/automations-section`
+- `web/pages/briefs`

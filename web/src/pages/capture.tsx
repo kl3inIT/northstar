@@ -1,11 +1,13 @@
 import { Link, useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import {
+  BookOpenCheck,
   CalendarDays,
   Camera,
   CheckSquare,
   ExternalLink,
   FileText,
+  GraduationCap,
   Loader2,
   Sparkles,
   Tag,
@@ -27,10 +29,11 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { deleteEvent, useRangeEvents } from '@/lib/calendar-api'
-import { capture, captureReceipt, deleteLedgerEntry, deleteNote, type CaptureKind } from '@/lib/capture-api'
+import { capture, captureReceipt, deleteLedgerEntry, deleteNote, deleteStudyEntry, deleteVocabEntry, type CaptureKind } from '@/lib/capture-api'
 import { MicButton } from '@/components/mic-button'
 import { m } from '@/components/motion-primitives'
 import { useTransactions } from '@/lib/finance-api'
+import { parseVocabMetadata, useStudySessions, useVocabCards } from '@/lib/study-api'
 import { useNotes } from '@/lib/notes-api'
 import { deleteTask, useTodayTasks, useUpcomingTasks, type Task } from '@/lib/tasks-api'
 import { cn } from '@/lib/utils'
@@ -60,6 +63,8 @@ export function CapturePage() {
     queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
     queryClient.invalidateQueries({ queryKey: ['finance'] })
     queryClient.invalidateQueries({ queryKey: ['finance-summary'] })
+    queryClient.invalidateQueries({ queryKey: ['study'] })
+    queryClient.invalidateQueries({ queryKey: ['study-summary'] })
   }
 
   function report(result: Awaited<ReturnType<typeof capture>>) {
@@ -67,6 +72,8 @@ export function CapturePage() {
     const label = result.kind === 'TASK' ? 'Task'
       : result.kind === 'EVENT' ? 'Event'
       : result.kind === 'EXPENSE' ? 'Expense'
+      : result.kind === 'STUDY' ? 'Study'
+      : result.kind === 'VOCAB' ? 'Vocab'
       : 'Note'
     toast.success(
       `${label}: ${result.title}`,
@@ -135,7 +142,7 @@ export function CapturePage() {
             data-capture-input
             value={text}
             onChange={(e) => setText(e.currentTarget.value)}
-            placeholder="Type or paste… a task, note, event, or expense"
+            placeholder="Type or paste… a task, note, event, expense, or study session"
             autoFocus
           />
         </PromptInputBody>
@@ -164,6 +171,18 @@ export function CapturePage() {
               onClick={() => setKind((k) => (k === 'EXPENSE' ? null : 'EXPENSE'))}
             >
               <Wallet className="size-4" /> Add expense
+            </PromptInputButton>
+            <PromptInputButton
+              variant={kind === 'STUDY' ? 'default' : 'ghost'}
+              onClick={() => setKind((k) => (k === 'STUDY' ? null : 'STUDY'))}
+            >
+              <GraduationCap className="size-4" /> Log study
+            </PromptInputButton>
+            <PromptInputButton
+              variant={kind === 'VOCAB' ? 'default' : 'ghost'}
+              onClick={() => setKind((k) => (k === 'VOCAB' ? null : 'VOCAB'))}
+            >
+              <BookOpenCheck className="size-4" /> Save vocab
             </PromptInputButton>
             <PromptInputButton onClick={() => receiptInput.current?.click()}>
               <Camera className="size-4" /> Receipt
@@ -211,6 +230,7 @@ type Row = {
   amount?: number
   txType?: 'EXPENSE' | 'INCOME'
   category?: string
+  studyMeta?: string
   createdAt: string
 }
 
@@ -241,6 +261,14 @@ function eventWindow(): { from: string; to: string } {
   return { from: from.toISOString(), to: to.toISOString() }
 }
 
+/** Last 30 days as yyyy-MM-dd, anchored to the date for a stable query key. */
+function studyWindow(): { from: string; to: string } {
+  const today = new Date()
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return { from: iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() - 29)), to: iso(today) }
+}
+
 /** One unified recent list — a finished capture surfaces at the top of it. */
 function RecentSection({ pending }: { pending: PendingCapture[] }) {
   const { data: notes = [] } = useNotes('')
@@ -249,6 +277,9 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
   const range = eventWindow()
   const { data: events = [] } = useRangeEvents(range.from, range.to)
   const { data: transactions = [] } = useTransactions(currentMonthKey())
+  const studyRange = studyWindow()
+  const { data: studySessions = [] } = useStudySessions(studyRange.from, studyRange.to)
+  const { data: vocabCards = [] } = useVocabCards()
   const [showAll, setShowAll] = useState(false)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -299,7 +330,27 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
     category: t.category,
     createdAt: t.createdAt,
   }))
-  const all = [...taskRows, ...noteRows, ...eventRows, ...expenseRows].sort((a, b) =>
+  const studyRows: Row[] = studySessions.map((s) => ({
+    kind: 'STUDY',
+    key: `s-${s.id}`,
+    id: s.id,
+    title: s.notes ? `${s.skill} · ${s.notes}` : s.skill,
+    studyMeta: [
+      s.durationMinutes != null ? `${s.durationMinutes}m` : null,
+      s.scoreRaw != null && s.scoreMax != null ? `${s.scoreRaw}/${s.scoreMax}` : null,
+      s.kind === 'MOCK' ? 'mock' : null,
+    ].filter(Boolean).join(' · '),
+    createdAt: s.createdAt,
+  }))
+  const vocabRows: Row[] = vocabCards.map((c) => ({
+    kind: 'VOCAB',
+    key: `v-${c.id}`,
+    id: c.id,
+    title: `${c.front} · ${c.back}`,
+    studyMeta: parseVocabMetadata(c.metadata).reading || 'card',
+    createdAt: c.createdAt,
+  }))
+  const all = [...taskRows, ...noteRows, ...eventRows, ...expenseRows, ...studyRows, ...vocabRows].sort((a, b) =>
     b.createdAt.localeCompare(a.createdAt),
   )
   const rows = showAll ? all : all.slice(0, 8)
@@ -311,6 +362,8 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
       navigate({ to: '/calendar' })
     } else if (row.kind === 'EXPENSE') {
       navigate({ to: '/finance' })
+    } else if (row.kind === 'STUDY' || row.kind === 'VOCAB') {
+      navigate({ to: '/study' })
     } else {
       navigate({ to: '/tasks' })
     }
@@ -321,6 +374,8 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
       row.kind === 'TASK' ? deleteTask(row.id)
       : row.kind === 'EVENT' ? deleteEvent(row.id)
       : row.kind === 'EXPENSE' ? deleteLedgerEntry(row.id)
+      : row.kind === 'STUDY' ? deleteStudyEntry(row.id)
+      : row.kind === 'VOCAB' ? deleteVocabEntry(row.id)
       : deleteNote(row.id)
     del
       .then(() => {
@@ -329,6 +384,9 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
         queryClient.invalidateQueries({ queryKey: ['calendar-events'] })
         queryClient.invalidateQueries({ queryKey: ['finance'] })
         queryClient.invalidateQueries({ queryKey: ['finance-summary'] })
+        queryClient.invalidateQueries({ queryKey: ['study'] })
+        queryClient.invalidateQueries({ queryKey: ['study-summary'] })
+        queryClient.invalidateQueries({ queryKey: ['study-vocab'] })
         toast.success(`Deleted “${row.title}”`)
       })
       .catch(() => toast.error('Delete failed — try again.'))
@@ -357,10 +415,10 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
         {rows.map((r, index) => (
           <m.div key={r.key} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(index, 8) * 0.035 }} className="flex items-center gap-3 py-2">
             <Badge
-              variant={r.kind === 'TASK' ? 'default' : r.kind === 'EVENT' || r.kind === 'EXPENSE' ? 'outline' : 'secondary'}
+              variant={r.kind === 'TASK' ? 'default' : r.kind === 'NOTE' ? 'secondary' : 'outline'}
               className="shrink-0"
             >
-              {r.kind === 'TASK' ? 'Task' : r.kind === 'EVENT' ? 'Event' : r.kind === 'EXPENSE' ? 'Expense' : 'Note'}
+              {r.kind === 'TASK' ? 'Task' : r.kind === 'EVENT' ? 'Event' : r.kind === 'EXPENSE' ? 'Expense' : r.kind === 'STUDY' ? 'Study' : r.kind === 'VOCAB' ? 'Vocab' : 'Note'}
             </Badge>
             {r.kind === 'NOTE' && r.slug ? (
               <Link
@@ -395,6 +453,16 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
                   <span className="tabular-nums">
                     {r.txType === 'INCOME' ? '+' : ''}{VND_FMT.format(r.amount ?? 0)} ₫ · {r.category}
                   </span>
+                </>
+              ) : r.kind === 'STUDY' ? (
+                <>
+                  <GraduationCap className="size-3 shrink-0" />
+                  <span className="tabular-nums">{r.studyMeta || 'logged'}</span>
+                </>
+              ) : r.kind === 'VOCAB' ? (
+                <>
+                  <BookOpenCheck className="size-3 shrink-0" />
+                  <span>{r.studyMeta}</span>
                 </>
               ) : (
                 <>
