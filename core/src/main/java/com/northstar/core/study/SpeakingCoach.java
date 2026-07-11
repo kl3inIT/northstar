@@ -93,10 +93,10 @@ public class SpeakingCoach {
 
         AiRoute route = ai.route(AiTask.STUDY_GRADER);
         SpeakingContentFeedback content = callCoach(route, prompt, transcript, delivery, null);
-        String problems = evaluate(content, transcript);
+        String problems = evaluate(content, prompt, transcript, delivery);
         if (problems != null) {
             content = callCoach(route, prompt, transcript, delivery, problems);
-            String remaining = evaluate(content, transcript);
+            String remaining = evaluate(content, prompt, transcript, delivery);
             if (remaining != null) {
                 throw new IllegalStateException("Speaking feedback failed evaluation twice: " + remaining);
             }
@@ -136,11 +136,19 @@ public class SpeakingCoach {
                         ChatClient.EntityParamSpec::useProviderStructuredOutput);
     }
 
-    private String evaluate(SpeakingContentFeedback feedback, String transcript) {
+    private String evaluate(SpeakingContentFeedback feedback, String question, String transcript,
+            SpokenAnswerResult delivery) {
         String structural = structuralProblems(feedback, transcript);
         if (structural != null) return structural;
-        var response = faithfulness.evaluate(new EvaluationRequest(transcript, claims(feedback)));
+        var response = faithfulness.evaluate(new EvaluationRequest(
+                evidence(question, transcript, delivery), claims(feedback)));
         return response.isPass() ? null : response.getFeedback();
+    }
+
+    static String evidence(String question, String transcript, SpokenAnswerResult delivery) {
+        return "Question:\n" + question + "\n\nTranscript:\n" + transcript
+                + "\n\nMeasured delivery (0-100):\npronunciation=" + delivery.pronunciation()
+                + ", fluency=" + delivery.fluency() + ", prosody=" + delivery.prosody();
     }
 
     static String structuralProblems(SpeakingContentFeedback feedback, String transcript) {

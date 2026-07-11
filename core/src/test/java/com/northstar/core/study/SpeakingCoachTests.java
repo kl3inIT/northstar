@@ -30,4 +30,15 @@ class SpeakingCoachTests {
                 .contains("not verbatim")
                 .contains("IELTS band");
     }
+
+    @Test
+    void evaluatorEvidenceIncludesQuestionTranscriptAndMeasuredDelivery() {
+        var delivery = new SpokenAnswerResult("I enjoy learning English.", 82, 76, 71.0, List.of());
+
+        assertThat(SpeakingCoach.evidence("What do you enjoy learning?",
+                delivery.transcript(), delivery))
+                .contains("Question:\nWhat do you enjoy learning?")
+                .contains("Transcript:\nI enjoy learning English.")
+                .contains("pronunciation=82.0, fluency=76.0, prosody=71.0");
+    }
 }
