@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
 import 'package:northstar/ui/core/navigation/northstar_shell.dart';
 import 'package:northstar/ui/features/assistant/views/assistant_landing_view.dart';
+import 'package:northstar/ui/features/assistant/view_models/assistant_view_model.dart';
 import 'package:northstar/ui/features/auth/view_models/auth_view_model.dart';
 import 'package:northstar/ui/features/auth/views/login_view.dart';
 import 'package:northstar/ui/features/more/views/more_view.dart';
@@ -19,7 +20,10 @@ abstract final class NorthstarRoutes {
   static const protected = {assistant, tasks, notes, finance, more};
 }
 
-GoRouter createNorthstarRouter(AuthViewModel auth) {
+GoRouter createNorthstarRouter(
+  AuthViewModel auth,
+  AssistantViewModel assistant,
+) {
   return GoRouter(
     initialLocation: NorthstarRoutes.startup,
     refreshListenable: auth,
@@ -72,7 +76,8 @@ GoRouter createNorthstarRouter(AuthViewModel auth) {
             routes: [
               GoRoute(
                 path: NorthstarRoutes.assistant,
-                builder: (context, state) => const AssistantLandingView(),
+                builder: (context, state) =>
+                    AssistantLandingView(viewModel: assistant),
               ),
             ],
           ),

@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:northstar/data/repositories/assistant_repository.dart';
 import 'package:northstar/data/repositories/auth_repository.dart';
+import 'package:northstar/domain/models/assistant_models.dart';
 import 'package:northstar/domain/models/auth_session.dart';
 import 'package:northstar/ui/core/northstar_app.dart';
 
@@ -10,9 +12,7 @@ void main() {
   ) async {
     _setWindowSize(tester, const Size(390, 844));
 
-    await tester.pumpWidget(
-      NorthstarApp(authRepository: _signedInRepository()),
-    );
+    await tester.pumpWidget(_testApp(_signedInRepository()));
     await tester.pumpAndSettle();
 
     expect(find.byType(CupertinoApp), findsOneWidget);
@@ -31,9 +31,7 @@ void main() {
   ) async {
     _setWindowSize(tester, const Size(1024, 768));
 
-    await tester.pumpWidget(
-      NorthstarApp(authRepository: _signedInRepository()),
-    );
+    await tester.pumpWidget(_testApp(_signedInRepository()));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('northstar-sidebar')), findsOneWidget);
@@ -49,9 +47,7 @@ void main() {
     tester,
   ) async {
     _setWindowSize(tester, const Size(390, 844));
-    await tester.pumpWidget(
-      NorthstarApp(authRepository: _signedInRepository()),
-    );
+    await tester.pumpWidget(_testApp(_signedInRepository()));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(CupertinoIcons.doc_text));
@@ -69,9 +65,7 @@ void main() {
     tester,
   ) async {
     _setWindowSize(tester, const Size(390, 844));
-    await tester.pumpWidget(
-      NorthstarApp(authRepository: _signedInRepository()),
-    );
+    await tester.pumpWidget(_testApp(_signedInRepository()));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(CupertinoIcons.ellipsis_circle));
@@ -90,9 +84,7 @@ void main() {
     tester,
   ) async {
     _setWindowSize(tester, const Size(390, 844));
-    await tester.pumpWidget(
-      NorthstarApp(authRepository: _FakeAuthRepository()),
-    );
+    await tester.pumpWidget(_testApp(_FakeAuthRepository()));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('login-page')), findsOneWidget);
@@ -104,7 +96,7 @@ void main() {
   ) async {
     _setWindowSize(tester, const Size(390, 844));
     final repository = _FakeAuthRepository();
-    await tester.pumpWidget(NorthstarApp(authRepository: repository));
+    await tester.pumpWidget(_testApp(repository));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('username-field')), 'datph');
@@ -123,7 +115,7 @@ void main() {
   ) async {
     _setWindowSize(tester, const Size(390, 844));
     final repository = _signedInRepository();
-    await tester.pumpWidget(NorthstarApp(authRepository: repository));
+    await tester.pumpWidget(_testApp(repository));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(CupertinoIcons.ellipsis_circle));
@@ -142,6 +134,13 @@ _FakeAuthRepository _signedInRepository() {
   );
 }
 
+NorthstarApp _testApp(AuthRepository authRepository) {
+  return NorthstarApp(
+    authRepository: authRepository,
+    assistantRepository: _FakeAssistantRepository(),
+  );
+}
+
 class _FakeAuthRepository implements AuthRepository {
   _FakeAuthRepository({this.restoredSession});
 
@@ -153,6 +152,9 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   String? get accessToken => restoredSession == null ? null : 'access-token';
+
+  @override
+  Future<String?> refreshAccessToken() async => accessToken;
 
   @override
   Future<AuthSession?> restore() async => restoredSession;
@@ -169,6 +171,21 @@ class _FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> logout() async => logoutCalls += 1;
+}
+
+class _FakeAssistantRepository implements AssistantRepository {
+  @override
+  Future<List<AssistantConversation>> listConversations() async => const [];
+
+  @override
+  Future<List<AssistantMessage>> history(String conversationId) async =>
+      const [];
+
+  @override
+  Stream<AssistantTurnEvent> streamTurn({
+    required String conversationId,
+    required String message,
+  }) => const Stream.empty();
 }
 
 void _setWindowSize(WidgetTester tester, Size size) {

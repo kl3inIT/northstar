@@ -7,6 +7,8 @@ on:
       - "mobile/**"
       - "apps/api/src/main/java/com/northstar/api/auth/**"
       - "apps/api/src/test/java/com/northstar/api/auth/**"
+      - "apps/api/src/main/java/com/northstar/api/assistant/**"
+      - "apps/api/src/test/java/com/northstar/api/assistant/**"
       - "core/src/main/resources/db/migration/*mobile_auth.sql"
       - ".github/workflows/mobile-ci.yml"
   pull_request:
@@ -14,9 +16,16 @@ on:
       - "mobile/**"
       - "apps/api/src/main/java/com/northstar/api/auth/**"
       - "apps/api/src/test/java/com/northstar/api/auth/**"
+      - "apps/api/src/main/java/com/northstar/api/assistant/**"
+      - "apps/api/src/test/java/com/northstar/api/assistant/**"
       - "core/src/main/resources/db/migration/*mobile_auth.sql"
       - ".github/workflows/mobile-ci.yml"
   workflow_dispatch:
+    inputs:
+      api_base_url:
+        description: Public HTTPS API base URL embedded in sideload builds
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -107,12 +116,14 @@ jobs:
           retention-days: 7
 
   ios:
-    name: iOS (unsigned)
+    name: iOS (Sideloadly IPA)
     runs-on: macos-latest
     timeout-minutes: 35
     defaults:
       run:
         working-directory: mobile
+    env:
+      MOBILE_API_BASE_URL: ${{ inputs.api_base_url || vars.NORTHSTAR_BASE_URL || 'http://localhost:8888' }}
     steps:
       - uses: actions/checkout@v7.0.0
 
@@ -153,13 +164,61 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
-      - name: Build unsigned iOS app
-        run: flutter build ios --release --no-codesign --no-pub
+      - name: Validate embedded API URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$MOBILE_API_BASE_URL" in
+            https://*|http://localhost:*|http://127.0.0.1:*) ;;
+            *)
+              echo "::error::Use HTTPS for a device build (local loopback is allowed only for compile review)."
+              exit 1
+              ;;
+          esac
+          echo "Embedding API base URL: $MOBILE_API_BASE_URL"
 
-      - name: Upload unsigned iOS app
+      - name: Build unsigned iOS app
+        run: >-
+          flutter build ios --release --no-codesign --no-pub
+          --build-number="${{ github.run_number }}"
+          --dart-define="NORTHSTAR_API_BASE_URL=$MOBILE_API_BASE_URL"
+
+      - name: Package and verify Sideloadly IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$PWD/build/ios/iphoneos/Runner.app"
+          output="$PWD/build/ios/northstar-sideloadly.ipa"
+          staging="$RUNNER_TEMP/northstar-sideloadly"
+
+          test -d "$app"
+          rm -rf "$staging"
+          mkdir -p "$staging/Payload"
+          /usr/bin/ditto "$app" "$staging/Payload/Runner.app"
+          (
+            cd "$staging"
+            /usr/bin/ditto -c -k --sequesterRsrc --keepParent Payload "$output"
+          )
+
+          /usr/bin/unzip -tq "$output"
+          /usr/bin/unzip -l "$output" | grep -q 'Payload/Runner.app/Info.plist'
+          /usr/bin/shasum -a 256 "$output" > "$output.sha256"
+
+          bundle_id=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' \
+            "$staging/Payload/Runner.app/Info.plist")
+          if [[ "$bundle_id" != "io.github.kl3init.northstar" ]]; then
+            echo "::error::Unexpected bundle ID: $bundle_id"
+            exit 1
+          fi
+          echo "Sideloadly IPA verified for $bundle_id" >> "$GITHUB_STEP_SUMMARY"
+          echo "API base URL: $MOBILE_API_BASE_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Sideloadly IPA
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: northstar-ios-unsigned
-          path: mobile/build/ios/iphoneos/Runner.app
+          name: northstar-ios-sideloadly
+          path: |
+            mobile/build/ios/northstar-sideloadly.ipa
+            mobile/build/ios/northstar-sideloadly.ipa.sha256
           if-no-files-found: error
           retention-days: 7

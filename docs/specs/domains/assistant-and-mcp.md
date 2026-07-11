@@ -5,7 +5,8 @@
 Northstar exposes the same domain through in-app assistant tools and MCP tools
 where possible.
 
-The in-app assistant streams AI SDK UI Message Stream frames to the web chat.
+The in-app assistant streams AI SDK UI Message Stream frames to the web and
+Flutter chats.
 Conversation text is stored in Spring AI's `spring_ai_chat_memory` table, while
 tool workflow parts are stored in `northstar_assistant_tool_trace` and replayed
 from `/api/assistant/history` so completed workflow steps survive page reloads
@@ -14,6 +15,22 @@ While a user turn is submitted or streaming, the web chat renders an assistant
 waiting message until the latest assistant message has visible text, an image,
 or a tool workflow part. This keeps the first turn and pre-tool-call gap from
 looking frozen.
+
+The Flutter client authenticates the same REST/SSE contract with a Bearer access
+token. Its typed service parses known text, tool, error, finish, and done frames;
+the repository maps those frames into provider-neutral domain events; and a
+`Listenable` ViewModel owns conversation history, partial text, tool progress,
+stop, failure, and retry state. The compact iPhone layout uses a Cupertino
+composer and modal history, while widths of at least 840 logical pixels keep
+conversation history beside the chat. A new turn inserts an empty streaming
+assistant message immediately, so the waiting state appears before the first
+text or tool frame. Partial output remains visible after stop or failure, and
+unfinished tool rows become failed instead of spinning forever.
+
+The mobile UI uses `flutter_chat_ui` and `flutter_chat_core` only as its
+backend-agnostic message-list component. Northstar owns the Cupertino builders,
+Markdown rendering, transport, authorization, and agent/tool behavior; model
+provider keys and orchestration remain on the backend.
 
 Current MCP tool areas:
 

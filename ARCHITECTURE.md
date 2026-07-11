@@ -14,6 +14,9 @@ active increment, not here.
   is Cupertino-first on every target during mobile development so the iPhone
   experience can be reviewed from Windows. Compact windows use five native-style
   tabs; windows at least 600 logical pixels wide use a Cupertino-styled sidebar.
+  Assistant chat uses `flutter_chat_ui`/`flutter_chat_core` for its maintained
+  message-list engine, with Northstar-owned Cupertino builders, typed SSE
+  transport, repository, and `Listenable` ViewModel behavior.
 - Contract: the API emits `contracts/openapi.json`; Hey API generates the web
   fetch client, SDK functions, and DTO types from that contract.
 - Build config: dependency versions live in `gradle/libs.versions.toml`; shared
@@ -156,7 +159,9 @@ verification in `:core:test` is the boundary check.
   revocation on replay. It is disabled until its environment secret is set.
 - Flutter holds access tokens in memory and native refresh tokens in platform
   secure storage. `go_router` observes the auth state and guards the Cupertino
-  route shell; the Web preview does not persist mobile credentials.
+  route shell; the Web preview does not persist mobile credentials. Authenticated
+  Assistant requests retry once after a single-flight refresh; a second 401
+  expires the local session.
 - Native iOS and Android do not use CORS. Cross-origin browser previews use the
   exact, comma-separated `NORTHSTAR_CORS_ALLOWED_ORIGINS` allowlist. Cross-origin
   cookies are disabled; Bearer requests may use standard REST methods with only
@@ -189,6 +194,10 @@ Use `./gradlew --no-daemon clean test` for the context-load gate. Do not use
 `bootRun` as a terminating verification command.
 
 `.github/workflows/mobile-ci.yml` mirrors the Flutter checks on Linux, builds an
-Android debug APK, and compiles an unsigned iOS release on a GitHub-hosted macOS
-runner. Flutter is pinned and installed from its official repository; reusable
-actions are pinned to full release tags verified against their official repos.
+Android debug APK, and packages an unsigned `Payload/Runner.app` as a validated
+IPA plus SHA-256 checksum on a GitHub-hosted macOS runner. The IPA is intended
+for local signing/install through Sideloadly; no Apple credentials enter CI.
+Flutter is pinned and installed from its official repository; reusable actions
+are pinned to full release tags verified against their official repos. Device
+builds embed an HTTPS `NORTHSTAR_API_BASE_URL` from the dispatch input or
+`NORTHSTAR_BASE_URL` repository variable.
