@@ -31,6 +31,14 @@ This file tracks delivery status. Increment descriptions and rationale live in
 - Study V1.5: brief study section (after automation/brief), scored Task 1
   anchors, LanguageTool sidecar, bulk HSK/Tatoeba imports, embedding-based
   new-card dispersion.
+- TTS dictation (OpenAI `gpt-4o-mini-tts-2025-12-15` + audio player in chat):
+  assistant reads sentences containing the user's at-risk vocab, user types
+  what they hear, diff-graded — listening practice + vocab review in one.
+- Speaking debrief capture: practice conversation in ChatGPT voice, paste
+  the takeaways back — capture/assistant classify into a Speaking session +
+  errors into the grammar corpus.
+- Per-card pronunciation history (extends the speech-assessment increment's
+  live-only card scoring with a persisted trend).
 - LLM reranker as a `DocumentPostProcessor` for knowledge search (Spring AI
   core ships the hook but no implementation; issue #5903).
 - Scholarship/university research workflows.
