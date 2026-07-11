@@ -109,4 +109,49 @@ final class ToolSupport {
             throw new IllegalArgumentException(field + " must be HH:mm, got '" + value + "'");
         }
     }
+
+    /**
+     * Assembles a vocab card's metadata JSON ({@code {"reading":..,"example":..}})
+     * from the two enrichment fields; null when both are absent.
+     */
+    static String vocabMetadata(String reading, String example) {
+        boolean hasReading = reading != null && !reading.isBlank();
+        boolean hasExample = example != null && !example.isBlank();
+        if (!hasReading && !hasExample) {
+            return null;
+        }
+        StringBuilder json = new StringBuilder("{");
+        if (hasReading) {
+            json.append("\"reading\":\"").append(escapeJson(reading.strip())).append('"');
+        }
+        if (hasExample) {
+            if (hasReading) {
+                json.append(',');
+            }
+            json.append("\"example\":\"").append(escapeJson(example.strip())).append('"');
+        }
+        return json.append('}').toString();
+    }
+
+    private static String escapeJson(String value) {
+        StringBuilder out = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            switch (c) {
+                case '"' -> out.append("\\\"");
+                case '\\' -> out.append("\\\\");
+                case '\n' -> out.append("\\n");
+                case '\r' -> out.append("\\r");
+                case '\t' -> out.append("\\t");
+                default -> {
+                    if (c < 0x20) {
+                        out.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        out.append(c);
+                    }
+                }
+            }
+        }
+        return out.toString();
+    }
 }

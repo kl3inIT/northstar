@@ -3,6 +3,12 @@ package com.northstar.core.alignment;
 import com.northstar.core.calendar.CalendarEventService;
 import com.northstar.core.calendar.CalendarEventSummary;
 import com.northstar.core.finance.FinanceService;
+import com.northstar.core.study.StudyKind;
+import com.northstar.core.study.StudyService;
+import com.northstar.core.study.StudySessionSummary;
+import com.northstar.core.study.StudySummary;
+import com.northstar.core.study.VocabCardSummary;
+import com.northstar.core.study.VocabService;
 import com.northstar.core.finance.SubscriptionSummary;
 import com.northstar.core.finance.TransactionSummary;
 import com.northstar.core.finance.TransactionType;
@@ -107,7 +113,10 @@ public class AlignmentService {
               "Money this week" section is present, ONE sentence comparing spending to
               the typical week and naming the one-off purchases — descriptive and
               factual, never scolding, never advice about spending less; if it lists
-              subscriptions due soon, name them and their dates in that sentence. If the
+              subscriptions due soon, name them and their dates in that sentence. If a
+              "Study this week" section is present, ONE sentence describing the effort
+              versus last week and naming the most-neglected skill and any words
+              slipping away — descriptive, never scolding. If the
               numbers are nearly empty, exactly 2 short sentences — do not pad. No
               headings, do not restate the numbers table, never invent work that is
               not in the numbers.
@@ -119,14 +128,18 @@ public class AlignmentService {
     private final CalendarEventService events;
     private final NoteService notes;
     private final FinanceService finance;
+    private final StudyService study;
+    private final VocabService vocab;
 
     public AlignmentService(ChatClient chat, TaskService tasks, CalendarEventService events,
-            NoteService notes, FinanceService finance) {
+            NoteService notes, FinanceService finance, StudyService study, VocabService vocab) {
         this.chat = chat;
         this.tasks = tasks;
         this.events = events;
         this.notes = notes;
         this.finance = finance;
+        this.study = study;
+        this.vocab = vocab;
     }
 
     /** Today's review note if it was already generated (zone-local day). */
@@ -269,7 +282,59 @@ public class AlignmentService {
         section(sb, "Next week (%s with a due date)".formatted(count(nextWeek.size(), "task")),
                 nextWeek.stream().map(t -> "- %s (due %s)".formatted(t.title(), t.dueDate())).toList());
         spendingSection(sb, monday);
+        studySection(sb, monday);
         return sb.toString().stripTrailing();
+    }
+
+    /**
+     * The week's study effort next to last week's — the same descriptive-norm
+     * contract as money (reference, never a quota) — plus the vocabulary
+     * memory's at-risk words so the review reinforces retrieval instead of
+     * re-exposure. Silent log and empty trainer = no section; study never nags
+     * someone who is not tracking it.
+     */
+    private void studySection(StringBuilder sb, LocalDate monday) {
+        StudySummary week = study.summary(monday);
+        List<VocabCardSummary> slipping = vocab.atRisk(3, null).stream()
+                .filter(card -> card.recallProbability() < 0.7)
+                .toList();
+        if (week.sessionCount() == 0 && week.previousWeekMinutes() == 0 && slipping.isEmpty()) {
+            return;
+        }
+        List<String> lines = new ArrayList<>();
+        if (week.sessionCount() > 0) {
+            String bySkill = week.bySkill().stream()
+                    .map(e -> "%s %s".formatted(e.skill(), minutes(e.minutes())))
+                    .collect(Collectors.joining(", "));
+            lines.add("- Sessions: %d%s".formatted(week.sessionCount(),
+                    bySkill.isEmpty() ? "" : " — " + bySkill));
+        }
+        List<StudySessionSummary> mocks = study.sessions(monday, monday.plusDays(6)).stream()
+                .filter(s -> s.kind() == StudyKind.MOCK && s.scoreRaw() != null)
+                .toList();
+        if (!mocks.isEmpty()) {
+            lines.add("- Mock results: " + mocks.stream()
+                    .map(s -> "%s %d/%d".formatted(s.skill(), s.scoreRaw(), s.scoreMax()))
+                    .collect(Collectors.joining("; ")));
+        }
+        if (!slipping.isEmpty()) {
+            lines.add("- Words slipping away (recall <70%): " + slipping.stream()
+                    .map(card -> "%s (%d%%)".formatted(card.front(),
+                            Math.round(card.recallProbability() * 100)))
+                    .collect(Collectors.joining(", ")));
+        }
+        section(sb, "Study this week (%s, last week %s)"
+                .formatted(minutes(week.totalMinutes()), minutes(week.previousWeekMinutes())),
+                lines);
+    }
+
+    private static String minutes(int total) {
+        int hours = total / 60;
+        int rest = total % 60;
+        if (hours == 0) {
+            return rest + "m";
+        }
+        return rest == 0 ? hours + "h" : "%dh %02dm".formatted(hours, rest);
     }
 
     /**
