@@ -39,6 +39,10 @@ facts here.
   record in the same change.
 - Do not treat completed increment docs as current state. Current state is the
   sum of `ARCHITECTURE.md` plus the durable specs and guidelines.
+- The user's knowledge base holds one note, "Northstar App Behavior", that
+  restates user-facing behavior so the in-app assistant can answer "how does
+  my app handle X". When consolidation changes a spec's user-facing behavior,
+  update that note too (via Northstar MCP `update_note`).
 
 ## Documentation Hygiene
 
