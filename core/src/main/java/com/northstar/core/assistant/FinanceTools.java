@@ -73,16 +73,41 @@ class FinanceTools implements NorthstarTool {
             month's limit with inherited=true, measured against this month's
             spend — mention when a limit is carried over. To change an inherited
             limit, call set_budget for THIS month; never reuse an inherited
-            entry's id, it belongs to the source month.""";
+            entry's id, it belongs to the source month. Budgets are reference
+            lines, not envelopes: unspent money does NOT roll over anywhere —
+            only the limit carries forward, and spent restarts from the new
+            month's ledger. If the user asks what to do with leftover money,
+            suggest contribute_savings_goal instead of inventing rollover
+            mechanics.""";
 
     private static final String SET_BUDGET = """
             Create or replace one monthly category budget. Month is yyyy-MM, amount
             is a positive VND integer, and category should reuse the ledger vocabulary.
-            Only write when the user explicitly asks to set or change a budget.""";
+            Only write when the user explicitly asks to set or change a budget.
+            When advising, favor a few budgets on variable, controllable categories
+            (food, cafe, transport, fun); fixed costs like rent rarely need one and
+            one-off spending is already tracked by the exceptional flag.""";
+
+    private static final String DELETE_BUDGET = """
+            Delete one monthly budget by UUID after explicit user intent. Ids come
+            from list_budgets. NEVER call this with an inherited (carried-over)
+            entry's id — that id belongs to the source month and deleting it would
+            erase that month's budget; an inherited limit the user wants gone is
+            removed by deleting it in its source month or overriding it with
+            set_budget for the requested month.""";
 
     private static final String LIST_GOALS = """
             List savings goals with current/target amounts, remaining, progress,
-            target date, and expected monthly contribution.""";
+            target date, and expected monthly contribution. The ids and versions
+            returned here are required by save_savings_goal,
+            contribute_savings_goal, and delete_savings_goal.""";
+
+    private static final String CONTRIBUTE_GOAL = """
+            Add a positive VND contribution to a savings goal on explicit user
+            intent ("bỏ 500k vào quỹ MacBook"). Increments the goal's saved amount
+            only — it does NOT write an expense to the ledger. This is also the
+            right destination for leftover budget money at month end. Goal ids come
+            from list_savings_goals.""";
 
     private static final String SAVE_GOAL = """
             Create or update a savings goal. Pass id="" to create; otherwise use an
@@ -183,8 +208,8 @@ class FinanceTools implements NorthstarTool {
         return finance.setBudget(parseMonth(month), category, limitAmount);
     }
 
-    @Tool(name = "delete_budget", description = "Delete one monthly budget by UUID after explicit user intent.")
-    @McpTool(name = "delete_budget", description = "Delete one monthly budget by UUID after explicit user intent.",
+    @Tool(name = "delete_budget", description = DELETE_BUDGET)
+    @McpTool(name = "delete_budget", description = DELETE_BUDGET,
             annotations = @McpTool.McpAnnotations(destructiveHint = true, openWorldHint = false))
     String deleteBudget(
             @ToolParam(description = "Budget UUID")
@@ -232,10 +257,8 @@ class FinanceTools implements NorthstarTool {
                 savedAmount, date, monthlyContribution, version);
     }
 
-    @Tool(name = "contribute_savings_goal",
-            description = "Add a positive VND contribution to a savings goal on explicit user intent.")
-    @McpTool(name = "contribute_savings_goal",
-            description = "Add a positive VND contribution to a savings goal on explicit user intent.",
+    @Tool(name = "contribute_savings_goal", description = CONTRIBUTE_GOAL)
+    @McpTool(name = "contribute_savings_goal", description = CONTRIBUTE_GOAL,
             annotations = @McpTool.McpAnnotations(destructiveHint = false, openWorldHint = false))
     SavingsGoalSummary contributeSavingsGoal(
             @ToolParam(description = "Savings goal UUID")
@@ -246,9 +269,9 @@ class FinanceTools implements NorthstarTool {
     }
 
     @Tool(name = "delete_savings_goal",
-            description = "Delete one savings goal by UUID after explicit user intent.")
+            description = "Delete one savings goal by UUID (from list_savings_goals) after explicit user intent. No undo.")
     @McpTool(name = "delete_savings_goal",
-            description = "Delete one savings goal by UUID after explicit user intent.",
+            description = "Delete one savings goal by UUID (from list_savings_goals) after explicit user intent. No undo.",
             annotations = @McpTool.McpAnnotations(destructiveHint = true, openWorldHint = false))
     String deleteSavingsGoal(
             @ToolParam(description = "Savings goal UUID")
@@ -336,9 +359,9 @@ class FinanceTools implements NorthstarTool {
     }
 
     @Tool(name = "delete_subscription",
-            description = "Delete one subscription definition by UUID after explicit user intent.")
+            description = "Delete one subscription definition by UUID (from list_subscriptions) after explicit user intent. Already-posted charges stay in the ledger; to stop future charges without losing history, prefer save_subscription with active=false.")
     @McpTool(name = "delete_subscription",
-            description = "Delete one subscription definition by UUID after explicit user intent.",
+            description = "Delete one subscription definition by UUID (from list_subscriptions) after explicit user intent. Already-posted charges stay in the ledger; to stop future charges without losing history, prefer save_subscription with active=false.",
             annotations = @McpTool.McpAnnotations(destructiveHint = true, openWorldHint = false))
     String deleteSubscription(
             @ToolParam(description = "Subscription UUID")

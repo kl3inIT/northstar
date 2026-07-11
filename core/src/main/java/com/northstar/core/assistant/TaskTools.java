@@ -32,7 +32,11 @@ class TaskTools implements NorthstarTool {
             The user's tasks for today: overdue + due today (open), plus what was already \
             completed today. Use to answer 'what should I/the user do today?'.""";
 
-    private static final String UPCOMING_TASKS = "Open tasks due within the next N days (after today).";
+    private static final String UPCOMING_TASKS = """
+            Open tasks due within the next N days AFTER today, soonest first. Excludes \
+            today's and overdue tasks (today_tasks covers those) and undated someday \
+            tasks (find_tasks reaches those). Use for 'what's coming up / this week?' \
+            questions and for weekly planning.""";
 
     private static final String FIND_TASKS = """
             Find tasks whose title contains the query (case-insensitive), across open, \
