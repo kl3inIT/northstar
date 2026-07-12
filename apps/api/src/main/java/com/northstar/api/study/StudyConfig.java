@@ -7,10 +7,12 @@ import com.northstar.core.study.SpeakingCoach;
 import com.northstar.core.study.SpeakingService;
 import com.northstar.core.study.SpeechAssessor;
 import com.northstar.core.study.StudyService;
+import com.northstar.core.study.VocabCoach;
 import java.time.ZoneId;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Wires the writing grader for this app (the CaptureConfig precedent): core's
@@ -25,6 +27,11 @@ class StudyConfig {
     @Bean
     WritingGrader writingGrader(AiClientRouter ai, WritingService writing) {
         return new WritingGrader(ai, writing, ZoneId.systemDefault());
+    }
+
+    @Bean
+    VocabCoach vocabCoach(AiClientRouter ai, ObjectMapper json) {
+        return new VocabCoach(ai, json);
     }
 
     @Bean

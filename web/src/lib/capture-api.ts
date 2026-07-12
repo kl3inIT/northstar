@@ -151,8 +151,9 @@ function parsePositiveInt(value: string | undefined | null, allowZero = false): 
 
 /**
  * Save the draft's vocab cards with the same echo contract — every card named
- * back (front · back) so the user ratifies what the AI parsed and enriched.
- * The AI-generated reading/example travel in the card's metadata JSON.
+ * back (front · back) so the user ratifies what the AI parsed. Reading and
+ * part of speech are the base language fields; generated enrichment is a
+ * separate, explicit workflow.
  */
 async function saveVocab(items: VocabItem[]): Promise<CaptureResult> {
   const disciplineIds = await Promise.all(items.map((i) => resolveDisciplineId(i.disciplineName)))
@@ -161,6 +162,7 @@ async function saveVocab(items: VocabItem[]): Promise<CaptureResult> {
       items: items.map((i, index) => {
         const metadata: Record<string, string> = {}
         if (i.reading?.trim()) metadata.reading = i.reading.trim()
+        if (i.partOfSpeech?.trim()) metadata.partOfSpeech = i.partOfSpeech.trim()
         if (i.example?.trim()) metadata.example = i.example.trim()
         return {
           front: i.front || '(word)',

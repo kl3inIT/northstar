@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   assessSpeakingAttempt,
   assessVocabPronunciation,
+  checkVocabAnswer,
   deleteSpeakingFeedback,
   deleteStudySession,
   deleteVocabCard,
@@ -13,7 +14,10 @@ import {
   listStudySessions,
   listStudySkills,
   listVocabCards,
+  listVocabReviewCards,
   listWritingFeedback,
+  previewVocabEnrichment,
+  recordVocabReview,
   recordStudySessions,
   updateStudySession,
   updateVocabCard,
@@ -27,7 +31,11 @@ import type {
   StudySessionSummary,
   StudySummary,
   UpdateVocabCardRequest,
+  VocabAnswerAssessment,
   VocabCardSummary,
+  VocabEnrichmentPreview,
+  VocabEnrichmentRequest,
+  VocabReviewRequest,
   WritingFeedbackSummary,
 } from './hey-api'
 
@@ -39,6 +47,10 @@ export type WritingFeedback = WritingFeedbackSummary
 export type SpeakingFeedback = SpeakingFeedbackSummary
 export type SpeakingAttempt = SpeakingAttemptResult
 export type PronunciationAssessment = PronunciationResult
+export type VocabAnswerCheck = VocabAnswerAssessment
+export type VocabEnrichment = VocabEnrichmentPreview
+export type VocabEnrichmentField = VocabEnrichmentRequest['fields'][number]
+export type VocabRating = VocabReviewRequest['rating']
 export type { StudySummary }
 
 export interface WritingCriterion {
@@ -216,6 +228,40 @@ export function useVocabCards() {
   return useQuery({
     queryKey: ['study-vocab'],
     queryFn: async () => dataOrThrow(await listVocabCards()),
+  })
+}
+
+export function useVocabReviewCards(limit: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ['study-vocab-review', limit],
+    enabled,
+    queryFn: async () => dataOrThrow(await listVocabReviewCards({ query: { limit } })),
+  })
+}
+
+export function useRecordVocabReview() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, rating }: { id: string; rating: VocabRating }) =>
+      dataOrThrow(await recordVocabReview({ path: { id }, body: { rating } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['study-vocab'] })
+      void queryClient.invalidateQueries({ queryKey: ['study-vocab-review'] })
+    },
+  })
+}
+
+export function useCheckVocabAnswer() {
+  return useMutation({
+    mutationFn: async ({ id, answer }: { id: string; answer: string }) =>
+      dataOrThrow(await checkVocabAnswer({ path: { id }, body: { answer } })),
+  })
+}
+
+export function usePreviewVocabEnrichment() {
+  return useMutation({
+    mutationFn: async ({ id, fields }: { id: string; fields: VocabEnrichmentField[] }) =>
+      dataOrThrow(await previewVocabEnrichment({ path: { id }, body: { fields } })),
   })
 }
 

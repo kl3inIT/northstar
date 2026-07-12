@@ -10,7 +10,8 @@ import java.util.UUID;
  * chat quiz reason about. {@code recallProbability} is computed at read time
  * for "now" — there is no due date to expose. {@code metadata} is the raw
  * JSON string ({"reading": ..., "example": ...}); clients parse what they
- * know and ignore the rest.
+ * know and ignore the rest. Base language metadata uses {@code reading} for
+ * IPA/pinyin and {@code partOfSpeech} for the lexical category.
  */
 public record VocabCardSummary(
         @NotNull UUID id,

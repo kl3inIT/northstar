@@ -20,7 +20,19 @@ import java.util.UUID;
 public class VocabReviewLog extends BaseEntity {
 
     /** How confidently the user recalled — the model updates on >= 0.5 as success. */
-    public enum Rating { AGAIN, HARD, GOOD, EASY }
+    public enum Rating {
+        AGAIN(0.0), HARD(0.6), GOOD(0.9), EASY(1.0);
+
+        private final double success;
+
+        Rating(double success) {
+            this.success = success;
+        }
+
+        public double success() {
+            return success;
+        }
+    }
 
     /** Which surface delivered the review. */
     public enum ReviewSource { BRIEF, CHAT, MANUAL }

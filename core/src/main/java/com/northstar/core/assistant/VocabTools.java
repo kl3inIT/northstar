@@ -140,13 +140,7 @@ class VocabTools implements NorthstarTool {
             @McpToolParam(description = "AGAIN, HARD, GOOD, or EASY",
                     required = true) String rating) {
         VocabReviewLog.Rating parsed = parseRating(rating);
-        double success = switch (parsed) {
-            case AGAIN -> 0.0;
-            case HARD -> 0.6;
-            case GOOD -> 0.9;
-            case EASY -> 1.0;
-        };
-        return vocab.recordReview(UUID.fromString(cardId), success, parsed,
+        return vocab.recordReview(UUID.fromString(cardId), parsed.success(), parsed,
                 VocabReviewLog.ReviewSource.CHAT);
     }
 

@@ -12,7 +12,10 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import com.northstar.core.study.VocabEnrichmentField;
+import com.northstar.core.study.VocabReviewLog;
 
 /**
  * Request bodies for the study endpoints. One item shape serves both the batch
@@ -59,6 +62,15 @@ final class StudyRequest {
             @Size(max = 4000) String metadata,
             UUID disciplineId,
             @NotNull Boolean suspended) {
+    }
+
+    record VocabReviewRequest(@NotNull VocabReviewLog.Rating rating) {
+    }
+
+    record VocabAnswerRequest(@NotBlank @Size(max = 1000) String answer) {
+    }
+
+    record VocabEnrichmentRequest(@NotEmpty Set<VocabEnrichmentField> fields) {
     }
 
     record SpeakingQuestionRequest(@Min(1) @Max(3) int part) {

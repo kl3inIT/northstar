@@ -15,6 +15,10 @@ import com.northstar.core.study.StudySessionSummary;
 import com.northstar.core.study.StudySource;
 import com.northstar.core.study.StudySummary;
 import com.northstar.core.study.VocabCardSummary;
+import com.northstar.core.study.VocabAnswerAssessment;
+import com.northstar.core.study.VocabCoach;
+import com.northstar.core.study.VocabEnrichmentPreview;
+import com.northstar.core.study.VocabReviewLog;
 import com.northstar.core.study.VocabService;
 import com.northstar.core.study.WritingFeedbackSummary;
 import com.northstar.core.study.WritingService;
@@ -60,16 +64,18 @@ class StudyController {
 
     private final StudyService study;
     private final VocabService vocab;
+    private final VocabCoach vocabCoach;
     private final WritingService writing;
     private final SpeakingService speaking;
     private final ObjectProvider<SpeechAssessor> speechProvider;
     private final ObjectProvider<SpeakingCoach> coachProvider;
 
-    StudyController(StudyService study, VocabService vocab, WritingService writing,
+    StudyController(StudyService study, VocabService vocab, VocabCoach vocabCoach, WritingService writing,
             SpeakingService speaking, ObjectProvider<SpeechAssessor> speechProvider,
             ObjectProvider<SpeakingCoach> coachProvider) {
         this.study = study;
         this.vocab = vocab;
+        this.vocabCoach = vocabCoach;
         this.writing = writing;
         this.speaking = speaking;
         this.speechProvider = speechProvider;
@@ -141,6 +147,40 @@ class StudyController {
     @Operation(operationId = "listVocabCards")
     List<VocabCardSummary> vocabCards() {
         return vocab.cards();
+    }
+
+    /** Active cards with the lowest predicted recall right now; there are no due dates. */
+    @GetMapping("/vocab/review")
+    @Operation(operationId = "listVocabReviewCards")
+    List<VocabCardSummary> vocabReviewCards(
+            @RequestParam(name = "limit", defaultValue = "20") int limit) {
+        return vocab.atRisk(limit, null);
+    }
+
+    /** A learner-chosen rating is the only page action that updates the memory model. */
+    @PostMapping("/vocab/{id}/reviews")
+    @Operation(operationId = "recordVocabReview")
+    VocabCardSummary recordVocabReview(@PathVariable("id") UUID id,
+            @Valid @RequestBody StudyRequest.VocabReviewRequest request) {
+        VocabReviewLog.Rating rating = request.rating();
+        return vocab.recordReview(id, rating.success(), rating,
+                VocabReviewLog.ReviewSource.MANUAL);
+    }
+
+    /** Explicit semantic feedback only; this endpoint never records a review. */
+    @PostMapping("/vocab/{id}/answer-check")
+    @Operation(operationId = "checkVocabAnswer")
+    VocabAnswerAssessment checkVocabAnswer(@PathVariable("id") UUID id,
+            @Valid @RequestBody StudyRequest.VocabAnswerRequest request) {
+        return vocabCoach.checkAnswer(vocab.find(id), request.answer());
+    }
+
+    /** Explicit, non-persisting enrichment preview. PUT the card to apply it. */
+    @PostMapping("/vocab/{id}/enrichment")
+    @Operation(operationId = "previewVocabEnrichment")
+    VocabEnrichmentPreview previewVocabEnrichment(@PathVariable("id") UUID id,
+            @Valid @RequestBody StudyRequest.VocabEnrichmentRequest request) {
+        return vocabCoach.enrich(vocab.find(id), request.fields());
     }
 
     @PostMapping("/vocab")
