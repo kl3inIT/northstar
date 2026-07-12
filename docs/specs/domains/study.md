@@ -42,6 +42,14 @@ via predicted recall, so missed days never build a backlog. New cards start
 balanced (α=β=2) at a one-day half-life; ~10 new cards a day is guidance in
 the tool description, not a hard wall.
 
+Recognition (target expression → saved meaning) is always enabled. A card may
+also enable production (saved, sense-specific meaning → target expression),
+which owns an independent Ebisu state and review-log direction without copying
+the card content. Deck settings provide the default for newly-created cards;
+existing cards stay recognition-only unless explicitly changed. Each queue
+snapshot selects only the weaker enabled direction for an item, so both sides
+never appear as siblings in one session.
+
 - `front` is the word and `back` its meaning. Tone-marked pinyin/IPA
   `reading` and `partOfSpeech` are the base language fields. They travel in a
   `metadata` JSON string — never as columns — and remain empty when the model
@@ -53,17 +61,23 @@ the tool description, not a hard wall.
   cards are backfilled deterministically (Han front → Chinese, otherwise
   English), without an AI call.
 - Examples, collocations, synonyms, antonyms, easily-confused-word contrast,
-  and mnemonics are optional enrichment. Creating, loading, or revealing a
-  card never generates them. The learner selects fields and explicitly asks
-  for a validated preview, then applies or discards it; unknown metadata keys
-  and existing user-authored values are preserved.
+  mnemonics, defensible word formation, and a text-free mnemonic illustration
+  are optional enrichment. Creating, loading, or revealing a card never
+  generates them. The learner selects fields and explicitly starts an expiring
+  in-API background preview, then keeps reviewing until a toast offers Apply or
+  Discard. The review header retains a running/ready action until that decision,
+  so preview access does not depend on a transient notification. Word formation
+  is omitted when decomposition is uncertain or malformed. Image bytes remain transient until Apply stores them through
+  Attachments and references them as `frontImageId`; unknown metadata keys and
+  existing user-authored values are preserved.
 - Re-capturing an existing front (accent- and case-insensitive) returns the
   existing card instead of duplicating it.
 - Focused reviews happen on the Vocabulary page; chat may still conduct a
   quiz. The learner first selects English or Chinese, then `All decks`,
   `General`, or one saved deck such as IELTS/HSK4. A browser-owned 10/20/30-card
-  snapshot takes the lowest-recall active cards only inside that scope and
-  never mixes languages. Optional free-text answer checking
+  snapshot takes the lowest-recall active items only inside that scope, chooses
+  one weakest enabled direction per item, and never mixes languages. Production
+  prompts hide listening until reveal. Optional free-text answer checking
   returns `CORRECT`, `CLOSE`, or `MISSED` with a short explanation but does
   not select a rating or update memory. Only the learner's subsequent
   Again/Hard/Good/Easy action records a `MANUAL` review. Ratings map to Ebisu
@@ -196,9 +210,17 @@ skipped, never fatal.
   sorted most-at-risk first with suspended cards last. It provides
   pause/resume/edit/delete, language/deck correction, live
   pronunciation assessment, and a keyboard-first weak-card reviewer. The
-  reviewer supports typed or dictated answers, explicit semantic checking,
+  reviewer supports recognition and optional production, typed or dictated
+  answers, click-anywhere-on-the-non-interactive-card or Space flipping,
+  explicit semantic checking, and a compact answer face. Answer, reading, part
+  of speech, and one example remain visible; richer usage/relationship/memory
+  fields live under a counted `Study details` disclosure. Expanded details
+  scroll inside the card while the rating footer remains visible,
   Space to flip between question and answer, 1-4 to rate, R to listen, Escape to exit, a completion
-  tally, and an opt-in enrichment Sheet with preview/apply/discard. Writing:
+  tally, deck/per-card two-direction controls, and an opt-in background
+  enrichment Sheet whose ready preview replaces the field picker instead of
+  forcing a scroll. Applied mnemonic images appear only on the question/front
+  face; word-formation parts appear on the answer face. Writing:
   essays graded, latest estimate,
   trend vs previous essay, recurring-error strip, feedback table with a
   detail dialog (per-criterion justifications, quote-to-fix errors, the
@@ -210,9 +232,11 @@ skipped, never fatal.
   an optional entry path for vocab quizzes. Writing grading remains in chat.
 - REST surface: `/api/study/sessions` (GET/POST/PUT/DELETE), `/summary`,
   `/mocks`, `/skills`, `/vocab` (GET/POST/PUT/DELETE),
-  `/vocab/review` (required language, optional deck), `/vocab/{id}/reviews`,
+  `/vocab/review` (required language, optional deck, direction-specific rows),
+  `/vocab/decks/settings`, `/vocab/{id}/reviews`,
   `/vocab/{id}/answer-check`,
-  `/vocab/{id}/enrichment`, `/vocab/{id}/pronunciation`, `/writing`
+  `/vocab/{id}/enrichment`, `/vocab/{id}/enrichment-jobs` plus job
+  status/apply/discard, `/vocab/{id}/pronunciation`, `/writing`
   (GET/DELETE), and `/speaking`
   history plus `/speaking/question` and `/speaking/attempts`. Week boundaries
   respect the `X-Timezone` header.
