@@ -8,6 +8,9 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import com.northstar.core.ai.AiGatewayConnection;
+import com.northstar.core.ai.AiGatewayType;
+import com.northstar.core.web.WebProviderRoute;
 import com.northstar.core.web.WebRecency;
 import com.northstar.core.web.WebSearchProviderResult;
 import com.northstar.core.web.WebSearchRequest;
@@ -21,12 +24,13 @@ class OpenAiWebSearchProviderTests {
 
     @Test
     void parsesAnswerAndDeduplicatedCitationSources() {
-        OpenAiWebSearchProperties properties = new OpenAiWebSearchProperties(
-                "test-key", "test-model", "medium", java.time.Duration.ofSeconds(5),
-                java.time.Duration.ofSeconds(60));
-        RestClient.Builder builder = RestClient.builder().baseUrl("https://api.openai.com");
+        OpenAiWebSearchProperties properties = new OpenAiWebSearchProperties("medium");
+        AiGatewayConnection connection = new AiGatewayConnection("openai", "OpenAI", AiGatewayType.OPENAI,
+                "https://api.openai.com/v1", "test-key", java.time.Duration.ofSeconds(60));
+        RestClient.Builder builder = RestClient.builder().baseUrl(connection.baseUrl());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        OpenAiWebSearchProvider provider = new OpenAiWebSearchProvider(properties, builder.build());
+        OpenAiWebSearchProvider provider = new OpenAiWebSearchProvider(properties, _ -> connection,
+                _ -> builder.build());
         server.expect(requestTo("https://api.openai.com/v1/responses"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("allowed_domains")))
                 .andRespond(withSuccess("""
@@ -44,7 +48,8 @@ class OpenAiWebSearchProviderTests {
                         """, MediaType.APPLICATION_JSON));
 
         WebSearchProviderResult result = provider.search(new WebSearchRequest(
-                "current answer", WebRecency.WEEK, 5, List.of("example.com"), List.of("blocked.test")));
+                "current answer", WebRecency.WEEK, 5, List.of("example.com"), List.of("blocked.test")),
+                new WebProviderRoute("openai", "test-model"));
 
         assertThat(result.answer()).isEqualTo("Current answer");
         assertThat(result.sources()).hasSize(1);

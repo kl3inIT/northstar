@@ -35,7 +35,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /** Finance acceptance against the real PostgreSQL schema and generated HTTP contract. */
-@SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
+@SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers

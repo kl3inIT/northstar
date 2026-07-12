@@ -1,4 +1,4 @@
-# 0028: Feature colors use semantic intent tokens
+# 0029: Feature colors use semantic intent tokens
 
 ## Status
 

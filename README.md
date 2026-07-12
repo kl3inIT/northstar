@@ -73,8 +73,8 @@ Requirements:
 ```bash
 # Local configuration. The example keeps login disabled for trusted local use.
 cp .env.example .env
-# Set OPENAI_API_KEY. Generate NORTHSTAR_AI_CREDENTIAL_KEY before saving
-# runtime gateway credentials from Settings.
+# Provider keys can be added later in Settings > AI models. Generate
+# NORTHSTAR_AI_CREDENTIAL_KEY before saving runtime gateway credentials.
 
 # PostgreSQL + pgvector
 docker compose up -d

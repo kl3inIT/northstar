@@ -11,7 +11,6 @@ dependencies {
     // The worker owns search indexing (SearchIndexingWorker): OpenAI for the
     // vision captions + embeddings, PgVectorStore for the vectors it writes.
     // This is the heavy LLM/Tika work kept off the api's request threads.
-    implementation(libs.spring.ai.starter.openai)
     implementation(libs.spring.ai.starter.pgvector)
     implementation(libs.db.scheduler.boot4)
 

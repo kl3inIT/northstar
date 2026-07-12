@@ -23,7 +23,6 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -32,41 +31,20 @@ import org.springframework.web.client.RestClientResponseException;
 public class OpenAiWebSearchProvider implements WebSearchProvider {
 
     private final OpenAiWebSearchProperties properties;
-    private final RestClient openai;
     private final AiGatewayConnectionResolver gateways;
     private final Function<AiGatewayConnection, RestClient> gatewayClients;
 
     @Autowired
     OpenAiWebSearchProvider(OpenAiWebSearchProperties properties,
             ObjectProvider<AiGatewayConnectionResolver> gateways) {
-        this(properties, client(properties), gateways.getIfAvailable(), OpenAiWebSearchProvider::client);
+        this(properties, gateways.getIfAvailable(), OpenAiWebSearchProvider::client);
     }
 
-    public OpenAiWebSearchProvider(OpenAiWebSearchProperties properties, RestClient openai) {
-        this(properties, openai, null, OpenAiWebSearchProvider::client);
-    }
-
-    OpenAiWebSearchProvider(OpenAiWebSearchProperties properties, RestClient openai,
-            AiGatewayConnectionResolver gateways,
+    public OpenAiWebSearchProvider(OpenAiWebSearchProperties properties, AiGatewayConnectionResolver gateways,
             Function<AiGatewayConnection, RestClient> gatewayClients) {
         this.properties = properties;
-        this.openai = openai;
         this.gateways = gateways;
         this.gatewayClients = gatewayClients;
-    }
-
-    private static RestClient client(OpenAiWebSearchProperties properties) {
-        HttpClient http = HttpClient.newBuilder()
-                .connectTimeout(properties.connectTimeout())
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build();
-        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
-        requests.setReadTimeout(properties.requestTimeout());
-        return RestClient.builder()
-                .baseUrl("https://api.openai.com")
-                .defaultHeader("Authorization", "Bearer " + properties.apiKey())
-                .requestFactory(requests)
-                .build();
     }
 
     @Override
@@ -81,7 +59,7 @@ public class OpenAiWebSearchProvider implements WebSearchProvider {
 
     @Override
     public boolean configured() {
-        return StringUtils.hasText(properties.apiKey());
+        return gateways != null;
     }
 
     @Override
@@ -108,11 +86,8 @@ public class OpenAiWebSearchProvider implements WebSearchProvider {
 
     @Override
     public WebSearchProviderResult search(WebSearchRequest request) {
-        if (!configured()) {
-            throw new WebResearchException(WebResearchFailureCode.NOT_CONFIGURED,
-                    "OPENAI_API_KEY is not configured");
-        }
-        return search(openai, "/v1/responses", properties.model(), request);
+        throw new WebResearchException(WebResearchFailureCode.NOT_CONFIGURED,
+                "OpenAI Web Search requires a configured gateway route");
     }
 
     @Override

@@ -62,7 +62,11 @@ Northstar is one domain with three backend deployables:
   capability metadata such as the selected TTS language.
   Gateway ids are configuration. Each gateway also declares a protocol type
   and its supported capabilities so chat compatibility is never assumed to
-  imply web, speech, or realtime compatibility.
+  imply web, speech, or realtime compatibility. A Settings row with the same
+  id as a deployment gateway is an encrypted runtime overlay; it takes effect
+  immediately and can be reset to the optional environment fallback without
+  changing task routes. Provider credentials are resolved only when an AI call
+  runs, so API and worker boot without a provider key.
 
 The app classes are explicitly named `NorthstarApiApplication`,
 `NorthstarMcpApplication`, and `NorthstarWorkerApplication`. The package root is

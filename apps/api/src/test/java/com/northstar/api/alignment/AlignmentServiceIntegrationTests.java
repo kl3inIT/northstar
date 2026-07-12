@@ -43,7 +43,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * (regenerating refreshes the same Journal note), and the facts-only fallback
  * when the LLM call fails.
  */
-@SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
+@SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class AlignmentServiceIntegrationTests {

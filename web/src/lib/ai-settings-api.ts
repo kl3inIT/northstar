@@ -27,6 +27,7 @@ export const AI_TASKS = [
   'IMAGE_CAPTION',
   'TEXT_TO_SPEECH',
   'SPEECH_TO_TEXT',
+  'REALTIME_TRANSCRIPTION',
   'IMAGE_GENERATION',
   'EMBEDDING',
 ] as const
@@ -52,6 +53,9 @@ export interface AiGateway {
   capabilities: AiGatewayCapability[]
   configured: boolean
   source: 'DEPLOYMENT' | 'SETTINGS'
+  credentialSource: 'ENVIRONMENT' | 'SETTINGS' | 'NONE'
+  deploymentBacked: boolean
+  overridden: boolean
   editable: boolean
   baseUrl: string
   configuredModels: string[]
@@ -132,6 +136,9 @@ function settings(value: AiSettingsResponse): AiSettings {
         capabilities: gateway.capabilities ?? ['CHAT'],
         configured: gateway.configured ?? false,
         source: gateway.source ?? 'DEPLOYMENT',
+        credentialSource: gateway.credentialSource ?? 'NONE',
+        deploymentBacked: gateway.deploymentBacked ?? false,
+        overridden: gateway.overridden ?? false,
         editable: gateway.editable ?? false,
         baseUrl: gateway.baseUrl ?? '',
         configuredModels: gateway.configuredModels ?? [],
@@ -157,6 +164,9 @@ function gateway(value: import('./hey-api').AiGatewayDescriptor): AiGateway {
     capabilities: value.capabilities ?? ['CHAT'],
     configured: value.configured ?? false,
     source: value.source ?? 'DEPLOYMENT',
+    credentialSource: value.credentialSource ?? 'NONE',
+    deploymentBacked: value.deploymentBacked ?? false,
+    overridden: value.overridden ?? false,
     editable: value.editable ?? false,
     baseUrl: value.baseUrl ?? '',
     configuredModels: value.configuredModels ?? [],

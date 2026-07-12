@@ -27,7 +27,7 @@ Model-backed workloads resolve an `AiTask` route at call time. Each route is a
 configured gateway id, capability target id, and optional metadata; application
 YAML supplies defaults and a database override from Settings wins without
 restarting either API or worker. Chat, text-to-speech, speech-to-text, image
-generation, and embedding routes validate against isolated capability catalogs,
+generation, embedding, and realtime-transcription routes validate against isolated capability catalogs,
 so a target discovered for one protocol cannot be selected for another.
 Deployment defaults are workload-specific: the cost-efficient reasoning tier handles
 Assistant, Capture, Alignment, and web research; the strongest tier handles Study
@@ -37,8 +37,10 @@ Gateway instances declare `OPENAI`, `NINE_ROUTER`, or
 `OPENAI_CHAT_COMPATIBLE`. OpenAI and 9Router reuse the shared chat transport but
 advertise the additional capability protocols Northstar has implemented;
 generic compatible endpoints remain a conservative chat-only contract.
-Deployment gateways remain read-only defaults;
-Settings can also create, edit, test, and delete runtime gateway instances from
+Settings can edit a deployment-backed gateway by saving an encrypted overlay
+under the same id. The logical gateway remains one row; removing the overlay
+restores its optional environment credential without deleting workload routes.
+Settings can also create, edit, test, and delete independent runtime gateway instances from
 OpenAI, 9Router, OpenRouter, LiteLLM, or Custom presets. Presets provide form
 defaults and select the gateway contract. Runtime API keys
 are encrypted with AES-256-GCM using a deployment key and are never returned to
@@ -56,6 +58,13 @@ with a selected provider alias or combo. Connection testing stays in AI
 Settings; Web Research only validates that the referenced gateway supports the
 capability and that a target is present. Direct page and Firecrawl adapters
 remain available as non-gateway alternatives.
+
+Capture realtime dictation is routed separately from ordinary speech-to-text.
+The API uses the selected Realtime-capable gateway to mint an ephemeral client
+secret and returns that gateway's WebSocket URL; the browser never hardcodes a
+provider endpoint or receives the durable credential. Embedding and ordinary
+transcription likewise resolve their current task routes at call time. The
+pgvector schema remains fixed at 1536 dimensions regardless of runtime model.
 
 The web Assistant composes its transcript from AI Elements primitives. The
 composer and transcript share native attachment tiles; the native Prompt Input

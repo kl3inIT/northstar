@@ -29,7 +29,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * occurrence (persisted as an exception row), "cả chuỗi" removes everything,
  * and a bad rrule never reaches the table.
  */
-@SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
+@SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class CalendarEventServiceIntegrationTests {

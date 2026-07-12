@@ -27,7 +27,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * unknown resources render 404, and a stale {@code version} renders 409 — so
  * the typed web client can rely on one error shape.
  */
-@SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
+@SpringBootTest
 @AutoConfigureMockMvc
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers

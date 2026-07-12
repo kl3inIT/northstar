@@ -126,6 +126,7 @@ const AI_TASK_LABELS: Record<AiTask, { title: string; description: string }> = {
   IMAGE_CAPTION: { title: 'Image indexing', description: 'Describe images before search indexing.' },
   TEXT_TO_SPEECH: { title: 'Text to speech', description: 'Generate reusable audio for Assistant and study.' },
   SPEECH_TO_TEXT: { title: 'Speech to text', description: 'Transcribe capture and study audio.' },
+  REALTIME_TRANSCRIPTION: { title: 'Live transcription', description: 'Stream microphone audio directly to a realtime transcription service.' },
   IMAGE_GENERATION: { title: 'Image generation', description: 'Generate visual study and assistant assets.' },
   EMBEDDING: { title: 'Embeddings', description: 'Index notes and app knowledge for retrieval.' },
 }
@@ -177,7 +178,7 @@ function AiSettingsSection() {
           ))}
         </div>
         <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          Deployment gateways come from server configuration. Gateways added here are encrypted and available immediately without a restart.
+          Settings credentials take priority immediately. Server credentials are optional fallbacks and can be restored without changing workload routes.
         </p>
       </div>
       {editingGateway !== undefined && (
@@ -201,10 +202,16 @@ function GatewayRow({ gateway, onEdit }: { gateway: AiGateway; onEdit: () => voi
     onError: (error) => toast.error(error.message),
   })
 
-  const deleteGateway = () => {
-    if (!window.confirm(`Delete ${gateway.displayName}? Routes using it will return to their app defaults.`)) return
+  const removeGateway = () => {
+    const resetting = gateway.deploymentBacked
+    const prompt = resetting
+      ? `Use the server credential for ${gateway.displayName} again? Workload routes will stay unchanged.`
+      : `Delete ${gateway.displayName}? Routes using it will return to their app defaults.`
+    if (!window.confirm(prompt)) return
     remove.mutate(gateway.id, {
-      onSuccess: () => toast.success(`${gateway.displayName} deleted`),
+      onSuccess: () => toast.success(resetting
+        ? `${gateway.displayName} restored to its server fallback`
+        : `${gateway.displayName} deleted`),
       onError: (error) => toast.error(error.message),
     })
   }
@@ -215,7 +222,9 @@ function GatewayRow({ gateway, onEdit }: { gateway: AiGateway; onEdit: () => voi
         <div className="flex flex-wrap items-center gap-2">
           <p className="truncate text-sm font-medium">{gateway.displayName}</p>
           <Badge variant="outline" className="text-[10px]">
-            {gateway.source === 'DEPLOYMENT' ? 'Server' : 'Runtime'}
+            {gateway.credentialSource === 'SETTINGS'
+              ? 'Settings key'
+              : gateway.credentialSource === 'ENVIRONMENT' ? 'Environment key' : 'No key'}
           </Badge>
         </div>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{gateway.baseUrl}</p>
@@ -243,18 +252,24 @@ function GatewayRow({ gateway, onEdit }: { gateway: AiGateway; onEdit: () => voi
             <Button type="button" size="icon" variant="ghost" title={`Edit ${gateway.displayName}`} aria-label={`Edit ${gateway.displayName}`} onClick={onEdit}>
               <Pencil className="size-4" />
             </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              className="text-destructive hover:text-destructive"
-              title={`Delete ${gateway.displayName}`}
-              aria-label={`Delete ${gateway.displayName}`}
-              disabled={remove.isPending}
-              onClick={deleteGateway}
-            >
-              <Trash2 className="size-4" />
-            </Button>
+            {(gateway.overridden || !gateway.deploymentBacked) && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className={cn(!gateway.deploymentBacked && 'text-destructive hover:text-destructive')}
+                title={gateway.deploymentBacked
+                  ? `Use the server credential for ${gateway.displayName}`
+                  : `Delete ${gateway.displayName}`}
+                aria-label={gateway.deploymentBacked
+                  ? `Use the server credential for ${gateway.displayName}`
+                  : `Delete ${gateway.displayName}`}
+                disabled={remove.isPending}
+                onClick={removeGateway}
+              >
+                {gateway.deploymentBacked ? <RotateCcw className="size-4" /> : <Trash2 className="size-4" />}
+              </Button>
+            )}
           </>
         )}
       </div>
@@ -263,7 +278,7 @@ function GatewayRow({ gateway, onEdit }: { gateway: AiGateway; onEdit: () => voi
 }
 
 const GATEWAY_PRESETS = {
-  openai: { label: 'OpenAI', type: 'OPENAI', id: 'openai-direct', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
+  openai: { label: 'Additional OpenAI', type: 'OPENAI', id: 'openai-secondary', name: 'OpenAI secondary', baseUrl: 'https://api.openai.com/v1' },
   nineRouter: { label: '9Router', type: 'NINE_ROUTER', id: 'nine-router', name: '9Router', baseUrl: '' },
   openRouter: { label: 'OpenRouter', type: 'OPENAI_CHAT_COMPATIBLE', id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
   liteLlm: { label: 'LiteLLM', type: 'OPENAI_CHAT_COMPATIBLE', id: 'litellm', name: 'LiteLLM', baseUrl: '' },
@@ -643,7 +658,11 @@ function AiRouteRow({
             onClick={() => update.mutate({ task, route: {
               gatewayId,
               modelId,
-              options: task === 'TEXT_TO_SPEECH' ? { language } : {},
+              options: task === 'TEXT_TO_SPEECH'
+                ? { language }
+                : task === 'REALTIME_TRANSCRIPTION'
+                  ? { language: selection.route.options?.language ?? 'vi' }
+                  : {},
             } }, {
               onSuccess: () => toast.success(`${label.title} route saved`),
               onError: (error) => toast.error(error.message),
@@ -660,6 +679,7 @@ function AiRouteRow({
 function taskCapability(task: AiTask): AiGatewayCapability {
   if (task === 'TEXT_TO_SPEECH') return 'TEXT_TO_SPEECH'
   if (task === 'SPEECH_TO_TEXT') return 'SPEECH_TO_TEXT'
+  if (task === 'REALTIME_TRANSCRIPTION') return 'REALTIME'
   if (task === 'IMAGE_GENERATION') return 'IMAGE_GENERATION'
   if (task === 'EMBEDDING') return 'EMBEDDING'
   return 'CHAT'

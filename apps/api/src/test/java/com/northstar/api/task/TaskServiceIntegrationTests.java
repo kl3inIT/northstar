@@ -21,7 +21,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * due-today + completed-today; completing removes a task from tomorrow's list;
  * upcoming windows exclude today.
  */
-@SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
+@SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class TaskServiceIntegrationTests {

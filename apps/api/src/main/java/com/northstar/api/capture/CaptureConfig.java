@@ -11,7 +11,6 @@ import java.time.ZoneId;
 import org.springframework.ai.audio.transcription.TranscriptionModel;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
 
 /**
  * Wires the capture module for this app (the shared ChatClient bean lives in
@@ -19,7 +18,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
  * components so apps without an LLM (mcp, worker) never try to build them.
  */
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(RealtimeCaptureProperties.class)
 class CaptureConfig {
 
     @Bean

@@ -25,9 +25,10 @@ record AiGatewayDefinition(
         return !baseUrl.isBlank() && !apiKey.isBlank();
     }
 
-    AiGatewayDescriptor descriptor() {
+    AiGatewayDescriptor descriptor(AiCredentialSource credentialSource,
+            boolean deploymentBacked, boolean overridden) {
         return new AiGatewayDescriptor(id, displayName, type, type.capabilities(), configured(), source,
-                source == AiGatewaySource.SETTINGS, baseUrl, models, ttsTargets,
+                credentialSource, deploymentBacked, overridden, true, baseUrl, models, ttsTargets,
                 webSearchTargets, webFetchTargets, sttTargets, imageTargets, embeddingTargets,
                 discoverModels,
                 Math.toIntExact(timeout.toSeconds()));

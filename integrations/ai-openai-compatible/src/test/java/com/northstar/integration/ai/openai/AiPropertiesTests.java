@@ -41,6 +41,7 @@ class AiPropertiesTests {
         assertEquals("gpt-4o-mini", defaults.get(AiTask.IMAGE_CAPTION));
         assertEquals("openai/tts-1-hd/alloy", defaults.get(AiTask.TEXT_TO_SPEECH));
         assertEquals("gpt-4o-mini-transcribe", defaults.get(AiTask.SPEECH_TO_TEXT));
+        assertEquals("gpt-realtime-whisper", defaults.get(AiTask.REALTIME_TRANSCRIPTION));
         assertEquals("gpt-image-2", defaults.get(AiTask.IMAGE_GENERATION));
         assertEquals("text-embedding-3-large", defaults.get(AiTask.EMBEDDING));
     }
@@ -64,6 +65,7 @@ class AiPropertiesTests {
                 "caption-combo",
                 "openai/tts-1-hd/alloy",
                 "gpt-4o-mini-transcribe",
+                "gpt-realtime-whisper",
                 "gpt-image-2",
                 "text-embedding-3-large");
         return new AiProperties("custom-router", Map.of("custom-router", gateway), routes,
