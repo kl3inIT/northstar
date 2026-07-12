@@ -11,5 +11,6 @@ public record VocabEnrichmentPreview(
         @NotNull List<String> antonyms,
         String contrast,
         String mnemonic,
+        VocabWordFormation wordFormation,
         @NotNull String metadata) {
 }

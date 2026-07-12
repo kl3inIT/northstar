@@ -14,8 +14,10 @@ import com.northstar.core.study.VocabCardSummary;
 import com.northstar.core.study.VocabCoach;
 import com.northstar.core.study.VocabEnrichmentField;
 import com.northstar.core.study.VocabEnrichmentPreview;
+import com.northstar.core.study.VocabDeckService;
 import com.northstar.core.study.VocabLanguage;
 import com.northstar.core.study.VocabReviewLog;
+import com.northstar.core.study.VocabReviewDirection;
 import com.northstar.core.study.VocabService;
 import com.northstar.core.study.WritingService;
 import java.time.Instant;
@@ -31,6 +33,8 @@ class StudyControllerTests {
     private final StudyService study = mock(StudyService.class);
     private final VocabService vocab = mock(VocabService.class);
     private final VocabCoach coach = mock(VocabCoach.class);
+    private final VocabDeckService decks = mock(VocabDeckService.class);
+    private final VocabEnrichmentJobService enrichmentJobs = mock(VocabEnrichmentJobService.class);
     private final WritingService writing = mock(WritingService.class);
     private final SpeakingService speaking = mock(SpeakingService.class);
     private StudyController controller;
@@ -38,7 +42,7 @@ class StudyControllerTests {
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        controller = new StudyController(study, vocab, coach, writing, speaking,
+        controller = new StudyController(study, vocab, coach, decks, enrichmentJobs, writing, speaking,
                 (ObjectProvider<SpeechAssessor>) mock(ObjectProvider.class),
                 (ObjectProvider<SpeakingCoach>) mock(ObjectProvider.class));
     }
@@ -47,14 +51,17 @@ class StudyControllerTests {
     void manualRatingIsTheOnlyReviewEndpointMemoryWrite() {
         UUID id = UUID.randomUUID();
         VocabCardSummary expected = card(id);
-        when(vocab.recordReview(id, 0.6, VocabReviewLog.Rating.HARD,
+        when(vocab.recordReview(id, VocabReviewDirection.RECOGNITION, 0.6,
+                VocabReviewLog.Rating.HARD,
                 VocabReviewLog.ReviewSource.MANUAL)).thenReturn(expected);
 
         VocabCardSummary actual = controller.recordVocabReview(id,
-                new StudyRequest.VocabReviewRequest(VocabReviewLog.Rating.HARD));
+                new StudyRequest.VocabReviewRequest(VocabReviewLog.Rating.HARD,
+                        VocabReviewDirection.RECOGNITION));
 
         assertThat(actual).isSameAs(expected);
-        verify(vocab).recordReview(id, 0.6, VocabReviewLog.Rating.HARD,
+        verify(vocab).recordReview(id, VocabReviewDirection.RECOGNITION, 0.6,
+                VocabReviewLog.Rating.HARD,
                 VocabReviewLog.ReviewSource.MANUAL);
     }
 
@@ -62,7 +69,7 @@ class StudyControllerTests {
     void reviewQueueIsScopedByLanguageAndDeck() {
         controller.vocabReviewCards(VocabLanguage.ENGLISH, "IELTS", 10);
 
-        verify(vocab).atRisk(VocabLanguage.ENGLISH, "IELTS", 10, null);
+        verify(vocab).reviewQueue(VocabLanguage.ENGLISH, "IELTS", 10, null);
     }
 
     @Test
@@ -71,7 +78,8 @@ class StudyControllerTests {
         VocabCardSummary card = card(id);
         Set<VocabEnrichmentField> fields = Set.of(VocabEnrichmentField.MNEMONIC);
         VocabEnrichmentPreview expected = new VocabEnrichmentPreview(null, List.of(), List.of(),
-                List.of(), null, "Minute details.", "{\"mnemonic\":\"Minute details.\"}");
+                List.of(), null, "Minute details.", null,
+                "{\"mnemonic\":\"Minute details.\"}");
         when(vocab.find(id)).thenReturn(card);
         when(coach.enrich(card, fields)).thenReturn(expected);
 
@@ -87,6 +95,7 @@ class StudyControllerTests {
         Instant now = Instant.parse("2026-07-12T00:00:00Z");
         return new VocabCardSummary(id, "meticulous", "tỉ mỉ",
                 "{\"reading\":\"/məˈtɪkjələs/\",\"partOfSpeech\":\"adjective\"}",
-                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24, now, 2, false, now, 1);
+                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24, now, 2, false, now, 1,
+                false, null, null);
     }
 }

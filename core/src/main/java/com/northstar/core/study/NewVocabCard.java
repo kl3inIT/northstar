@@ -7,5 +7,10 @@ import java.util.UUID;
  * audio — whatever the capturing surface knows); null when there is none.
  */
 public record NewVocabCard(String front, String back, String metadata,
-        VocabLanguage language, String deck, UUID disciplineId) {
+        VocabLanguage language, String deck, UUID disciplineId, Boolean productionEnabled) {
+
+    public NewVocabCard(String front, String back, String metadata,
+            VocabLanguage language, String deck, UUID disciplineId) {
+        this(front, back, metadata, language, deck, disciplineId, null);
+    }
 }

@@ -109,7 +109,7 @@ public record AiProperties(
         static Routes empty() {
             return new Routes("gpt-5.5", "gpt-5.5", "gpt-5.5", "gpt-5.5",
                     "gpt-5.5", "gpt-5.5", "openai/gpt-4o-mini-tts/alloy",
-                    "whisper-1", "gpt-image-1", "text-embedding-3-large");
+                    "whisper-1", "gpt-image-2", "text-embedding-3-large");
         }
 
         Map<AiTask, String> byTask() {

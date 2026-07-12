@@ -29,7 +29,7 @@ class VocabLanguageDeckTests {
         VocabCard hsk = card("磨蹭", VocabLanguage.CHINESE, "HSK4", 0.1);
         when(cards.findBySuspendedFalse()).thenReturn(List.of(ielts, daily, hsk));
         when(reviews.countByCard(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
-        VocabService service = new VocabService(cards, reviews);
+        VocabService service = new VocabService(cards, reviews, mock(VocabDeckService.class));
 
         assertThat(service.atRisk(VocabLanguage.ENGLISH, "IELTS", 20, NOW))
                 .extracting(VocabCardSummary::front).containsExactly("meticulous");
@@ -63,6 +63,22 @@ class VocabLanguageDeckTests {
         assertThat(card.getBeta()).isEqualTo(beta);
         assertThat(card.getHalflifeHours()).isEqualTo(halfLife);
         assertThat(card.getLastReviewedAt()).isEqualTo(reviewedAt);
+    }
+
+    @Test
+    void productionDirectionHasIndependentMemoryAndIsTheOnlySiblingQueued() {
+        VocabCardRepository cards = mock(VocabCardRepository.class);
+        VocabReviewLogRepository reviews = mock(VocabReviewLogRepository.class);
+        VocabCard card = card("serendipity", VocabLanguage.ENGLISH, "IELTS", 20);
+        card.setProductionEnabled(true, NOW);
+        when(cards.findBySuspendedFalse()).thenReturn(List.of(card));
+        when(reviews.countByCard(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
+        VocabService service = new VocabService(cards, reviews, mock(VocabDeckService.class));
+
+        assertThat(service.reviewQueue(VocabLanguage.ENGLISH, "IELTS", 20, NOW))
+                .singleElement()
+                .extracting(VocabReviewCardSummary::direction)
+                .isEqualTo(VocabReviewDirection.PRODUCTION);
     }
 
     private static VocabCard card(String front, VocabLanguage language, String deck,

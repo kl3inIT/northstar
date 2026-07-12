@@ -57,6 +57,10 @@ public class VocabReviewLog extends BaseEntity {
     @Column(nullable = false, length = 16)
     private ReviewSource source;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private VocabReviewDirection direction;
+
     @Column(name = "alpha_before", nullable = false)
     private double alphaBefore;
 
@@ -82,6 +86,15 @@ public class VocabReviewLog extends BaseEntity {
     public VocabReviewLog(UUID id, UUID cardId, Instant reviewedAt, double success, Rating rating,
             double elapsedHours, ReviewSource source, double alphaBefore, double betaBefore,
             double halflifeBefore, double alphaAfter, double betaAfter, double halflifeAfter) {
+        this(id, cardId, reviewedAt, success, rating, elapsedHours, source,
+                VocabReviewDirection.RECOGNITION, alphaBefore, betaBefore, halflifeBefore,
+                alphaAfter, betaAfter, halflifeAfter);
+    }
+
+    public VocabReviewLog(UUID id, UUID cardId, Instant reviewedAt, double success, Rating rating,
+            double elapsedHours, ReviewSource source, VocabReviewDirection direction,
+            double alphaBefore, double betaBefore, double halflifeBefore,
+            double alphaAfter, double betaAfter, double halflifeAfter) {
         super(id);
         this.cardId = cardId;
         this.reviewedAt = reviewedAt;
@@ -89,6 +102,7 @@ public class VocabReviewLog extends BaseEntity {
         this.rating = rating;
         this.elapsedHours = elapsedHours;
         this.source = source;
+        this.direction = direction;
         this.alphaBefore = alphaBefore;
         this.betaBefore = betaBefore;
         this.halflifeBefore = halflifeBefore;
@@ -119,5 +133,9 @@ public class VocabReviewLog extends BaseEntity {
 
     public ReviewSource getSource() {
         return source;
+    }
+
+    public VocabReviewDirection getDirection() {
+        return direction;
     }
 }

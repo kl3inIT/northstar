@@ -24,7 +24,7 @@ class VocabCoachTests {
         var generated = new VocabCoach.GeneratedEnrichment(
                 "She keeps meticulous records. — Cô ấy lưu hồ sơ rất tỉ mỉ.",
                 List.of("meticulous planning"), List.of("careful"), List.of("careless"),
-                "Meticulous emphasizes every detail.", "Think: minute details.");
+                "Meticulous emphasizes every detail.", "Think: minute details.", null);
 
         VocabEnrichmentPreview preview = VocabCoach.preview(
                 "{\"reading\":\"/məˈtɪkjələs/\",\"partOfSpeech\":\"adjective\",\"future\":7}",
@@ -46,7 +46,7 @@ class VocabCoachTests {
     @Test
     void malformedLegacyMetadataCanBeRepairedByAnExplicitPreview() {
         var generated = new VocabCoach.GeneratedEnrichment(null, null, null, null,
-                null, "Minute details make meticulous.");
+                null, "Minute details make meticulous.", null);
 
         VocabEnrichmentPreview preview = VocabCoach.preview("not-json", generated,
                 Set.of(VocabEnrichmentField.MNEMONIC), json);
@@ -57,7 +57,7 @@ class VocabCoachTests {
     @Test
     void structuredOutputValidationRejectsEmptyRequestedFields() {
         var generated = new VocabCoach.GeneratedEnrichment("", List.of(), List.of(),
-                List.of(), "", "");
+                List.of(), "", "", null);
 
         assertThat(VocabCoach.enrichmentProblem(generated,
                 Set.of(VocabEnrichmentField.EXAMPLE, VocabEnrichmentField.SYNONYMS)))
@@ -66,5 +66,35 @@ class VocabCoachTests {
         assertThat(VocabCoach.answerProblem(new VocabAnswerAssessment(
                 VocabAnswerAssessment.Verdict.CLOSE, "Missing the sense of careful detail.")))
                 .isNull();
+    }
+
+    @Test
+    void wordFormationIsStructuredAndMayBeOmittedWhenNotUseful() {
+        VocabWordFormation formation = new VocabWordFormation(List.of(
+                new VocabWordPart("re-", "prefix", "again"),
+                new VocabWordPart("assign", "base", "give a task")),
+                "reassign means assign again", List.of("assign", "assignment", "reassignment"));
+        var generated = new VocabCoach.GeneratedEnrichment(null, null, null, null,
+                null, null, formation);
+
+        VocabEnrichmentPreview preview = VocabCoach.preview("{}", generated,
+                Set.of(VocabEnrichmentField.WORD_FORMATION), json);
+
+        assertThat(preview.wordFormation()).isEqualTo(formation);
+        assertThat(preview.metadata()).contains("\"wordFormation\"").contains("\"prefix\"");
+
+        var absent = new VocabCoach.GeneratedEnrichment(null, null, null, null,
+                null, null, null);
+        assertThat(VocabCoach.enrichmentProblem(absent,
+                Set.of(VocabEnrichmentField.WORD_FORMATION))).isNull();
+
+        var malformed = new VocabCoach.GeneratedEnrichment(null, null, null, null,
+                null, null, new VocabWordFormation(List.of(
+                        new VocabWordPart("serendipity", "history", "uncertain origin")),
+                        "Not a useful modern decomposition", List.of()));
+        assertThat(VocabCoach.enrichmentProblem(malformed,
+                Set.of(VocabEnrichmentField.WORD_FORMATION))).isNull();
+        assertThat(VocabCoach.preview("{}", malformed,
+                Set.of(VocabEnrichmentField.WORD_FORMATION), json).wordFormation()).isNull();
     }
 }

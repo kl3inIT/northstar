@@ -5,16 +5,10 @@ import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Read model for one card: content plus the memory numbers the page and the
- * chat quiz reason about. {@code recallProbability} is computed at read time
- * for "now" — there is no due date to expose. {@code metadata} is the raw
- * JSON string ({"reading": ..., "example": ...}); clients parse what they
- * know and ignore the rest. Base language metadata uses {@code reading} for
- * IPA/pinyin and {@code partOfSpeech} for the lexical category.
- */
-public record VocabCardSummary(
+/** One direction-specific review prompt backed by a shared vocabulary item. */
+public record VocabReviewCardSummary(
         @NotNull UUID id,
+        @NotNull VocabReviewDirection direction,
         @NotNull String front,
         @NotNull String back,
         String metadata,
@@ -27,8 +21,5 @@ public record VocabCardSummary(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int reviewCount,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean suspended,
         @NotNull Instant createdAt,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long version,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean productionEnabled,
-        Double productionRecallProbability,
-        Integer productionReviewCount) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long version) {
 }

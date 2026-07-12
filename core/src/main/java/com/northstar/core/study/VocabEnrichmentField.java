@@ -7,5 +7,7 @@ public enum VocabEnrichmentField {
     SYNONYMS,
     ANTONYMS,
     CONTRAST,
-    MNEMONIC
+    MNEMONIC,
+    WORD_FORMATION,
+    IMAGE
 }
