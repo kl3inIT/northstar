@@ -1,6 +1,8 @@
 # FSRS Vocabulary Scheduling — Plan
 
-Status: active.
+Status: completed 2026-07-12. All four blocks, local gates, clean-schema boot,
+and browser/API/DB verification passed; Decision 0030 and Study sources of truth
+contain the consolidated behavior.
 
 ## Block A — Persistence and scheduler boundary
 

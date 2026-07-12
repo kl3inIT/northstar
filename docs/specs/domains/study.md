@@ -4,7 +4,7 @@
 
 Study combines a capture-first practice log, a focused vocabulary memory,
 an LLM writing tutor, and measured speech practice with one
-shared grammar-error history. There is no due-date queue, streak system,
+shared grammar-error history. There is no streak system,
 lesson content, or conversational voice agent: entries arrive through
 Capture/chat or the focused speech workflows, and `/study` answers "how much,
 what, and is it moving".
@@ -35,20 +35,21 @@ explicitly says not to save. A contextual reference such as "that word" must
 resolve to exactly one lexical item; incidental words in prose, quotations, or
 research are not auto-saved.
 
-Anki's mechanics rebuilt AI-native: each card carries an Ebisu v2 memory
-model (`alpha`, `beta`, `halflifeHours`, anchored at `lastReviewedAt`) instead
-of a due date. Every consumer asks "which N cards are most at risk right now"
-via predicted recall, so missed days never build a backlog. New cards start
-balanced (α=β=2) at a one-day half-life; ~10 new cards a day is guidance in
-the tool description, not a hard wall.
+Anki's mechanics rebuilt AI-native: each review direction carries an FSRS-6
+memory state (Learning, Review, or Relearning; step, stability, difficulty,
+due time, and last review). Northstar uses the official Open Spaced Repetition
+Java implementation behind a provider-neutral core wrapper, desired retention
+90%, learning steps 1m/10m, relearning 10m, maximum interval 36500 days, the
+published 21 default parameters, and deterministic-seeded fuzzing. ~10 new
+cards a day remains guidance in the tool description, not a hard wall.
 
 Recognition (target expression → saved meaning) is always enabled. A card may
 also enable production (saved, sense-specific meaning → target expression),
-which owns an independent Ebisu state and review-log direction without copying
+which owns an independent FSRS scheduling row and review-log direction without copying
 the card content. Deck settings provide the default for newly-created cards;
 existing cards stay recognition-only unless explicitly changed. Each queue
-snapshot selects only the weaker enabled direction for an item, so both sides
-never appear as siblings in one session.
+session selects at most one due direction for an item. Reviewing it buries the
+enabled sibling until the next midnight in the browser's timezone.
 
 - `front` is the word and `back` its meaning. Tone-marked pinyin/IPA
   `reading` and `partOfSpeech` are the base language fields. They travel in a
@@ -57,7 +58,7 @@ never appear as siblings in one session.
 - Every card belongs to exactly one `ENGLISH` or `CHINESE` library and may
   have one flat deck inside it. A missing deck is displayed as `General`;
   `All decks` is a review scope, not stored data. Changing language or deck
-  never changes the card's Ebisu model or immutable review history. Existing
+  never changes either FSRS schedule or immutable review history. Existing
   cards are backfilled deterministically (Han front → Chinese, otherwise
   English), without an AI call.
 - Examples, collocations, synonyms, antonyms, easily-confused-word contrast,
@@ -75,17 +76,19 @@ never appear as siblings in one session.
 - Focused reviews happen on the Vocabulary page; chat may still conduct a
   quiz. The learner first selects English or Chinese, then `All decks`,
   `General`, or one saved deck such as IELTS/HSK4. A browser-owned 10/20/30-card
-  snapshot takes the lowest-recall active items only inside that scope, chooses
-  one weakest enabled direction per item, and never mixes languages. Production
+  session takes due, unburied items only inside that scope and never mixes
+  languages. Intraday Learning/Relearning comes first, then Review, then new;
+  lower retrievability breaks ties. Production
   prompts hide listening until reveal. Optional free-text answer checking
   returns `CORRECT`, `CLOSE`, or `MISSED` with a short explanation but does
   not select a rating or update memory. Only the learner's subsequent
-  Again/Hard/Good/Easy action records a `MANUAL` review. Ratings map to Ebisu
-  success values: AGAIN=0, HARD=0.6, GOOD=0.9, EASY=1.0 (binary update at
-  ≥0.5).
-- Every review appends to an immutable log carrying rating, elapsed hours,
-  and the model triple before/after — enough for a future FSRS-style
-  optimizer to retrain from history.
+  Again/Hard/Good/Easy action records a `MANUAL` review. The four buttons show
+  server-computed next intervals and own distinct FSRS outcomes. Again from
+  Review is a lapse and enters Relearning; Hard means the learner did recall
+  with difficulty and must never stand in for a forgotten answer.
+- Every review appends to an immutable log carrying rating, elapsed days, and
+  state/step/stability/difficulty/due before and after. At eight Review-state
+  lapses the direction is visibly marked as a leech but is not silently hidden.
 - Cards can be suspended (kept with history, excluded from at-risk) and
   deleted (cascades the review log).
 - A card can be read aloud from its row. The browser records raw mic samples,
@@ -207,7 +210,7 @@ skipped, never fatal.
   Vocabulary: separate English/Chinese tabs, a deck selector, and scoped
   tracked/at-risk/new-this-week stats plus search across word, meaning,
   reading, and part of speech. Each table row shows its deck and the table is
-  sorted most-at-risk first with suspended cards last. It provides
+  sorted due-first then by retrievability, with suspended cards last. It provides
   pause/resume/edit/delete, language/deck correction, live
   pronunciation assessment, and a keyboard-first weak-card reviewer. The
   reviewer supports recognition and optional production, typed or dictated
@@ -216,7 +219,8 @@ skipped, never fatal.
   of speech, and one example remain visible; richer usage/relationship/memory
   fields live under a counted `Study details` disclosure. Expanded details
   scroll inside the card while the rating footer remains visible,
-  Space to flip between question and answer, 1-4 to rate, R to listen, Escape to exit, a completion
+  Space to flip between question and answer, 1-4 to rate with the real next
+  interval, R to listen, Escape to exit, a completion
   tally, deck/per-card two-direction controls, and an opt-in background
   enrichment Sheet whose ready preview replaces the field picker instead of
   forcing a scroll. Applied mnemonic images appear only on the question/front
@@ -232,7 +236,8 @@ skipped, never fatal.
   an optional entry path for vocab quizzes. Writing grading remains in chat.
 - REST surface: `/api/study/sessions` (GET/POST/PUT/DELETE), `/summary`,
   `/mocks`, `/skills`, `/vocab` (GET/POST/PUT/DELETE),
-  `/vocab/review` (required language, optional deck, direction-specific rows),
+  `/vocab/review` (required language, optional deck, due direction-specific rows
+  with rating previews),
   `/vocab/decks/settings`, `/vocab/{id}/reviews`,
   `/vocab/{id}/answer-check`,
   `/vocab/{id}/enrichment`, `/vocab/{id}/enrichment-jobs` plus job

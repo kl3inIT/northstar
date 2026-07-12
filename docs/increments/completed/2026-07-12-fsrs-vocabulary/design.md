@@ -125,3 +125,20 @@ and reset controls.
 6. A local browser pass reviews a new card through Learning and exercises a
    Review lapse/relearning path once before consolidation.
 
+## Completion evidence
+
+- The official FSRS-6 Java artifact and exact builder/card APIs were verified
+  from Maven binary and source JARs before implementation.
+- V1 through V45 migrated on an isolated PostgreSQL database and Hibernate
+  schema validation completed successfully.
+- Java compile/test plus Spring Modulith/core verification, web lint/tests,
+  TypeScript typecheck, and production build are green. Lint reports only the
+  existing repository warnings outside this increment.
+- A real 1440x1000 Chromium pass reviewed two fresh IELTS cards. The UI showed
+  Learning previews `1m / 6m / 10m / 12-13d`; Good persisted Learning step 1,
+  Easy persisted Review, and the production sibling was buried to the next
+  Asia/Bangkok midnight. After making that Review card due, the UI showed
+  `10m / 10d / 20d / 1mo`; Again persisted Relearning step 0, a 10-minute due
+  time, and lapse count 1. All three writes returned 200 and the console was clean.
+- Decision 0030, Study spec/test matrix, roadmap, and Northstar App Behavior
+  are updated.
