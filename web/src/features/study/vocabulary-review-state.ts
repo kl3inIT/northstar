@@ -1,4 +1,4 @@
-import type { VocabEnrichmentField, VocabRating } from '@/lib/study-api'
+import type { VocabCard, VocabEnrichmentField, VocabRating } from '@/lib/study-api'
 
 export type RatingTally = Record<VocabRating, number>
 
@@ -43,6 +43,22 @@ export function cardMatchesDeck(storedDeck: string | undefined, scope: string): 
 
 export function deckQuery(scope: string): string | undefined {
   return scope === 'ALL' ? undefined : scope
+}
+
+export function directionIsDue(
+  dueAt: string | undefined,
+  buriedUntil: string | undefined,
+  now: number,
+): boolean {
+  if (!dueAt) return false
+  return new Date(dueAt).getTime() <= now
+    && (!buriedUntil || new Date(buriedUntil).getTime() <= now)
+}
+
+export function cardHasDueDirection(card: VocabCard, now: number): boolean {
+  return directionIsDue(card.dueAt, card.buriedUntil, now)
+    || (card.productionEnabled
+      && directionIsDue(card.productionDueAt, card.productionBuriedUntil, now))
 }
 
 /** Selection alone is inert; only an explicit Generate action returns request fields. */

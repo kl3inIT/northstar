@@ -189,7 +189,13 @@ export function VocabularyReviewer({
 
   function rate(rating: VocabRating) {
     if (!card || !revealed || review.isPending) return
-    review.mutate({ id: card.id, rating, direction: card.direction }, {
+    review.mutate({
+      id: card.id,
+      rating,
+      direction: card.direction,
+      previewedAt: card.previewedAt,
+      schedulingVersion: card.schedulingVersion,
+    }, {
       onSuccess: () => {
         setTally((current) => incrementRating(current, rating))
         setIndex((current) => current + 1)
@@ -305,7 +311,7 @@ export function VocabularyReviewer({
       <Card className="mx-auto max-w-2xl py-12 text-center">
         <CardContent className="flex flex-col items-center gap-3">
           <BookOpen className="size-7 text-muted-foreground" />
-          <div><h2 className="font-semibold">No active cards to review</h2><p className="text-sm text-muted-foreground">Resume a paused card or ask the Assistant to save a word.</p></div>
+          <div><h2 className="font-semibold">You&apos;re caught up</h2><p className="text-sm text-muted-foreground">Nothing is due in this deck right now. FSRS will bring cards back when recall needs reinforcement.</p></div>
           <Button variant="outline" onClick={onExit}><ArrowLeft /> Back to vocabulary</Button>
         </CardContent>
       </Card>
@@ -320,7 +326,12 @@ export function VocabularyReviewer({
         <Button variant="ghost" size="sm" onClick={onExit}><X /> Exit</Button>
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-            <span>{language === 'ENGLISH' ? 'English' : 'Chinese'} · {deck ?? 'All decks'}</span><span className="tabular-nums">{index + 1} / {cards.length}</span>
+            <span className="flex items-center gap-2">
+              {language === 'ENGLISH' ? 'English' : 'Chinese'} · {deck ?? 'All decks'}
+              <Badge variant="outline" className="h-5 rounded px-1.5 text-[10px] font-medium">{scheduleLabel(card.schedulingState)}</Badge>
+              {card.leech && <Badge variant="destructive" className="h-5 rounded px-1.5 text-[10px]">Leech · {card.lapseCount} lapses</Badge>}
+            </span>
+            <span className="tabular-nums">{index + 1} / {cards.length}</span>
           </div>
           <div role="progressbar" aria-valuemin={0} aria-valuemax={cards.length} aria-valuenow={index}
             className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -455,7 +466,7 @@ export function VocabularyReviewer({
                   onClick={() => rate(item.rating)}>
                   <span className="flex items-center gap-1.5"><item.icon /> {item.label}</span>
                   <span className={cn('text-[11px]', item.rating === 'GOOD' ? 'text-primary-foreground/75' : 'text-muted-foreground')}>
-                    {item.hint} · {ratingIndex + 1}
+                    {card.ratingPreviews.find((preview) => preview.rating === item.rating)?.intervalLabel ?? '—'} · {item.hint} · {ratingIndex + 1}
                   </span>
                 </Button>
               ))}
@@ -558,14 +569,20 @@ function ReviewComplete({ total, tally, onReviewMore, onExit }: { total: number;
     <Card className="mx-auto w-full max-w-2xl py-10 text-center">
       <CardContent className="space-y-6">
         <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary"><Check className="size-6" /></div>
-        <div><h2 className="text-2xl font-semibold">Review complete</h2><p className="mt-1 text-sm text-muted-foreground">You reviewed {total} {total === 1 ? 'card' : 'cards'}. Your memory model is up to date.</p></div>
+        <div><h2 className="text-2xl font-semibold">Due cards complete</h2><p className="mt-1 text-sm text-muted-foreground">You reviewed {total} {total === 1 ? 'card' : 'cards'}. FSRS has scheduled each next review.</p></div>
         <div className="grid grid-cols-4 divide-x rounded-lg border">
           {RATINGS.map(({ rating, label }) => <div key={rating} className="p-3"><p className="text-lg font-semibold tabular-nums">{tally[rating]}</p><p className="text-xs text-muted-foreground">{label}</p></div>)}
         </div>
-        <div className="flex justify-center gap-2"><Button variant="outline" onClick={onExit}><ArrowLeft /> Back to vocabulary</Button><Button onClick={onReviewMore}><RotateCcw /> Review more</Button></div>
+        <div className="flex justify-center gap-2"><Button variant="outline" onClick={onExit}><ArrowLeft /> Back to vocabulary</Button><Button onClick={onReviewMore}><RotateCcw /> Check due cards</Button></div>
       </CardContent>
     </Card>
   )
+}
+
+function scheduleLabel(state: VocabReviewCard['schedulingState']): string {
+  if (state === 'RELEARNING') return 'Relearning'
+  if (state === 'LEARNING') return 'Learning'
+  return 'Review'
 }
 
 function EnrichmentSheet({

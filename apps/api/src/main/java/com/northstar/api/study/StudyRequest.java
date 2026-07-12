@@ -76,7 +76,7 @@ final class StudyRequest {
     record VocabReviewRequest(@NotNull VocabReviewLog.Rating rating,
             @NotNull VocabReviewDirection direction,
             @NotNull Instant previewedAt,
-            @PositiveOrZero long schedulingVersion) {
+            @NotNull @PositiveOrZero Long schedulingVersion) {
     }
 
     record VocabAnswerRequest(@NotBlank @Size(max = 1000) String answer,

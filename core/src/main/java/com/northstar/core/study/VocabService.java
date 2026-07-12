@@ -276,7 +276,8 @@ public class VocabService {
             return new VocabCardSummary(card.getId(), card.getFront(), card.getBack(),
                     card.getMetadata(), card.getLanguage(), card.getDeck(), card.getDisciplineId(),
                     VocabScheduler.retrievability(recognition, now), recognition.getStabilityDays(),
-                    recognition.getDueAt(), recognition.getLastReviewedAt(), recognition.getState(),
+                    recognition.getDueAt(), recognition.getBuriedUntil(),
+                    recognition.getLastReviewedAt(), recognition.getState(),
                     recognition.getLapseCount(), recognition.isLeech(), counts.getOrDefault(
                             new ReviewKey(card.getId(), VocabReviewDirection.RECOGNITION), 0),
                     card.isSuspended(), card.getCreatedAt(), card.getVersion(),
@@ -284,6 +285,7 @@ public class VocabService {
                     production == null ? null : VocabScheduler.retrievability(production, now),
                     production == null ? null : production.getStabilityDays(),
                     production == null ? null : production.getDueAt(),
+                    production == null ? null : production.getBuriedUntil(),
                     production == null ? null : production.getState(),
                     production == null ? null : production.getLapseCount(),
                     production == null ? null : production.isLeech(),

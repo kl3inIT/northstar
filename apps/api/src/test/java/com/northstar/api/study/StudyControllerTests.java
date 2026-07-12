@@ -59,7 +59,7 @@ class StudyControllerTests {
 
         VocabCardSummary actual = controller.recordVocabReview(id,
                 new StudyRequest.VocabReviewRequest(VocabReviewLog.Rating.HARD,
-                        VocabReviewDirection.RECOGNITION, previewedAt, 3), "Asia/Bangkok");
+                        VocabReviewDirection.RECOGNITION, previewedAt, 3L), "Asia/Bangkok");
 
         assertThat(actual).isSameAs(expected);
         verify(vocab).recordReview(id, VocabReviewDirection.RECOGNITION,
@@ -97,8 +97,8 @@ class StudyControllerTests {
         Instant now = Instant.parse("2026-07-12T00:00:00Z");
         return new VocabCardSummary(id, "meticulous", "tỉ mỉ",
                 "{\"reading\":\"/məˈtɪkjələs/\",\"partOfSpeech\":\"adjective\"}",
-                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24.0, now, now,
+                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24.0, now, null, now,
                 VocabSchedulingState.REVIEW, 0, false, 2, false, now, 1,
-                false, null, null, null, null, null, null, null);
+                false, null, null, null, null, null, null, null, null);
     }
 }
