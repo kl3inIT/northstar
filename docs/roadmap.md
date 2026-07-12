@@ -8,7 +8,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Increment | Status | Notes |
 | --- | --- | --- |
 | Repository and domain foundation | Done | Spring Modulith `core`, API/MCP/worker apps, Flyway schema, PostgreSQL/pgvector, web shell. |
-| Knowledge base baseline | Done | Markdown notes, folders/tags, links/backlinks, note status, search surface. |
+| Knowledge base baseline | Done | Markdown notes, folders/tags, links/backlinks, note status, search surface, and optional primary-project linking with project note panels. |
 | AI capture baseline | Done | Capture endpoints and AI-backed note drafting path. |
 | Planning baseline | Done | Disciplines, projects/milestones, tasks, calendar events, recurrence, free-slot lookup. |
 | Assistant and MCP tools | Done | In-app assistant tools, reactive Vercel streaming with structured sources, encrypted typed gateways with explicit OpenAI/9Router/chat-compatible capabilities, per-conversation searchable model selection, native AI Elements attachments/actions/citations, and streamable-http MCP exposure. |
