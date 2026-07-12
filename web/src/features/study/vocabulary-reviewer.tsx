@@ -43,6 +43,14 @@ import {
   type VocabRating,
 } from '@/lib/study-api'
 import { cn } from '@/lib/utils'
+import {
+  EMPTY_TALLY,
+  enrichmentFieldsForRequest,
+  incrementRating,
+  reviewIsComplete,
+  reviewKeyboardAction,
+  type RatingTally,
+} from './vocabulary-review-state'
 
 const RATINGS: Array<{ rating: VocabRating; label: string; hint: string; icon: typeof RotateCcw }> = [
   { rating: 'AGAIN', label: 'Again', hint: 'Forgot', icon: RotateCcw },
@@ -59,10 +67,6 @@ const ENRICHMENT_OPTIONS: Array<{ field: VocabEnrichmentField; label: string; de
   { field: 'CONTRAST', label: 'Contrast', description: 'Difference from easily confused words' },
   { field: 'MNEMONIC', label: 'Mnemonic', description: 'A truthful memory hook' },
 ]
-
-type RatingTally = Record<VocabRating, number>
-
-const EMPTY_TALLY: RatingTally = { AGAIN: 0, HARD: 0, GOOD: 0, EASY: 0 }
 
 export function VocabularyReviewer({
   limit,
@@ -92,7 +96,7 @@ export function VocabularyReviewer({
 
   const card = cards?.[index]
   const metadata = useMemo(() => parseVocabMetadata(card?.metadata), [card?.metadata])
-  const complete = cards !== null && index >= cards.length
+  const complete = cards !== null && reviewIsComplete(index, cards.length)
   const progress = cards?.length ? Math.min(index / cards.length, 1) : 0
 
   function reveal() {
@@ -123,7 +127,7 @@ export function VocabularyReviewer({
     if (!card || !revealed || review.isPending) return
     review.mutate({ id: card.id, rating }, {
       onSuccess: () => {
-        setTally((current) => ({ ...current, [rating]: current[rating] + 1 }))
+        setTally((current) => incrementRating(current, rating))
         setIndex((current) => current + 1)
         setAnswer('')
         setRevealed(false)
@@ -151,24 +155,15 @@ export function VocabularyReviewer({
 
   useEffect(() => {
     function keydown(event: KeyboardEvent) {
-      if (enrichmentOpen) return
       const target = event.target as HTMLElement | null
       const typing = target?.matches('input, textarea, [contenteditable="true"]')
-      if (event.key === 'Escape') {
-        onExit()
-        return
-      }
-      if (typing) return
-      if (event.key === ' ' && !revealed) {
-        event.preventDefault()
-        reveal()
-      } else if (event.key.toLowerCase() === 'r') {
-        event.preventDefault()
-        listen()
-      } else if (revealed && /^[1-4]$/.test(event.key)) {
-        event.preventDefault()
-        rate(RATINGS[Number(event.key) - 1].rating)
-      }
+      const action = reviewKeyboardAction(event.key, { enrichmentOpen, typing: Boolean(typing), revealed })
+      if (!action) return
+      if (action.type === 'exit') return onExit()
+      event.preventDefault()
+      if (action.type === 'reveal') reveal()
+      else if (action.type === 'listen') listen()
+      else rate(action.rating)
     }
     window.addEventListener('keydown', keydown)
     return () => window.removeEventListener('keydown', keydown)
@@ -374,8 +369,9 @@ function EnrichmentSheet({ open, onOpenChange, card, onApplied }: {
   }
 
   function generate() {
-    if (selected.size === 0) return
-    preview.mutate({ id: card.id, fields: [...selected] }, {
+    const fields = enrichmentFieldsForRequest(selected, true)
+    if (!fields) return
+    preview.mutate({ id: card.id, fields }, {
       onError: (error) => toast.error(error.message),
     })
   }

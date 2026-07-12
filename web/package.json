@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.mjs",
     "typecheck": "tsc -b",
     "preview": "vite preview",
     "gen:api": "pnpm dlx --package @hey-api/openapi-ts@0.99.0 --package typescript@6.0.1-rc openapi-ts -i ../contracts/openapi.json -o src/lib/hey-api -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk zod @tanstack/react-query"
