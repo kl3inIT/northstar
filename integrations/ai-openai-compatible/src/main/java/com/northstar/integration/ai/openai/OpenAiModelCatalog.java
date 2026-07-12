@@ -1,5 +1,7 @@
 package com.northstar.integration.ai.openai;
 
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -64,8 +66,8 @@ class OpenAiModelCatalog {
             return sorted(result);
         }
         try {
-            JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory();
-            requestFactory.setReadTimeout(gateway.timeout());
+            JdkClientHttpRequestFactory requestFactory =
+                    requestFactory(gateway.baseUrl(), gateway.timeout());
             ModelsResponse response = restClient.clone()
                     .baseUrl(gateway.baseUrl())
                     .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + gateway.apiKey())
@@ -102,6 +104,22 @@ class OpenAiModelCatalog {
         int slash = id.lastIndexOf('/');
         String name = slash >= 0 ? id.substring(slash + 1) : id;
         return name.replace('-', ' ');
+    }
+
+    private static JdkClientHttpRequestFactory requestFactory(String baseUrl, Duration timeout) {
+        HttpClient.Builder http = HttpClient.newBuilder()
+                .connectTimeout(timeout)
+                .followRedirects(HttpClient.Redirect.NEVER);
+        if (cleartext(baseUrl)) {
+            http.version(HttpClient.Version.HTTP_1_1);
+        }
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(http.build());
+        requestFactory.setReadTimeout(timeout);
+        return requestFactory;
+    }
+
+    private static boolean cleartext(String baseUrl) {
+        return baseUrl.regionMatches(true, 0, "http://", 0, 7);
     }
 
     private record ModelsResponse(List<ModelResponse> data) {

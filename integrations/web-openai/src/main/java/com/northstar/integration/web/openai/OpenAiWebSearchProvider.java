@@ -173,17 +173,23 @@ public class OpenAiWebSearchProvider implements WebSearchProvider {
     }
 
     private static RestClient client(AiGatewayConnection connection) {
-        HttpClient http = HttpClient.newBuilder()
+        HttpClient.Builder http = HttpClient.newBuilder()
                 .connectTimeout(connection.timeout())
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build();
-        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
+                .followRedirects(HttpClient.Redirect.NEVER);
+        if (cleartext(connection.baseUrl())) {
+            http.version(HttpClient.Version.HTTP_1_1);
+        }
+        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http.build());
         requests.setReadTimeout(connection.timeout());
         return RestClient.builder()
                 .baseUrl(connection.baseUrl())
                 .defaultHeader("Authorization", "Bearer " + connection.apiKey())
                 .requestFactory(requests)
                 .build();
+    }
+
+    private static boolean cleartext(String baseUrl) {
+        return baseUrl.regionMatches(true, 0, "http://", 0, 7);
     }
 
     private static String searchPrompt(WebSearchRequest request) {

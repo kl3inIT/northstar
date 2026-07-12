@@ -214,17 +214,23 @@ public class NineRouterWebProvider implements WebSearchProvider, WebPageReader {
     }
 
     private static RestClient client(AiGatewayConnection gateway) {
-        HttpClient http = HttpClient.newBuilder()
+        HttpClient.Builder http = HttpClient.newBuilder()
                 .connectTimeout(gateway.timeout())
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build();
-        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
+                .followRedirects(HttpClient.Redirect.NEVER);
+        if (cleartext(gateway.baseUrl())) {
+            http.version(HttpClient.Version.HTTP_1_1);
+        }
+        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http.build());
         requests.setReadTimeout(gateway.timeout());
         return RestClient.builder()
                 .baseUrl(gateway.baseUrl())
                 .defaultHeader("Authorization", "Bearer " + gateway.apiKey())
                 .requestFactory(requests)
                 .build();
+    }
+
+    private static boolean cleartext(String baseUrl) {
+        return baseUrl.regionMatches(true, 0, "http://", 0, 7);
     }
 
     private static WebResearchException missingRoute() {
