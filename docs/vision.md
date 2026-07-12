@@ -56,9 +56,10 @@ The planning spine follows Life -> Disciplines -> Projects:
 
 ## Current MVP Shape
 
-The implemented baseline already centers on notes, capture, tasks, projects,
-disciplines, calendar, finance, assistant tools, MCP tools, attachments, and
-search.
+The implemented product centers on notes, capture, tasks, projects, disciplines,
+calendar, finance, study, automations, Morning Briefs, assistant tools, MCP
+tools, attachments, web research, speech, and hybrid search. A React web client
+and Cupertino-first Flutter client consume the same backend contracts.
 
 The immediate product direction is to make daily use feel natural:
 
@@ -89,15 +90,16 @@ tests make the feedback stricter than a quick UI demo. That friction is useful
 because Northstar stores personal data, tasks, decisions, and agent-readable
 context.
 
-## Future Modules
+## Future Direction
 
 Future modules tracked in the roadmap include:
 
-- Study tutor and study logs for IELTS/HSK.
+- Study V1.5, shadowing, dictation, and richer per-card pronunciation history.
 - Scholarship/university research.
 - Habit tracking.
 - Couple/shared workspace.
-- Mobile app.
+- More native mobile domain flows and physical-device validation.
+- Additional automation types, source adapters, and delivery channels.
 - Richer agent session continuity through MCP capture.
 
 Architecture facts move to `ARCHITECTURE.md` only after the code actually lands.

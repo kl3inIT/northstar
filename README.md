@@ -1,80 +1,66 @@
-# Northstar
+<div align="center">
+  <img src="./web/public/logo.png" alt="Northstar" width="96" />
+  <h1>Northstar</h1>
+  <p><strong>A personal growth operating system for knowledge, planning, finance, study, and AI-assisted daily work.</strong></p>
+</div>
 
-[![CI](https://github.com/kl3inIT/northstar/actions/workflows/ci.yml/badge.svg)](https://github.com/kl3inIT/northstar/actions/workflows/ci.yml)
-![Java 25](https://img.shields.io/badge/Java-25-007396?logo=openjdk&logoColor=white)
-![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white)
-![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=0B1220)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript&logoColor=white)
-![PostgreSQL + pgvector](https://img.shields.io/badge/PostgreSQL%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)
-![MCP](https://img.shields.io/badge/MCP-enabled-111827)
-![License](https://img.shields.io/badge/license-pending-lightgrey)
+[![CI](https://github.com/kl3inIT/northstar/actions/workflows/ci.yml/badge.svg)](https://github.com/kl3inIT/northstar/actions/workflows/ci.yml) [![Mobile CI](https://github.com/kl3inIT/northstar/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/kl3inIT/northstar/actions/workflows/mobile-ci.yml) ![Java 25](https://img.shields.io/badge/Java-25-007396?logo=openjdk&logoColor=white) ![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white) ![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=0B1220) ![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white) ![PostgreSQL + pgvector](https://img.shields.io/badge/PostgreSQL%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)
 
-Northstar is a personal growth OS: an Obsidian-lite knowledge base plus AI
-capture, tasks, projects, disciplines, calendar planning, search, and MCP tools
-for coding agents.
+Northstar brings notes, projects, tasks, calendar, personal finance, study,
+automations, and an AI assistant into one personal system. Raw input is captured
+first, reviewed when it becomes structured data, and connected to a durable
+Life -> Disciplines -> Projects spine instead of scattered across isolated apps.
 
-It is built around a simple premise: productivity should not become another job.
-Captured thoughts should find their place in a life structure instead of forcing
-the user to constantly manage folders, tags, templates, and dashboards.
+The application is personal-first and actively developed. It runs as a web app,
+a Cupertino-style Flutter client, a background worker, and an MCP server for
+external agents.
 
-## Status
+## Product Areas
 
-Northstar is an early personal project and reference repo. The code is usable as
-a working prototype, but the product model, APIs, and UI are still moving.
+- **Assistant and Capture** - streamed tool-using chat, text/voice/receipt
+  capture, editable drafts, attachments, citations, web research, and on-demand
+  text to speech.
+- **Knowledge** - Markdown notes, folders, tags, statuses, wiki links,
+  backlinks, attachments, and hybrid keyword/vector search.
+- **Planning** - disciplines, projects, milestones, tasks, recurring calendar
+  events, free-slot lookup, and daily/weekly alignment reviews.
+- **Finance** - VND ledger, balance reconciliation, learned categories,
+  budgets, savings goals, subscriptions, CSV export, and spending insights.
+- **Study** - study logs, Ebisu vocabulary memory, writing feedback, IELTS-style
+  rubric guidance, speaking practice, and Azure pronunciation assessment.
+- **Automations and Briefs** - typed persisted schedules, execution history,
+  retries, public-source Morning Brief research, and reviewable note output.
+- **AI routing** - runtime-configurable OpenAI, 9Router, OpenRouter, LiteLLM,
+  and custom OpenAI-compatible gateway instances with capability-specific
+  Chat, TTS, STT, image, embedding, web-search, and web-fetch catalogs.
+- **Agent access** - streamable HTTP MCP tools for knowledge, tasks, calendar,
+  projects, finance, study, and reviews.
 
-Before publishing as a formal open-source project, choose a license and add a
-`LICENSE` file.
+## Architecture
 
-## Core Model: LDP
-
-Northstar uses an LDP spine: **Life -> Disciplines -> Projects**.
-
-- **Life** creates meaning: the direction a person is trying to move toward.
-- **Disciplines** create direction: durable areas such as study, career, health,
-  finance, personal brand, or scholarship applications.
-- **Projects** create action: concrete multi-step outcomes inside a discipline.
-- **Tasks** are the next actions.
-- **Calendar events** reserve time.
-- **Notes** preserve durable context, decisions, and learning.
-
-Example: "work on my scholarship essay today" is not just a task. It belongs to
-a project, that project serves a discipline, and that discipline should connect
-back to the kind of life the user wants to build.
-
-## What Is Built
-
-- Markdown knowledge base with folders, tags, note status, wiki links, and
-  backlinks.
-- Single-user web login with Spring Security session auth and SPA CSRF.
-- AI capture flow for turning raw thoughts into structured note drafts.
-- Disciplines, projects, milestones, tasks, and calendar planning.
-- Recurring calendar events and free-slot lookup.
-- Attachment/search pipeline with PostgreSQL, pgvector, and derived indexes.
-- In-app assistant tools and streamable-http MCP tools for external agents.
-- React web app backed by a Java/Spring Boot modular monolith.
-- Repository-as-system-of-record harness for AI-assisted development.
-
-## Architecture Snapshot
-
-Northstar is one domain with three backend deployables sharing PostgreSQL:
+Northstar is a modular monolith with three backend deployables sharing one
+PostgreSQL database:
 
 ```text
 core/                 domain library and Spring Modulith modules
-apps/api/             REST API, Flyway owner, OpenAPI emitter
-apps/mcp/             streamable-http MCP tools for agents
-apps/worker/          scheduled background indexing worker
-web/                  Vite React SPA
+apps/api/             REST API, web auth, Flyway owner, OpenAPI emitter
+apps/mcp/             streamable HTTP MCP server
+apps/worker/          scheduled indexing and automation worker
+integrations/         AI, web research, and speech provider adapters
+web/                  Vite + React + TypeScript SPA
+mobile/               adaptive Cupertino-first Flutter client
 contracts/            generated OpenAPI contract
 build-logic/          Gradle convention plugins
 ```
 
-Stack:
+Backend: Java 25, Spring Boot 4.1, Spring Modulith 2.1, Spring Security 7,
+Spring AI, JPA, Flyway, PostgreSQL, and pgvector.
 
-- Backend: Spring Boot 4.1, Java 25, Gradle Kotlin DSL, Spring Modulith 2.1,
-  Spring Security 7, Spring Data JPA, Flyway, PostgreSQL, pgvector, Spring AI.
-- Frontend: Vite, React 19, TypeScript, Tailwind v4, shadcn/ui, TanStack Router,
-  TanStack Query.
-- Contract: OpenAPI emitted by the API and consumed by generated clients.
+Frontend: React 19, TypeScript, Vite, Tailwind CSS v4, shadcn/ui, AI Elements,
+TanStack Router, and TanStack Query. Mobile uses Flutter 3.44 and Dart 3.12.
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for module boundaries, schema
+ownership, authentication, provider routing, and deployment details.
 
 ## Quickstart
 
@@ -84,79 +70,46 @@ Requirements:
 - Docker
 - pnpm
 
-Run locally:
-
 ```bash
-# 0. local config
+# Local configuration. The example keeps login disabled for trusted local use.
 cp .env.example .env
-# fill OPENAI_API_KEY, NORTHSTAR_AUTH_USERNAME, and NORTHSTAR_AUTH_PASSWORD_HASH
+# Set OPENAI_API_KEY. Generate NORTHSTAR_AI_CREDENTIAL_KEY before saving
+# runtime gateway credentials from Settings.
 
-# 1. database
+# PostgreSQL + pgvector
 docker compose up -d
 
-# 2. backend API
+# API (the local profile imports .env)
 SPRING_PROFILES_ACTIVE=local ./gradlew :apps:api:bootRun
 
-# 3. web app
+# Web
 pnpm -C web install
 pnpm -C web dev
 ```
 
-The checked-in IntelliJ run configurations already activate `local`. In
-PowerShell, use
-`$env:SPRING_PROFILES_ACTIVE='local'; ./gradlew :apps:api:bootRun`.
-Production containers activate `prod` in Compose; do not run production with
-the local profile.
+PowerShell API command:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE='local'
+./gradlew :apps:api:bootRun
+```
 
 Local URLs:
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:8888`
 - MCP: `http://localhost:8081/mcp` when `apps/mcp` is running
-- Adminer: `http://localhost:8090`
+- PostgreSQL: `localhost:5432`
 
-## Documentation
-
-The repository is the system of record. Start here, then follow the focused docs
-instead of relying on chat history.
-
-| Path | Purpose |
-| --- | --- |
-| [harness.md](./harness.md) | Repository operating model used for AI-assisted development |
-| [CLAUDE.md](./CLAUDE.md) / [AGENTS.md](./AGENTS.md) | Thin agent map and workflow rules |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | Current stack, deployables, module layout, schema ownership, commands |
-| [docs/vision.md](./docs/vision.md) | Product intent and future scope |
-| [docs/roadmap.md](./docs/roadmap.md) | Increment status and backlog |
-| [docs/conventions.md](./docs/conventions.md) | Code, schema, generated client, and commit conventions |
-| [docs/guidelines/](./docs/guidelines/) | Testing harness, agent safety, asset pipeline, usage guidance |
-| [docs/specs/](./docs/specs/) | Current per-domain behavior |
-| [docs/tests/](./docs/tests/) | Per-domain test coverage and gaps |
-| [docs/decisions/](./docs/decisions/) | Append-only rationale for significant choices |
-| [docs/increments/](./docs/increments/) | Active and completed increment design/plan history |
-
-Old monolithic docs are intentionally retired. Current state is
-`ARCHITECTURE.md` plus the durable specs, tests, guidelines, and decisions.
-
-## Development Harness
-
-Northstar is built with a lightweight production vibe-coding harness:
-
-- Repo docs are the system of record, not chat history.
-- `CLAUDE.md` is a thin map; current facts live in `ARCHITECTURE.md`, specs,
-  tests, guidelines, and decisions.
-- Every meaningful increment goes design -> plan -> execute -> consolidate.
-- Java/Spring feedback is treated as part of the creative loop: prompt, compile,
-  test, refactor, document, repeat.
-- The harness intentionally keeps friction: compiler, types, Modulith
-  boundaries, Flyway validation, generated contracts, and browser checks all
-  push back before a change is considered done.
+To exercise the web login locally, set `NORTHSTAR_AUTH_ENABLED=true` plus
+`NORTHSTAR_AUTH_USERNAME` and a bcrypt `NORTHSTAR_AUTH_PASSWORD_HASH` in
+`.env`. Production Compose always activates the `prod` profile and uses the
+server environment template under `docker/`.
 
 ## Verification
 
-Use the full testing harness in
-[docs/guidelines/testing-harness.md](./docs/guidelines/testing-harness.md).
-
-Common commands:
+The repository treats compile, architecture, context, and UI checks as separate
+gates. Common commands:
 
 ```bash
 ./gradlew --no-daemon compileJava
@@ -164,17 +117,36 @@ Common commands:
 ./gradlew --no-daemon clean test
 pnpm -C web typecheck
 pnpm -C web build
+
+cd mobile
+flutter analyze
+flutter test
+flutter build web --release
 ```
 
-Use `bootRun` only to run an app, not as a terminating verification gate.
+Use `bootRun` to run an application, not as a terminating verification gate.
+The complete workflow lives in
+[docs/guidelines/testing-harness.md](./docs/guidelines/testing-harness.md).
 
-## Contributing
+## Documentation
 
-This repo is still personal-first. If you explore or fork it:
+The repository is the system of record; chat history is not.
 
-- Keep business logic in `core` first.
-- Keep the docs aligned with the operating model in `harness.md`.
-- Do not edit generated clients by hand.
-- Add or update specs/tests/decisions when durable behavior changes.
+| Path | Purpose |
+| --- | --- |
+| [CLAUDE.md](./CLAUDE.md) / [AGENTS.md](./AGENTS.md) | Thin agent map and durable workflow rules |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | Current stack, deployables, modules, and runtime behavior |
+| [docs/vision.md](./docs/vision.md) | Product intent and future direction |
+| [docs/roadmap.md](./docs/roadmap.md) | Delivered increments and backlog |
+| [docs/specs/](./docs/specs/) | Current per-domain behavior |
+| [docs/tests/](./docs/tests/) | Coverage matrix and known verification gaps |
+| [docs/decisions/](./docs/decisions/) | Append-only architectural rationale |
+| [docs/increments/](./docs/increments/) | Active and completed design/plan history |
 
-See [docs/conventions.md](./docs/conventions.md) for local conventions.
+Meaningful increments follow design -> plan -> implementation -> verification ->
+consolidation. Generated API clients are never edited by hand.
+
+## License
+
+No open-source license has been selected. The source is currently published for
+reference; no redistribution or derivative-use rights are granted by default.
