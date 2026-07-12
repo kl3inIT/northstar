@@ -23,9 +23,8 @@ class OpenAiWebSearchProviderTests {
                 "https://api.openai.com/v1", "secret", Duration.ofSeconds(30));
         RestClient.Builder builder = RestClient.builder().baseUrl(connection.baseUrl());
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        var properties = new OpenAiWebSearchProperties("", "unused", "medium",
-                Duration.ofSeconds(5), Duration.ofSeconds(30));
-        var provider = new OpenAiWebSearchProvider(properties, RestClient.create(), _ -> connection,
+        var properties = new OpenAiWebSearchProperties("medium");
+        var provider = new OpenAiWebSearchProvider(properties, _ -> connection,
                 _ -> builder.build());
         server.expect(requestTo("https://api.openai.com/v1/responses"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("research-model")))

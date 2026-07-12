@@ -9,5 +9,6 @@ dependencies {
     implementation("org.springframework:spring-web")
 
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.mockito:mockito-core")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

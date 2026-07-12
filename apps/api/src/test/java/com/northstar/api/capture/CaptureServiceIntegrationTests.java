@@ -44,7 +44,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * path must map it into a {@link CaptureDraft}. Catches broken prompt plumbing,
  * bean wiring and entity conversion without spending tokens.
  */
-@SpringBootTest(properties = "spring.ai.openai.api-key=test-key")
+@SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Testcontainers
 class CaptureServiceIntegrationTests {

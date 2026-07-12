@@ -23,19 +23,8 @@ spring:
       ddl-auto: validate
     open-in-view: false
   ai:
-    # The worker is the indexer: it embeds notes/files and captions images. Same
-    # OpenAI + pgvector config as the api (which keeps its own copy only to embed
-    # search QUERIES), so both write/read vectors of identical shape.
-    openai:
-      api-key: ${OPENAI_API_KEY:}
-      timeout: 60s
-      max-retries: 2
-      chat:
-        # Short vision captions for image attachments.
-        model: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-4o-mini}
-      embedding:
-        model: text-embedding-3-large
-        dimensions: 1536
+    # The route-aware embedding adapter keeps the worker and API on the same
+    # 1536-dimensional pgvector schema without requiring a provider key at boot.
     vectorstore:
       pgvector:
         # Flyway (api, V14) owns the schema — never initialize it here.
@@ -88,6 +77,7 @@ northstar:
       image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-4o-mini}
       text-to-speech: ${NORTHSTAR_TTS_TARGET:openai/tts-1-hd/alloy}
       speech-to-text: ${NORTHSTAR_STT_TARGET:gpt-4o-mini-transcribe}
+      realtime-transcription: ${NORTHSTAR_REALTIME_STT_MODEL:gpt-realtime-whisper}
       image-generation: ${NORTHSTAR_IMAGE_TARGET:gpt-image-2}
       embedding: ${NORTHSTAR_EMBEDDING_TARGET:text-embedding-3-large}
     catalog:
@@ -108,6 +98,8 @@ northstar:
   web:
     enabled: ${NORTHSTAR_WEB_ENABLED:true}
     default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}
+    default-search-gateway: ${NORTHSTAR_WEB_SEARCH_GATEWAY:openai}
+    default-search-target: ${NORTHSTAR_WEB_SEARCH_TARGET:gpt-5.6-luna}
     default-page-reader: ${NORTHSTAR_WEB_PAGE_READER:direct}
     fallback-enabled: false
     search-fallback-order: []
@@ -115,11 +107,7 @@ northstar:
     cache-ttl: 15m
     cache-max-size: 200
     openai:
-      api-key: ${OPENAI_API_KEY:}
-      model: ${NORTHSTAR_WEB_MODEL:gpt-5.6-luna}
       search-context-size: medium
-      connect-timeout: 5s
-      request-timeout: 60s
 
 logging:
   level:

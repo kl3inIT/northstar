@@ -9,6 +9,7 @@ public enum AiTask {
     IMAGE_CAPTION,
     TEXT_TO_SPEECH,
     SPEECH_TO_TEXT,
+    REALTIME_TRANSCRIPTION,
     IMAGE_GENERATION,
     EMBEDDING;
 
@@ -16,6 +17,7 @@ public enum AiTask {
         return switch (this) {
             case TEXT_TO_SPEECH -> AiGatewayCapability.TEXT_TO_SPEECH;
             case SPEECH_TO_TEXT -> AiGatewayCapability.SPEECH_TO_TEXT;
+            case REALTIME_TRANSCRIPTION -> AiGatewayCapability.REALTIME;
             case IMAGE_GENERATION -> AiGatewayCapability.IMAGE_GENERATION;
             case EMBEDDING -> AiGatewayCapability.EMBEDDING;
             default -> AiGatewayCapability.CHAT;

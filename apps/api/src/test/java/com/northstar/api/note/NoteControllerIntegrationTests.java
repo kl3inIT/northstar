@@ -18,7 +18,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest(properties = {
-        "spring.ai.openai.api-key=test-key",
         "northstar.auth.enabled=false"
 })
 @AutoConfigureMockMvc

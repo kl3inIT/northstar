@@ -18,9 +18,6 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  */
 @SpringBootTest(properties = {
         "spring.flyway.enabled=true",
-        // The worker now wires OpenAI (indexing/captions); the starter needs a key
-        // to build its beans, but nothing calls OpenAI during a context-load test.
-        "spring.ai.openai.api-key=test-key",
         "spring.datasource.hikari.minimum-idle=0",
         "spring.datasource.hikari.maximum-pool-size=3",
         "spring.datasource.hikari.connection-timeout=2000"})

@@ -9,9 +9,11 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
@@ -33,17 +35,15 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
     }
 
     AiGatewayDefinition definition(String gatewayId) {
+        var runtimeSetting = settings.findById(gatewayId);
+        if (runtimeSetting.isPresent()) {
+            return requireConfigured(runtime(runtimeSetting.get()));
+        }
         AiProperties.Gateway deployment = properties.gateways().get(gatewayId);
         if (deployment != null) {
-            AiGatewayDefinition definition = deployment(gatewayId, deployment);
-            if (!definition.configured()) {
-                throw new IllegalStateException("AI gateway is not configured: " + gatewayId);
-            }
-            return definition;
+            return requireConfigured(deployment(gatewayId, deployment));
         }
-        return settings.findById(gatewayId)
-                .map(this::runtime)
-                .orElseThrow(() -> new IllegalArgumentException("Unknown AI gateway: " + gatewayId));
+        throw new IllegalArgumentException("Unknown AI gateway: " + gatewayId);
     }
 
     @Override
@@ -54,11 +54,12 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
     }
 
     List<AiGatewayDescriptor> descriptors() {
-        List<AiGatewayDescriptor> result = new ArrayList<>();
-        properties.gateways().forEach((id, gateway) -> result.add(deployment(id, gateway).descriptor()));
-        settings.findAll().stream().map(this::runtimeDescriptor)
-                .forEach(result::add);
-        return result.stream()
+        Map<String, AiGatewayDescriptor> result = new LinkedHashMap<>();
+        properties.gateways().forEach((id, gateway) ->
+                result.put(id, deploymentDescriptor(id, gateway)));
+        settings.findAll().forEach(setting ->
+                result.put(setting.id(), runtimeDescriptor(setting)));
+        return new ArrayList<>(result.values()).stream()
                 .sorted(Comparator.comparing(AiGatewayDescriptor::displayName,
                         String.CASE_INSENSITIVE_ORDER))
                 .toList();
@@ -71,6 +72,10 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
             apiKey = settings.findById(id)
                     .map(setting -> cipher.decrypt(setting.apiKeyCiphertext(), id))
                     .orElse("");
+        }
+        if (apiKey.isBlank()) {
+            AiProperties.Gateway deployment = properties.gateways().get(id);
+            apiKey = deployment == null ? "" : deployment.apiKey();
         }
         if (apiKey.isBlank()) {
             throw new IllegalArgumentException("API key is required");
@@ -88,10 +93,6 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
 
     AiGatewayDescriptor save(AiGatewayInput input) {
         AiGatewayDefinition definition = draft(input);
-        if (properties.gateways().containsKey(definition.id())) {
-            throw new IllegalArgumentException(
-                    "Deployment gateway IDs cannot be changed in Settings: " + definition.id());
-        }
         byte[] encrypted = cipher.encrypt(definition.apiKey(), definition.id());
         AiGatewaySetting setting = settings.findById(definition.id())
                 .orElseGet(() -> new AiGatewaySetting(definition.id(), definition.displayName(), definition.type(),
@@ -109,17 +110,23 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
                 definition.discoverModels(),
                 Math.toIntExact(definition.timeout().toSeconds()));
         settings.save(setting);
-        return definition.descriptor();
+        boolean deploymentBacked = properties.gateways().containsKey(definition.id());
+        return definition.descriptor(AiCredentialSource.SETTINGS, deploymentBacked, deploymentBacked);
     }
 
     void delete(String gatewayId) {
-        if (properties.gateways().containsKey(gatewayId)) {
-            throw new IllegalArgumentException("Deployment gateways cannot be deleted");
-        }
         if (!settings.existsById(gatewayId)) {
+            if (properties.gateways().containsKey(gatewayId)) {
+                throw new IllegalArgumentException(
+                        "Deployment gateway has no Settings override: " + gatewayId);
+            }
             throw new IllegalArgumentException("Unknown runtime AI gateway: " + gatewayId);
         }
         settings.deleteById(gatewayId);
+    }
+
+    boolean deploymentBacked(String gatewayId) {
+        return properties.gateways().containsKey(gatewayId);
     }
 
     private AiGatewayDefinition deployment(String id, AiProperties.Gateway gateway) {
@@ -130,6 +137,13 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
                 gateway.discoverModels(),
                 gateway.timeout(),
                 AiGatewaySource.DEPLOYMENT);
+    }
+
+    private AiGatewayDescriptor deploymentDescriptor(String id, AiProperties.Gateway gateway) {
+        AiGatewayDefinition definition = deployment(id, gateway);
+        AiCredentialSource credentialSource = gateway.apiKey().isBlank()
+                ? AiCredentialSource.NONE : AiCredentialSource.ENVIRONMENT;
+        return definition.descriptor(credentialSource, true, false);
     }
 
     private AiGatewayDefinition runtime(AiGatewaySetting setting) {
@@ -145,14 +159,16 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
     }
 
     private AiGatewayDescriptor runtimeDescriptor(AiGatewaySetting setting) {
-        return new AiGatewayDescriptor(setting.id(), setting.displayName(), setting.type(),
-                setting.type().capabilities(), true,
-                AiGatewaySource.SETTINGS, true, setting.baseUrl(),
-                decodeModels(setting.models()), decodeModels(setting.ttsTargets()),
-                decodeModels(setting.webSearchTargets()), decodeModels(setting.webFetchTargets()),
-                decodeModels(setting.sttTargets()), decodeModels(setting.imageTargets()),
-                decodeModels(setting.embeddingTargets()),
-                setting.discoverModels(), setting.timeoutSeconds());
+        boolean deploymentBacked = properties.gateways().containsKey(setting.id());
+        return runtime(setting).descriptor(
+                AiCredentialSource.SETTINGS, deploymentBacked, deploymentBacked);
+    }
+
+    private static AiGatewayDefinition requireConfigured(AiGatewayDefinition definition) {
+        if (!definition.configured()) {
+            throw new IllegalStateException("AI gateway is not configured: " + definition.id());
+        }
+        return definition;
     }
 
     private static String normalizeId(String value) {

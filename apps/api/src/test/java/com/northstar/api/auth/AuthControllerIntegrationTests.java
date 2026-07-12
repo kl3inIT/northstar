@@ -27,7 +27,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 @SpringBootTest(properties = {
-        "spring.ai.openai.api-key=test-key",
         "northstar.auth.enabled=true",
         "northstar.auth.username=datph",
         "northstar.auth.password-hash={bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG",

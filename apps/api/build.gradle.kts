@@ -21,10 +21,10 @@ dependencies {
     // Emits the OpenAPI contract at /v3/api-docs -> contracts/openapi.json -> web `pnpm gen:api`.
     implementation(libs.springdoc.webmvc)
 
-    // OpenAI ChatModel autoconfig for the capture extraction (core uses ChatClient).
-    implementation(libs.spring.ai.starter.openai)
     // Durable assistant conversation memory (spring_ai_chat_memory, Flyway V12).
     implementation("org.springframework.ai:spring-ai-starter-model-chat-memory-repository-jdbc")
+    // Provider-neutral tool resolver/exception processor used by AssistantConfig.
+    implementation("org.springframework.ai:spring-ai-autoconfigure-model-tool")
     // Dynamic tool discovery: only search_tools goes to the model up front; the
     // advisor expands discovered tools per conversation. Lucene backs the index
     // (lucene-core is optional in the library — the starter's pin, minus its
@@ -32,7 +32,7 @@ dependencies {
     implementation(libs.spring.ai.tool.search.advisor)
     implementation(libs.lucene.core)
     implementation("org.jsoup:jsoup:1.22.2")
-    // PgVectorStore + EmbeddingModel autoconfig — semantic half of hybrid search.
+    // PgVectorStore autoconfig — the route-aware EmbeddingModel comes from the AI integration.
     // Schema is Flyway's (V14): spring.ai.vectorstore.pgvector.initialize-schema=false.
     implementation(libs.spring.ai.starter.pgvector)
 

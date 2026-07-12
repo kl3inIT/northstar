@@ -31,7 +31,11 @@ public record AiProperties(
         Map<AiTask, String> models = routes.byTask();
         Map<AiTask, AiRoute> result = new EnumMap<>(AiTask.class);
         models.forEach((task, model) -> result.put(task, new AiRoute(activeGateway, model,
-                task == AiTask.TEXT_TO_SPEECH ? Map.of("language", "auto") : Map.of())));
+                switch (task) {
+                    case TEXT_TO_SPEECH -> Map.of("language", "auto");
+                    case REALTIME_TRANSCRIPTION -> Map.of("language", "vi");
+                    default -> Map.of();
+                })));
         return result;
     }
 
@@ -103,13 +107,14 @@ public record AiProperties(
             String imageCaption,
             String textToSpeech,
             String speechToText,
+            String realtimeTranscription,
             String imageGeneration,
             String embedding) {
 
         static Routes empty() {
             return new Routes("gpt-5.6-luna", "gpt-5.6-luna", "gpt-5.6-luna",
                     "gpt-4o-mini", "gpt-5.6-sol", "gpt-4o-mini",
-                    "openai/tts-1-hd/alloy", "gpt-4o-mini-transcribe", "gpt-image-2",
+                    "openai/tts-1-hd/alloy", "gpt-4o-mini-transcribe", "gpt-realtime-whisper", "gpt-image-2",
                     "text-embedding-3-large");
         }
 
@@ -123,6 +128,8 @@ public record AiProperties(
             result.put(AiTask.IMAGE_CAPTION, required(imageCaption, "routes.image-caption"));
             result.put(AiTask.TEXT_TO_SPEECH, required(textToSpeech, "routes.text-to-speech"));
             result.put(AiTask.SPEECH_TO_TEXT, required(speechToText, "routes.speech-to-text"));
+            result.put(AiTask.REALTIME_TRANSCRIPTION,
+                    required(realtimeTranscription, "routes.realtime-transcription"));
             result.put(AiTask.IMAGE_GENERATION, required(imageGeneration, "routes.image-generation"));
             result.put(AiTask.EMBEDDING, required(embedding, "routes.embedding"));
             return result;

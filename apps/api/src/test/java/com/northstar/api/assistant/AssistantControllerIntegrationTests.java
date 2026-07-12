@@ -43,7 +43,7 @@ import reactor.core.publisher.Flux;
  * the JDBC-backed history roundtrip.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"spring.ai.openai.api-key=test-key",
+        properties = {
                 // Off so /conversations deterministically shows the first-message
                 // fallback; the titling path is driven synchronously below instead.
                 "northstar.assistant.title.enabled=false"})

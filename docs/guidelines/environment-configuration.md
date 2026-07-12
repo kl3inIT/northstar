@@ -20,7 +20,11 @@ YAML contains placeholders and non-secret defaults only. Local secrets live in
 the gitignored `.env`; production secrets live in the server `.env` consumed by
 Compose. Every environment owns a different stable
 `NORTHSTAR_AI_CREDENTIAL_KEY`; deployment never copies the local key to the
-server.
+server. Provider keys should normally be saved from `Settings > AI models` and
+are encrypted in PostgreSQL. An environment provider key such as
+`OPENAI_API_KEY` is an optional bootstrap/recovery fallback, not a startup
+requirement. The master encryption key remains server-owned because storing it
+beside the ciphertext it protects would remove the security boundary.
 
 ## Database Pools
 

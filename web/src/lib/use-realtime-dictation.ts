@@ -86,7 +86,7 @@ export function useRealtimeDictation(
     try {
       const res = await apiFetch('/api/capture/realtime-session', { method: 'POST' })
       if (!res.ok) throw new Error(`mint failed: ${res.status}`)
-      const { clientSecret } = (await res.json()) as { clientSecret: string }
+      const { clientSecret, websocketUrl } = (await res.json()) as { clientSecret: string; websocketUrl: string }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
@@ -99,7 +99,7 @@ export function useRealtimeDictation(
 
       // Browser WebSockets cannot set headers; the ephemeral secret rides as a
       // subprotocol (the only variant OpenAI accepts — probed, not guessed).
-      const ws = new WebSocket('wss://api.openai.com/v1/realtime', [
+      const ws = new WebSocket(websocketUrl, [
         'realtime',
         `openai-insecure-api-key.${clientSecret}`,
       ])

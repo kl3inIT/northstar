@@ -19,22 +19,6 @@ spring:
     # Migrations ship on the classpath from :core (core/src/main/resources/db/migration).
     locations: classpath:db/migration
   ai:
-    openai:
-      api-key: ${OPENAI_API_KEY:}
-      # Interactive calls (capture, alignment, transcribe) run on the request
-      # thread — bound the wait and retry transient failures instead of hanging.
-      timeout: 60s
-      max-retries: 2
-      # Spring AI 2.0 dropped the `.options` layer (chat.options.model -> chat.model).
-      # No temperature: reasoning-model defaults reject unsupported values.
-      chat:
-        model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.6-luna}
-      # Spring AI 2.0 binds embedding model options directly below `embedding`.
-      # 3-large is shortened to 1536 dimensions (Matryoshka):
-      # best multilingual quality (Vietnamese notes) at a pgvector-indexable width.
-      embedding:
-        model: text-embedding-3-large
-        dimensions: 1536
     vectorstore:
       pgvector:
         # Flyway owns the schema (V14) — HNSW + cosine are the defaults.
@@ -105,6 +89,7 @@ northstar:
       image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-4o-mini}
       text-to-speech: ${NORTHSTAR_TTS_TARGET:openai/tts-1-hd/alloy}
       speech-to-text: ${NORTHSTAR_STT_TARGET:gpt-4o-mini-transcribe}
+      realtime-transcription: ${NORTHSTAR_REALTIME_STT_MODEL:gpt-realtime-whisper}
       image-generation: ${NORTHSTAR_IMAGE_TARGET:gpt-image-2}
       embedding: ${NORTHSTAR_EMBEDDING_TARGET:text-embedding-3-large}
     catalog:
@@ -141,11 +126,6 @@ northstar:
   assistant:
     title:
       enabled: true
-  capture:
-    realtime:
-      base-url: https://api.openai.com
-      api-key: ${OPENAI_API_KEY:}
-      model: ${NORTHSTAR_REALTIME_STT_MODEL:gpt-realtime-whisper}
   web:
     enabled: ${NORTHSTAR_WEB_ENABLED:true}
     default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}
@@ -158,11 +138,7 @@ northstar:
     cache-ttl: 15m
     cache-max-size: 200
     openai:
-      api-key: ${OPENAI_API_KEY:}
-      model: ${NORTHSTAR_WEB_MODEL:gpt-5.6-luna}
       search-context-size: medium
-      connect-timeout: 5s
-      request-timeout: 60s
     direct:
       max-bytes: 2097152
       max-characters: 40000

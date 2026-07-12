@@ -3,9 +3,11 @@
 ## Status
 
 Partially superseded on 2026-07-12 by
-[0022](./0022-ai-gateways-declare-supported-capabilities.md). The encrypted
-runtime-instance decision remains accepted; the single `OPENAI_COMPATIBLE` type
-does not. This decision superseded the deployment-only credential portion of
+[0022](./0022-ai-gateways-declare-supported-capabilities.md) and refined by
+[0027](./0027-runtime-gateway-credentials-override-environment-fallbacks.md).
+The encrypted runtime-instance decision remains accepted; the single
+`OPENAI_COMPATIBLE` type and read-only deployment-instance rule do not. This
+decision superseded the deployment-only credential portion of
 [0020](./0020-ai-tasks-route-through-configured-gateways.md).
 
 ## Decision
@@ -15,9 +17,9 @@ configuration. The current adapter is `OPENAI_COMPATIBLE`; OpenAI, 9Router,
 OpenRouter, LiteLLM, and Custom are UI presets that create the same runtime
 gateway shape rather than provider branches.
 
-Deployment YAML may define read-only gateway defaults. Authenticated Settings
-may create, edit, connection-test, and delete runtime instances without a
-restart. Runtime definitions contain a stable gateway id, display name, base
+Deployment YAML may define gateway fallbacks. Authenticated Settings may
+override them by id and create, edit, connection-test, and delete independent
+runtime instances without a restart. Runtime definitions contain a stable gateway id, display name, base
 URL, manual model ids, `/models` discovery policy, timeout, and encrypted API
 key. The API key uses an AES-256-GCM envelope with the gateway id as associated
 data and a separately deployed base64 key; responses never echo the secret.

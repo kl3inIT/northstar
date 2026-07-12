@@ -1,14 +1,14 @@
 package com.northstar.integration.ai.openai;
 
+import com.northstar.core.ai.AiGatewayCapability;
 import com.northstar.core.ai.AiRouteSettingRepository;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
-import com.northstar.core.ai.AiGatewayCapability;
-import org.springframework.dao.DataAccessException;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,27 +56,29 @@ public class AiGatewayManagementService {
 
     @Transactional
     public void delete(String gatewayId) {
-        routes.deleteByGatewayId(gatewayId);
-        try {
-            jdbc.sql("DELETE FROM assistant_conversation_route WHERE gateway_id = ?")
-                    .param(gatewayId)
-                    .update();
-        } catch (DataAccessException ignored) {
-            // Focused integration tests may not create the API-owned conversation table.
-        }
-        try {
-            jdbc.sql("""
-                    UPDATE web_research_setting
-                    SET search_gateway_id = CASE WHEN search_gateway_id = ? THEN NULL ELSE search_gateway_id END,
-                        search_target_id = CASE WHEN search_gateway_id = ? THEN NULL ELSE search_target_id END,
-                        page_gateway_id = CASE WHEN page_gateway_id = ? THEN NULL ELSE page_gateway_id END,
-                        page_target_id = CASE WHEN page_gateway_id = ? THEN NULL ELSE page_target_id END
-                    WHERE search_gateway_id = ? OR page_gateway_id = ?
-                    """)
-                    .params(gatewayId, gatewayId, gatewayId, gatewayId, gatewayId, gatewayId)
-                    .update();
-        } catch (DataAccessException ignored) {
-            // Focused integration tests may not create the core-owned web settings table.
+        if (!gateways.deploymentBacked(gatewayId)) {
+            routes.deleteByGatewayId(gatewayId);
+            try {
+                jdbc.sql("DELETE FROM assistant_conversation_route WHERE gateway_id = ?")
+                        .param(gatewayId)
+                        .update();
+            } catch (DataAccessException ignored) {
+                // Focused integration tests may not create the API-owned conversation table.
+            }
+            try {
+                jdbc.sql("""
+                        UPDATE web_research_setting
+                        SET search_gateway_id = CASE WHEN search_gateway_id = ? THEN NULL ELSE search_gateway_id END,
+                            search_target_id = CASE WHEN search_gateway_id = ? THEN NULL ELSE search_target_id END,
+                            page_gateway_id = CASE WHEN page_gateway_id = ? THEN NULL ELSE page_gateway_id END,
+                            page_target_id = CASE WHEN page_gateway_id = ? THEN NULL ELSE page_target_id END
+                        WHERE search_gateway_id = ? OR page_gateway_id = ?
+                        """)
+                        .params(gatewayId, gatewayId, gatewayId, gatewayId, gatewayId, gatewayId)
+                        .update();
+            } catch (DataAccessException ignored) {
+                // Focused integration tests may not create the core-owned web settings table.
+            }
         }
         gateways.delete(gatewayId);
         invalidate(gatewayId);
@@ -93,7 +95,8 @@ public class AiGatewayManagementService {
                     new EnumMap<>(AiGatewayCapability.class);
             for (AiGatewayCapability capability : List.of(
                     AiGatewayCapability.WEB_SEARCH, AiGatewayCapability.WEB_FETCH,
-                    AiGatewayCapability.SPEECH_TO_TEXT, AiGatewayCapability.IMAGE_GENERATION,
+                    AiGatewayCapability.SPEECH_TO_TEXT, AiGatewayCapability.REALTIME,
+                    AiGatewayCapability.IMAGE_GENERATION,
                     AiGatewayCapability.EMBEDDING)) {
                 if (gateway.type().supports(capability)) {
                     capabilityTargets.put(capability, capabilities.probe(gateway, capability));
