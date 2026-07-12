@@ -253,10 +253,11 @@ public class CaptureService {
               it. back: the meaning in the user's language.
             - reading: pronunciation help you KNOW to be correct — pinyin for
               Chinese (with tone marks), IPA for English. "" when unsure.
-            - example: ONE short, natural example sentence using the front (in
-              the front's language), with a translation after " — ". Generate
-              it yourself; keep it simple. "" only when an example makes no
-              sense.
+            - partOfSpeech: the word's lexical category in concise English
+              (noun, verb, adjective, adverb, phrase, etc.). "" when unsure.
+            - example: preserve ONE example with translation after " — " only
+              when the user supplied or explicitly requested it. Otherwise "".
+              Never generate extra card enrichment during capture.
             - disciplineName: same rule as tasks — exact existing name or "".
             </vocab_shape>
 
