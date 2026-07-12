@@ -31,6 +31,7 @@ COPY integrations/web-firecrawl/build.gradle.kts integrations/web-firecrawl/buil
 COPY integrations/web-nine-router/build.gradle.kts integrations/web-nine-router/build.gradle.kts
 COPY integrations/ai-openai-compatible/build.gradle.kts integrations/ai-openai-compatible/build.gradle.kts
 COPY integrations/speech-azure/build.gradle.kts integrations/speech-azure/build.gradle.kts
+COPY integrations/news-huggingnews/build.gradle.kts integrations/news-huggingnews/build.gradle.kts
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     chmod +x gradlew && \

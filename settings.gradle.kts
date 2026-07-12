@@ -26,6 +26,7 @@ include(":integrations:web-firecrawl")
 include(":integrations:web-nine-router")
 include(":integrations:ai-openai-compatible")
 include(":integrations:speech-azure")
+include(":integrations:news-huggingnews")
 
 // Deployable Spring Boot applications (thin bootstraps over :core).
 include(":apps:api")

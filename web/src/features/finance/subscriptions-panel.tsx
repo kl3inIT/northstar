@@ -158,7 +158,7 @@ function RecurringSuggestions({ suggestions, onTrack }: {
   return (
     <section className="overflow-hidden rounded-lg border bg-card" aria-labelledby="recurring-suggestions-title">
       <div className="flex items-center gap-2 border-b bg-muted/25 px-3 py-2.5 sm:px-4">
-        <Sparkles className="size-4 text-amber-600 dark:text-amber-400" />
+        <Sparkles className="size-4 text-warning" />
         <div className="min-w-0"><h2 id="recurring-suggestions-title" className="text-sm font-semibold">Recurring patterns found</h2><p className="text-[11px] text-muted-foreground">Review before tracking. Nothing is added automatically.</p></div>
       </div>
       <div className="divide-y">
@@ -200,7 +200,7 @@ function SubscriptionRow({ subscription, onPay, onEdit, onDelete }: {
             <h3 className="truncate text-sm font-semibold">{subscription.name}</h3>
             <Badge variant="secondary" className="h-5 rounded px-1.5 text-[10px] font-normal">{subscription.category}</Badge>
             {subscription.cancelReminderOn && (
-              <Badge variant="outline" className="h-5 rounded border-amber-300 bg-amber-50 px-1.5 text-[10px] font-normal text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300" title="A reminder task is created for this date">
+              <Badge variant="outline" className="h-5 rounded border-warning/40 bg-warning/10 px-1.5 text-[10px] font-normal text-warning" title="A reminder task is created for this date">
                 Cancel by {formatFullDate(subscription.cancelReminderOn)}
               </Badge>
             )}
@@ -235,8 +235,8 @@ function dueState(subscription: Subscription): { label: string; tone: string } {
   }
   const days = dayNumber(subscription.nextDueOn) - dayNumber(todayIso())
   if (days < 0) return { label: 'Posting…', tone: 'text-muted-foreground' }
-  if (days === 0) return { label: 'Charges today', tone: 'text-amber-600 dark:text-amber-400' }
-  if (days <= 7) return { label: `Charges in ${days}d`, tone: 'text-amber-600 dark:text-amber-400' }
+  if (days === 0) return { label: 'Charges today', tone: 'text-warning' }
+  if (days <= 7) return { label: `Charges in ${days}d`, tone: 'text-warning' }
   return { label: `Charges in ${days}d`, tone: 'text-muted-foreground' }
 }
 

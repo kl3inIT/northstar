@@ -8,6 +8,7 @@ import { Select, SelectItem, SelectContent, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { useDisciplines } from "@/lib/disciplines-api";
 import { WEEKDAYS, weekdayCodeOf } from "@/features/calendar/recurrence";
+import { CALENDAR_EVENT_SOLID_VARIANTS } from "@/features/calendar/calendar-color-tokens";
 
 import type { UseFormReturn } from "react-hook-form";
 import type { TEventFormData } from "@/features/calendar/schemas";
@@ -15,13 +16,13 @@ import type { TEventFormData } from "@/features/calendar/schemas";
 const NO_DISCIPLINE = "__none__";
 
 const COLORS = [
-  { value: "blue", label: "Blue", dot: "bg-blue-600" },
-  { value: "green", label: "Green", dot: "bg-green-600" },
-  { value: "red", label: "Red", dot: "bg-red-600" },
-  { value: "yellow", label: "Yellow", dot: "bg-yellow-600" },
-  { value: "purple", label: "Purple", dot: "bg-purple-600" },
-  { value: "orange", label: "Orange", dot: "bg-orange-600" },
-  { value: "gray", label: "Gray", dot: "bg-neutral-600" },
+  { value: "blue", label: "Blue", dot: CALENDAR_EVENT_SOLID_VARIANTS.blue },
+  { value: "green", label: "Green", dot: CALENDAR_EVENT_SOLID_VARIANTS.green },
+  { value: "red", label: "Red", dot: CALENDAR_EVENT_SOLID_VARIANTS.red },
+  { value: "yellow", label: "Yellow", dot: CALENDAR_EVENT_SOLID_VARIANTS.yellow },
+  { value: "purple", label: "Purple", dot: CALENDAR_EVENT_SOLID_VARIANTS.purple },
+  { value: "orange", label: "Orange", dot: CALENDAR_EVENT_SOLID_VARIANTS.orange },
+  { value: "gray", label: "Gray", dot: CALENDAR_EVENT_SOLID_VARIANTS.gray },
 ] as const;
 
 interface IProps {
@@ -262,7 +263,7 @@ export function EventFormFields({ form, onSubmit }: IProps) {
                     {disciplines.map(d => (
                       <SelectItem key={d.id} value={d.id}>
                         <div className="flex items-center gap-2">
-                          <div className={`size-3.5 rounded-full ${COLORS.find(c => c.value === d.color.toLowerCase())?.dot ?? "bg-neutral-600"}`} />
+                          <div className={`size-3.5 rounded-full ${COLORS.find(c => c.value === d.color.toLowerCase())?.dot ?? CALENDAR_EVENT_SOLID_VARIANTS.gray}`} />
                           {d.name}
                         </div>
                       </SelectItem>

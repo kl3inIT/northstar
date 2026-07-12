@@ -61,37 +61,15 @@ import {
   type AutomationType,
 } from '@/lib/automation-api'
 import type { AutomationTrigger } from '@/lib/hey-api'
+import {
+  MORNING_BRIEF_TYPE,
+  isNewAutomationTarget,
+  morningBriefRequest,
+  type AutomationEditorTarget,
+  type MorningBriefForm,
+} from '@/lib/morning-brief-automation'
 
 type Day = AutomationTrigger['daysOfWeek'][number]
-
-interface MorningBriefForm {
-  name: string
-  enabled: boolean
-  time: string
-  timezone: string
-  days: Day[]
-  language: string
-  lookbackHours: number
-  maxItems: number
-  topics: string
-  queries: string
-  blockedDomains: string
-  saveAsNote: boolean
-  sourceIds: string[]
-  githubRepositories: string
-  feedUrls: string
-  blueskyHandles: string
-  firecrawlCreditBudget: number
-}
-
-interface NewAutomationTarget {
-  kind: 'new'
-  descriptor: AutomationType
-}
-
-type AutomationEditorTarget = AutomationDefinition | NewAutomationTarget
-
-const MORNING_BRIEF_TYPE = 'morning-brief.v1'
 
 const DAYS: Array<{ value: Day; short: string }> = [
   { value: 'MONDAY', short: 'Mon' },
@@ -127,6 +105,14 @@ export function AutomationsSection() {
   const runNow = useRunAutomationNow()
   const [editing, setEditing] = useState<AutomationEditorTarget | null>(null)
   const [typePickerOpen, setTypePickerOpen] = useState(false)
+  const visibleAutomations = useMemo(
+    () => automations.data?.filter((definition) => definition.type !== MORNING_BRIEF_TYPE) ?? [],
+    [automations.data],
+  )
+  const visibleTypes = useMemo(
+    () => types.data?.filter((descriptor) => descriptor.type !== MORNING_BRIEF_TYPE) ?? [],
+    [types.data],
+  )
   const typeById = useMemo(
     () => new Map(types.data?.map((descriptor) => [descriptor.type, descriptor]) ?? []),
     [types.data],
@@ -170,10 +156,12 @@ export function AutomationsSection() {
           <h2 id="automations-heading" className="text-xl font-semibold">Automations</h2>
           <p className="mt-1 text-sm text-muted-foreground">Scheduled workflows that run without opening Northstar.</p>
         </div>
-        <Button type="button" onClick={() => setTypePickerOpen(true)}>
-          <Plus className="size-4" />
-          New automation
-        </Button>
+        {visibleTypes.length > 0 && (
+          <Button type="button" onClick={() => setTypePickerOpen(true)}>
+            <Plus className="size-4" />
+            New automation
+          </Button>
+        )}
       </div>
       <Separator />
 
@@ -183,9 +171,9 @@ export function AutomationsSection() {
         </div>
       ) : automations.isError ? (
         <div className="py-8 text-sm text-destructive">{automations.error.message}</div>
-      ) : automations.data?.length ? (
+      ) : visibleAutomations.length ? (
         <div className="divide-y">
-          {automations.data.map((definition) => (
+          {visibleAutomations.map((definition) => (
             <AutomationRow
               key={definition.id}
               definition={definition}
@@ -210,7 +198,7 @@ export function AutomationsSection() {
 
       <AutomationTypePicker
         open={typePickerOpen}
-        types={types.data ?? []}
+        types={visibleTypes}
         loading={types.isLoading}
         error={types.isError ? types.error.message : null}
         onOpenChange={setTypePickerOpen}
@@ -221,15 +209,15 @@ export function AutomationsSection() {
       />
 
       <AutomationEditor
-        key={editing && isNewTarget(editing) ? `new-${editing.descriptor.type}` : editing?.id ?? 'closed'}
+        key={editing && isNewAutomationTarget(editing) ? `new-${editing.descriptor.type}` : editing?.id ?? 'closed'}
         target={editing}
-        descriptor={editing && !isNewTarget(editing) ? typeById.get(editing.type) : undefined}
+        descriptor={editing && !isNewAutomationTarget(editing) ? typeById.get(editing.type) : undefined}
         open={editing !== null}
         busy={create.isPending || update.isPending}
         onOpenChange={(open) => !open && setEditing(null)}
         onSubmit={(form) => {
-          const body = request(form)
-          const creating = editing !== null && isNewTarget(editing)
+          const body = morningBriefRequest(form)
+          const creating = editing !== null && isNewAutomationTarget(editing)
           const options = {
             onSuccess: () => {
               toast.success(creating ? 'Automation created' : 'Automation saved')
@@ -419,7 +407,7 @@ function RunRow({ run }: { run: AutomationRun }) {
   )
 }
 
-function AutomationEditor({
+export function AutomationEditor({
   target,
   descriptor,
   open,
@@ -437,7 +425,7 @@ function AutomationEditor({
   const initial = useMemo(() => formFrom(target), [target])
   const [form, setForm] = useState(initial)
   const [tab, setTab] = useState('schedule')
-  const creating = target !== null && isNewTarget(target)
+  const creating = target !== null && isNewAutomationTarget(target)
   const type = creating ? target.descriptor : descriptor
 
   function submit(event: SyntheticEvent<HTMLFormElement>) {
@@ -647,7 +635,7 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: str
 }
 
 function formFrom(target: AutomationEditorTarget | null): MorningBriefForm {
-  if (!target || isNewTarget(target)) {
+  if (!target || isNewAutomationTarget(target)) {
     const config = target?.descriptor.defaultConfig ?? {}
     return {
       name: target?.descriptor.displayName ?? 'Morning Brief',
@@ -691,44 +679,8 @@ function formFrom(target: AutomationEditorTarget | null): MorningBriefForm {
   }
 }
 
-function request(form: MorningBriefForm) {
-  return {
-    name: form.name.trim(),
-    enabled: form.enabled,
-    trigger: {
-      kind: 'DAILY' as const,
-      localTime: form.time,
-      daysOfWeek: form.days,
-      timezone: form.timezone.trim(),
-      catchUpWindowMinutes: 240,
-    },
-    workflowConfig: {
-      language: form.language,
-      lookbackHours: form.lookbackHours,
-      maxItems: form.maxItems,
-      topics: lines(form.topics),
-      queries: lines(form.queries),
-      blockedDomains: lines(form.blockedDomains),
-      saveAsNote: form.saveAsNote,
-      sourceIds: form.sourceIds,
-      githubRepositories: lines(form.githubRepositories),
-      feedUrls: lines(form.feedUrls),
-      blueskyHandles: lines(form.blueskyHandles),
-      firecrawlCreditBudget: form.firecrawlCreditBudget,
-    },
-  }
-}
-
-function isNewTarget(target: AutomationEditorTarget): target is NewAutomationTarget {
-  return 'kind' in target && target.kind === 'new'
-}
-
 function hasEditor(type: string) {
   return type === MORNING_BRIEF_TYPE
-}
-
-function lines(value: string) {
-  return [...new Set(value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean))]
 }
 
 function stringList(value: unknown): string[] {

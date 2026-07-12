@@ -1,0 +1,54 @@
+{
+  "nodes": [
+    {
+      "data": [
+        { "feedLive": 1, "recentStoryDays": 2 },
+        true,
+        { "data": 3 },
+        { "dayGroups": 4, "lastUpdatedAt": 5 },
+        [6],
+        1783866802421,
+        { "dayKey": 7, "routingTopicCounts": 8, "stories": 11 },
+        "2026-07-12",
+        [9],
+        { "routingTopicKey": 10, "count": 12 },
+        "ai",
+        [13],
+        1,
+        {
+          "authorCount": 14,
+          "isFreshStory": 1,
+          "isSuperseded": 15,
+          "isUpdateStory": 15,
+          "primaryRoutingTopic": 10,
+          "publishedAt": 16,
+          "rank": 12,
+          "routingTopicKeys": 17,
+          "slug": 20,
+          "storyId": 21,
+          "storyScore": 22,
+          "title": 23,
+          "topicTags": 24,
+          "tweetCount": 30
+        },
+        66,
+        false,
+        1783834486749,
+        [10, 18, 19],
+        "tech",
+        "business",
+        "apple-trade-secrets-lawsuit-threatens-to-delay-openai-hardware-launch-to-a846ee45",
+        "m57e4kyfbqfcx8xbhg99q6awws8acm6m",
+        0.76,
+        "Apple Trade Secrets Lawsuit Threatens to Delay OpenAI Hardware Launch to February 2027",
+        [25, 27],
+        { "name": 26, "slug": 10 },
+        "AI",
+        { "name": 28, "slug": 29 },
+        "AI Regulation",
+        "ai-governance",
+        127
+      ]
+    }
+  ]
+}

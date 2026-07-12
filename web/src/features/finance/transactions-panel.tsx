@@ -163,10 +163,10 @@ function TransactionStats({ summary }: {
     exceptionalCount: 0, previousMonthExpenseTotal: 0, categories: [],
   }
   const stats = [
-    { label: 'Total in', value: values.incomeTotal, format: vnd, icon: ArrowDownLeft, tone: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-500/10' },
-    { label: 'Total out', value: values.expenseTotal, format: vnd, icon: ArrowUpRight, tone: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-500/10' },
+    { label: 'Total in', value: values.incomeTotal, format: vnd, icon: ArrowDownLeft, tone: 'text-success', bg: 'bg-success/10' },
+    { label: 'Total out', value: values.expenseTotal, format: vnd, icon: ArrowUpRight, tone: 'text-destructive', bg: 'bg-destructive/10' },
     { label: 'Net', value: values.net, format: (value: number) => `${value >= 0 ? '+' : ''}${vnd(value)}`, icon: TrendingUp, tone: values.net >= 0 ? 'text-primary' : 'text-destructive', bg: 'bg-primary/10' },
-    { label: 'One-off', value: values.exceptionalTotal, format: vnd, icon: Sparkles, tone: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
+    { label: 'One-off', value: values.exceptionalTotal, format: vnd, icon: Sparkles, tone: 'text-warning', bg: 'bg-warning/10' },
   ]
   return (
     <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
@@ -215,7 +215,7 @@ function TransactionsTable({ rows, isLoading, onEdit, onDelete }: {
           <div className="mt-1 flex items-center gap-1">
             <Badge variant="secondary" className="h-5 rounded px-1.5 text-[10px] font-normal">{info.row.original.category}</Badge>
             {info.row.original.exceptional && (
-              <Badge variant="outline" className="h-5 rounded border-amber-400/50 px-1.5 text-[10px] font-normal text-amber-700 dark:text-amber-300">one-off</Badge>
+              <Badge variant="outline" className="h-5 rounded border-warning/50 px-1.5 text-[10px] font-normal text-warning">one-off</Badge>
             )}
           </div>
         </div>
@@ -233,7 +233,7 @@ function TransactionsTable({ rows, isLoading, onEdit, onDelete }: {
       cell: (info) => {
         const transaction = info.row.original
         return (
-          <span className={cn('block text-right text-sm font-semibold tabular-nums', transaction.type === 'INCOME' && 'text-emerald-600 dark:text-emerald-400')}>
+          <span className={cn('block text-right text-sm font-semibold tabular-nums', transaction.type === 'INCOME' && 'text-success')}>
             {transaction.type === 'INCOME' ? '+' : '-'}{vnd(transaction.amount)}
           </span>
         )
@@ -293,14 +293,14 @@ function TransactionsTable({ rows, isLoading, onEdit, onDelete }: {
                   {transaction.category}
                 </Badge>
                 {transaction.exceptional && (
-                  <Badge variant="outline" className="h-5 shrink-0 rounded border-amber-400/50 px-1.5 text-[10px] font-normal text-amber-700 dark:text-amber-300">
+                  <Badge variant="outline" className="h-5 shrink-0 rounded border-warning/50 px-1.5 text-[10px] font-normal text-warning">
                     one-off
                   </Badge>
                 )}
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <span className={cn('max-w-28 truncate text-right text-sm font-semibold tabular-nums', transaction.type === 'INCOME' && 'text-emerald-600 dark:text-emerald-400')} title={vnd(transaction.amount)}>
+              <span className={cn('max-w-28 truncate text-right text-sm font-semibold tabular-nums', transaction.type === 'INCOME' && 'text-success')} title={vnd(transaction.amount)}>
                 {transaction.type === 'INCOME' ? '+' : '-'}{vnd(transaction.amount)}
               </span>
               <TransactionActions transaction={transaction} onEdit={onEdit} onDelete={onDelete} />

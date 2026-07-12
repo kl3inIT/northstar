@@ -223,7 +223,7 @@ function GatewayRow({ gateway, onEdit }: { gateway: AiGateway; onEdit: () => voi
           {gatewayTypeLabel(gateway.type)} · {gateway.capabilities.map(gatewayCapabilityLabel).join(' · ')}
         </p>
       </div>
-      <Badge variant="outline" className={cn('hidden shrink-0 sm:inline-flex', gateway.configured && 'text-emerald-600 dark:text-emerald-400')}>
+      <Badge variant="outline" className={cn('hidden shrink-0 sm:inline-flex', gateway.configured && 'text-success')}>
         {gateway.configured ? 'Ready' : 'Not configured'}
       </Badge>
       <div className="flex shrink-0 items-center gap-1">
@@ -439,7 +439,7 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
           </div>
 
           {result && (
-            <div className={cn('flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm', result.success ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300' : 'border-destructive/30 bg-destructive/5 text-destructive')}>
+            <div className={cn('flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm', result.success ? 'border-success/30 bg-success/5 text-success' : 'border-destructive/30 bg-destructive/5 text-destructive')}>
               {result.success ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <PlugZap className="mt-0.5 size-4 shrink-0" />}
               <span>{result.message} · {result.latencyMillis} ms · {result.models.length} chat · {result.ttsTargets.length} TTS · {Object.values(result.capabilityTargets).reduce((total, targets) => total + (targets?.length ?? 0), 0)} other</span>
             </div>
@@ -858,9 +858,9 @@ function WebResearchSection({
         </div>
         <Badge
           variant="outline"
-          className={cn('gap-1.5', form.enabled && selectedReady && 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400')}
+          className={cn('gap-1.5', form.enabled && selectedReady && 'border-success/40 text-success')}
         >
-          <span className={cn('size-1.5 rounded-full bg-muted-foreground', form.enabled && selectedReady && 'bg-emerald-500')} />
+          <span className={cn('size-1.5 rounded-full bg-muted-foreground', form.enabled && selectedReady && 'bg-success')} />
           {form.enabled ? (selectedReady ? 'Ready' : 'Needs configuration') : 'Off'}
         </Badge>
       </div>
@@ -993,7 +993,7 @@ function WebResearchSection({
                   {provider.capabilities.map(capabilityLabel).join(' · ')}
                 </p>
               </div>
-              <Badge variant="outline" className={cn('shrink-0 gap-1', provider.configured && 'text-emerald-600 dark:text-emerald-400')}>
+              <Badge variant="outline" className={cn('shrink-0 gap-1', provider.configured && 'text-success')}>
                 <CheckCircle2 className="size-3" />
                  {provider.routeRequired ? 'Uses gateway' : provider.configured ? 'Configured' : 'Not configured'}
               </Badge>

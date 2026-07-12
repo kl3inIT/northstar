@@ -72,7 +72,7 @@ export function WritingPanel() {
         </p>
         {recurring.length > 0 && (
           <p className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-            <Repeat2 className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+            <Repeat2 className="size-3.5 shrink-0 text-warning" />
             <span className="truncate">
               Recurring: {recurring.map(([label, count]) => `${label} (×${count})`).join(' · ')}
             </span>
@@ -104,7 +104,7 @@ function WritingStats({ graded, latest, trend }: { graded: number; latest: strin
   const trendLabel = trend === null ? 'needs 2+ essays' : trend === 0 ? 'holding steady' : trend > 0 ? 'improving' : 'dipped last essay'
   const stats = [
     { label: 'Essays graded', value: String(graded), icon: PenLine, tone: 'text-primary', bg: 'bg-primary/10' },
-    { label: 'Latest estimate', value: latest, caption: 'unofficial band range', icon: PenLine, tone: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-500/10' },
+    { label: 'Latest estimate', value: latest, caption: 'unofficial band range', icon: PenLine, tone: 'text-insight', bg: 'bg-insight/10' },
     {
       label: 'Trend',
       value: trend === null ? '—' : `${trend > 0 ? '+' : ''}${trend.toFixed(2)}`,
@@ -112,8 +112,8 @@ function WritingStats({ graded, latest, trend }: { graded: number; latest: strin
       icon: TrendIcon,
       tone: trend === null || trend === 0
         ? 'text-muted-foreground'
-        : trend > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
-      bg: trend === null || trend === 0 ? 'bg-muted' : trend > 0 ? 'bg-emerald-500/10' : 'bg-amber-500/10',
+        : trend > 0 ? 'text-success' : 'text-warning',
+      bg: trend === null || trend === 0 ? 'bg-muted' : trend > 0 ? 'bg-success/10' : 'bg-warning/10',
     },
   ]
   return (
@@ -267,7 +267,7 @@ function ViewFeedbackDialog({ feedback, onClose }: { feedback: WritingFeedback |
                 <section className="flex flex-col gap-2">
                   <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Top error patterns</h3>
                   {errors.map((error, index) => (
-                    <div key={index} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                    <div key={index} className="rounded-lg border border-warning/30 bg-warning/5 p-3">
                       <p className="mb-1 text-xs font-medium">{error.label}</p>
                       <p className="text-xs text-muted-foreground">
                         <span className="line-through decoration-destructive/60">{error.quote}</span>

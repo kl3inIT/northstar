@@ -1,6 +1,7 @@
 package com.northstar.api;
 
 import com.northstar.core.calendar.CalendarEventNotFoundException;
+import com.northstar.core.brief.BriefFeedException;
 import com.northstar.core.automation.AutomationDefinitionNotFoundException;
 import com.northstar.core.discipline.DisciplineNotFoundException;
 import com.northstar.core.finance.FinancePlanningNotFoundException;
@@ -88,6 +89,13 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     ProblemDetail speechSynthesis(SpeechSynthesisException e) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());
         detail.setProperty("code", "SYNTHESIS_FAILED");
+        return detail;
+    }
+
+    @ExceptionHandler(BriefFeedException.class)
+    ProblemDetail briefFeed(BriefFeedException e) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());
+        detail.setProperty("code", "BRIEF_PROVIDER_UNAVAILABLE");
         return detail;
     }
 
