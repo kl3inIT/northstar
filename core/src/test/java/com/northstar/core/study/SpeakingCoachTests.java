@@ -9,7 +9,7 @@ class SpeakingCoachTests {
 
     @Test
     void acceptsWhitespaceTolerantVerbatimTranscriptQuotes() {
-        var feedback = new SpeakingContentFeedback(70, 62, 80,
+        var feedback = new SpeakingContentFeedback(70, 62, 80, List.of(),
                 List.of(new SpeakingContentFeedback.SpokenError(
                         "Verb tense", "Yesterday I  go", "Yesterday I went")),
                 "Unofficial content feedback. Improve past-tense consistency.");
@@ -20,7 +20,7 @@ class SpeakingCoachTests {
 
     @Test
     void rejectsInventedQuotesInvalidScoresAndIeltsBandClaims() {
-        var feedback = new SpeakingContentFeedback(101, 50, 70,
+        var feedback = new SpeakingContentFeedback(101, 50, 70, List.of(),
                 List.of(new SpeakingContentFeedback.SpokenError(
                         "Article errors", "a university", "the university")),
                 "This equals IELTS band 6.");

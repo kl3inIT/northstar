@@ -6,10 +6,12 @@ public record SpeakingContentFeedback(
         double vocabulary,
         double grammar,
         double topic,
+        List<SpeakingIeltsEstimate.Criterion> ieltsCriteria,
         List<SpokenError> topErrors,
         String summary) {
 
     public SpeakingContentFeedback {
+        ieltsCriteria = ieltsCriteria == null ? List.of() : List.copyOf(ieltsCriteria);
         topErrors = topErrors == null ? List.of() : List.copyOf(topErrors);
         summary = summary == null ? "" : summary;
     }
