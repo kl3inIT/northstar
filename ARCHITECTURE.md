@@ -89,6 +89,8 @@ Modulith modules. Current modules include:
 - `brief` - Morning Brief public-source orchestration, trust ranking, deterministic rendering,
   and idempotent Staging-note output.
 - `attachment` - stored uploaded content and metadata.
+- `speech` - provider-neutral text-to-speech routing, immutable generated-audio
+  metadata, and content-addressed reuse through the attachment module.
 - `assistant` - tool definitions shared by the in-app assistant and MCP.
 - `study` - practice/mock study log with a constrained skill vocabulary,
   vocabulary memory on an Ebisu recall-probability model (no due dates), and

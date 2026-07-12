@@ -74,11 +74,12 @@ public record AiProperties(
             String alignment,
             String title,
             String studyGrader,
-            String imageCaption) {
+            String imageCaption,
+            String textToSpeech) {
 
         static Routes empty() {
             return new Routes("gpt-5.5", "gpt-5.5", "gpt-5.5", "gpt-5.5",
-                    "gpt-5.5", "gpt-5.5");
+                    "gpt-5.5", "gpt-5.5", "openai/gpt-4o-mini-tts/alloy");
         }
 
         Map<AiTask, String> byTask() {
@@ -89,6 +90,7 @@ public record AiProperties(
             result.put(AiTask.TITLE, required(title, "routes.title"));
             result.put(AiTask.STUDY_GRADER, required(studyGrader, "routes.study-grader"));
             result.put(AiTask.IMAGE_CAPTION, required(imageCaption, "routes.image-caption"));
+            result.put(AiTask.TEXT_TO_SPEECH, required(textToSpeech, "routes.text-to-speech"));
             return result;
         }
     }

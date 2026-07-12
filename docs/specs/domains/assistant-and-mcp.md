@@ -63,6 +63,18 @@ disclosure and survive transcript rehydration. Tool workflow and Northstar's
 external-link confirmation remain application wrappers because they encode
 product behavior beyond a generic presentation component.
 
+Completed Assistant responses expose an explicit read-aloud action. It sends
+only the final visible message text, excluding tool rows, source metadata, and
+Markdown syntax, to a separate text-to-speech route and renders the result with
+the AI Elements audio player. Synthesis never starts automatically. Generated
+MP3 audio is stored as an immutable attachment; the same normalized text,
+gateway, target, locale, and format returns the persisted asset without
+validating or spending against the provider again. The TTS route is independent
+from chat model selection. OpenAI targets combine a speech model and voice,
+while 9Router discovers its normalized targets from `/models/tts`. The speech
+asset contract deliberately has no Assistant-message ownership so Study cards
+and shadowing can reuse it later.
+
 The Flutter client authenticates the same REST/SSE contract with a Bearer access
 token. Its typed service parses known text, tool, error, finish, and done frames;
 the repository maps those frames into provider-neutral domain events; and a
@@ -148,5 +160,7 @@ as the API.
 - `core.assistant`
 - `apps/mcp`
 - `apps/api.assistant`
+- `apps/api.speech`
 - `core.ai`
+- `core.speech`
 - `integrations/ai-openai-compatible`

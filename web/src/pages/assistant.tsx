@@ -25,6 +25,7 @@ import {
   PanelRightOpen,
   Search,
   Trash2,
+  Volume2,
   Wrench,
   XCircle,
   type LucideIcon,
@@ -59,6 +60,16 @@ import {
   InlineCitationText,
 } from '@/components/ai-elements/inline-citation'
 import { Message, MessageAction, MessageActions, MessageContent, MessageResponse } from '@/components/ai-elements/message'
+import {
+  AudioPlayer,
+  AudioPlayerControlBar,
+  AudioPlayerDurationDisplay,
+  AudioPlayerElement,
+  AudioPlayerMuteButton,
+  AudioPlayerPlayButton,
+  AudioPlayerTimeDisplay,
+  AudioPlayerTimeRange,
+} from '@/components/ai-elements/audio-player'
 import {
   ModelSelector,
   ModelSelectorContent,
@@ -118,6 +129,7 @@ import {
 } from '@/lib/ai-settings-api'
 import { useStagingCount } from '@/lib/notes-api'
 import { useTodayTasks } from '@/lib/tasks-api'
+import { useSynthesizeSpeech, type SpeechAsset } from '@/lib/speech-api'
 import { cn } from '@/lib/utils'
 
 /**
@@ -674,6 +686,7 @@ function AssistantChat({
               .filter((part) => part.type === 'text')
               .map((part) => part.text)
               .join('\n')
+            const speechTextId = `assistant-speech-${m.id}`
             return (
               <Message from={m.role} key={m.id}>
                 {fileParts.length > 0 && (
@@ -698,18 +711,20 @@ function AssistantChat({
                 )}
                 <MessageContent>
                   {m.role === 'assistant' && toolParts.length > 0 && <ToolWorkflow tools={toolParts} />}
-                  {m.parts.map((part, i) => {
-                  if (part.type === 'text') {
-                    return (
-                      <MessageResponse key={i} components={CHAT_MARKDOWN_COMPONENTS}>
-                        {part.text}
-                      </MessageResponse>
-                    )
-                  }
-                  if (part.type === 'file') return null
-                  if (isToolPart(part)) return null
-                  return null
-                  })}
+                  <div id={speechTextId}>
+                    {m.parts.map((part, i) => {
+                    if (part.type === 'text') {
+                      return (
+                        <MessageResponse key={i} components={CHAT_MARKDOWN_COMPONENTS}>
+                          {part.text}
+                        </MessageResponse>
+                      )
+                    }
+                    if (part.type === 'file') return null
+                    if (isToolPart(part)) return null
+                    return null
+                    })}
+                  </div>
                 </MessageContent>
                 {sources.length > 0 && (
                   <Sources className="mb-0">
@@ -731,7 +746,10 @@ function AssistantChat({
                   </Sources>
                 )}
                 {messageText.trim() && (
-                  <MessageActions className={m.role === 'user' ? 'justify-end' : undefined}>
+                  m.role === 'assistant' ? (
+                    <AssistantMessageActions textElementId={speechTextId} rawText={messageText} />
+                  ) : (
+                  <MessageActions className="justify-end">
                     <MessageAction
                       tooltip="Copy message"
                       label="Copy message"
@@ -742,6 +760,7 @@ function AssistantChat({
                       <Copy className="size-4" />
                     </MessageAction>
                   </MessageActions>
+                  )
                 )}
               </Message>
             )
@@ -752,6 +771,71 @@ function AssistantChat({
       </Conversation>
 
       <div className="mx-auto w-full max-w-3xl px-4 pb-6">{input}</div>
+    </div>
+  )
+}
+
+function AssistantMessageActions({ textElementId, rawText }: { textElementId: string; rawText: string }) {
+  const synthesize = useSynthesizeSpeech()
+  const [asset, setAsset] = useState<SpeechAsset | null>(null)
+  const audio = useRef<HTMLAudioElement | null>(null)
+
+  useEffect(() => {
+    if (!asset || !audio.current) return
+    void audio.current.play().catch(() => {})
+  }, [asset])
+
+  function readAloud() {
+    if (asset && audio.current) {
+      if (audio.current.paused) void audio.current.play().catch(() => {})
+      else audio.current.pause()
+      return
+    }
+    const visibleText = document.getElementById(textElementId)?.innerText.trim() || rawText.trim()
+    if (!visibleText) return
+    if (visibleText.length > 4096) {
+      toast.error('This response is too long to read aloud.')
+      return
+    }
+    synthesize.mutate(visibleText, {
+      onSuccess: setAsset,
+      onError: (error) => toast.error(error.message),
+    })
+  }
+
+  return (
+    <div className="flex max-w-md flex-col items-start gap-2">
+      <MessageActions>
+        <MessageAction
+          tooltip="Read aloud"
+          label="Read aloud"
+          disabled={synthesize.isPending}
+          onClick={readAloud}
+        >
+          {synthesize.isPending ? <Loader2 className="size-4 animate-spin" /> : <Volume2 className="size-4" />}
+        </MessageAction>
+        <MessageAction
+          tooltip="Copy message"
+          label="Copy message"
+          onClick={() => navigator.clipboard.writeText(rawText)
+            .then(() => toast.success('Message copied'))
+            .catch(() => toast.error('Could not copy message'))}
+        >
+          <Copy className="size-4" />
+        </MessageAction>
+      </MessageActions>
+      {asset && (
+        <AudioPlayer className="w-full max-w-xs rounded-md border bg-muted/20 px-1 py-1">
+          <AudioPlayerElement ref={audio} src={asset.audioUrl} preload="metadata" />
+          <AudioPlayerControlBar className="w-full">
+            <AudioPlayerPlayButton />
+            <AudioPlayerTimeDisplay />
+            <AudioPlayerTimeRange className="min-w-20 flex-1" />
+            <AudioPlayerDurationDisplay />
+            <AudioPlayerMuteButton />
+          </AudioPlayerControlBar>
+        </AudioPlayer>
+      )}
     </div>
   )
 }

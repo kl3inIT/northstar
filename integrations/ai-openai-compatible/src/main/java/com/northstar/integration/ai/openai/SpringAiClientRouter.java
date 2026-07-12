@@ -62,7 +62,14 @@ public class SpringAiClientRouter implements AiClientRouter {
 
     @Override
     public void validate(AiTask task, AiRoute route) {
-        validateGateway(route.gatewayId());
+        AiGatewayDefinition gateway = gateways.definition(route.gatewayId());
+        if (!gateway.type().supports(task.requiredCapability())) {
+            throw new IllegalArgumentException("Gateway " + route.gatewayId()
+                    + " does not support " + task.requiredCapability());
+        }
+        if (task.requiredCapability() != com.northstar.core.ai.AiGatewayCapability.CHAT) {
+            return;
+        }
         List<AiModelDescriptor> available = catalog.models(route.gatewayId());
         if (!available.isEmpty() && available.stream().noneMatch(model -> model.id().equals(route.modelId()))) {
             throw new IllegalArgumentException("Model is not available from gateway "

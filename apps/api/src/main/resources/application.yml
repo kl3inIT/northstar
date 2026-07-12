@@ -95,6 +95,7 @@ northstar:
       title: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
       study-grader: ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
       image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-5.5}
+      text-to-speech: ${NORTHSTAR_TTS_TARGET:openai/gpt-4o-mini-tts/alloy}
     catalog:
       cache-ttl: 5m
     credentials:

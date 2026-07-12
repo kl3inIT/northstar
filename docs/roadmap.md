@@ -25,6 +25,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Reviewed Mobile Capture | Done | Focused Cupertino flow for text and receipt-image drafts, editable review, explicit note/task/event/expense writes, batch-safe undo, shared token refresh, compact/dark tests, and a real local API walkthrough. Voice capture and native-device validation remain. |
 | Study tutor V1 | Done | Capture-first study log with weekly summary and mock trend, vocab SRS on Ebisu recall probability reviewed through chat, writing tutor with sourced anchored grading + evaluator loop + error corpus, `/study` page, assistant/MCP tools, weekly review facts. Brief section and bulk imports remain deferred. |
 | Speech assessment V1 | Done | Provider-neutral speech port with Azure Speech SDK delivery measurement, live card pronunciation, one-question Speaking practice, routed AI content coaching, shared grammar corpus, and four-tab Study UI. The UI keeps provider 0-100 measurements separate from a rubric-grounded, LOW-confidence unofficial one-answer IELTS-style range with criterion evidence and scorer version; no provider score is converted into a band. Live provider/grader and browser flows are verified. |
+| On-demand text to speech foundation | Done | Explicit Assistant read-aloud action, independent TTS workload routing, OpenAI and 9Router delivery, target discovery, persisted content-addressed MP3 reuse, and responsive AI Elements playback. No automatic generation or playback. |
 | Today dashboard | Deferred | Assistant/chat is the daily cockpit for composing tasks, calendar, projects, finance, and review context. Revisit only if a zero-prompt glance surface becomes necessary. |
 | Repository documentation harness | In progress | Apply repo-as-system-of-record structure and consolidate existing guidance. |
 
@@ -33,9 +34,8 @@ This file tracks delivery status. Increment descriptions and rationale live in
 - Study V1.5: brief study section (after automation/brief), scored Task 1
   anchors, LanguageTool sidecar, bulk HSK/Tatoeba imports, embedding-based
   new-card dispersion.
-- TTS dictation (OpenAI `gpt-4o-mini-tts-2025-12-15` + audio player in chat):
-  assistant reads sentences containing the user's at-risk vocab, user types
-  what they hear, diff-graded — listening practice + vocab review in one.
+- Shadowing and dictation: reuse persisted speech assets for explicit per-card
+  generation, at-risk vocabulary sentences, typed recall, and diff grading.
 - Speaking debrief capture: practice conversation in ChatGPT voice, paste
   the takeaways back — capture/assistant classify into a Speaking session +
   errors into the grammar corpus.

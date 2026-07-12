@@ -12,6 +12,7 @@ import com.northstar.core.study.SpeakingFeedbackNotFoundException;
 import com.northstar.core.study.SpeechAssessmentException;
 import com.northstar.core.study.VocabCardNotFoundException;
 import com.northstar.core.study.WritingFeedbackNotFoundException;
+import com.northstar.core.speech.SpeechSynthesisException;
 import com.northstar.core.task.TaskNotFoundException;
 import com.northstar.core.web.WebResearchException;
 import com.northstar.core.web.WebResearchFailureCode;
@@ -80,6 +81,13 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         };
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(status, e.getMessage());
         detail.setProperty("code", e.failure().name());
+        return detail;
+    }
+
+    @ExceptionHandler(SpeechSynthesisException.class)
+    ProblemDetail speechSynthesis(SpeechSynthesisException e) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());
+        detail.setProperty("code", "SYNTHESIS_FAILED");
         return detail;
     }
 

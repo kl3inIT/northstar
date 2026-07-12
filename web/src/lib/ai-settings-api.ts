@@ -24,6 +24,7 @@ export const AI_TASKS = [
   'TITLE',
   'STUDY_GRADER',
   'IMAGE_CAPTION',
+  'TEXT_TO_SPEECH',
 ] as const
 
 export type AiTask = (typeof AI_TASKS)[number]

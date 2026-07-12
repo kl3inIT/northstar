@@ -51,6 +51,7 @@ import {
   type AiRouteSelection,
   type AiTask,
 } from '@/lib/ai-settings-api'
+import { useSpeechTargets } from '@/lib/speech-api'
 
 const SECTIONS = [
   { id: 'ai', label: 'AI models', icon: BrainCircuit },
@@ -110,6 +111,7 @@ const AI_TASK_LABELS: Record<AiTask, { title: string; description: string }> = {
   TITLE: { title: 'Chat titles', description: 'Short background conversation titles.' },
   STUDY_GRADER: { title: 'Study grader', description: 'Writing grading and faithfulness checks.' },
   IMAGE_CAPTION: { title: 'Image indexing', description: 'Describe images before search indexing.' },
+  TEXT_TO_SPEECH: { title: 'Text to speech', description: 'Generate reusable audio for Assistant and study.' },
 }
 
 function AiSettingsSection() {
@@ -460,14 +462,18 @@ function AiRouteRow({
   const reset = useResetAiRoute()
   const [gatewayId, setGatewayId] = useState(selection.route.gatewayId)
   const [modelId, setModelId] = useState(selection.route.modelId)
-  const models = useAiModels(gatewayId)
+  const capability: AiGatewayCapability = task === 'TEXT_TO_SPEECH' ? 'TEXT_TO_SPEECH' : 'CHAT'
+  const compatibleGateways = gateways.filter((gateway) => gateway.capabilities.includes(capability))
+  const models = useAiModels(task === 'TEXT_TO_SPEECH' ? undefined : gatewayId)
+  const speechTargets = useSpeechTargets(task === 'TEXT_TO_SPEECH' ? gatewayId : undefined)
 
   useEffect(() => {
     setGatewayId(selection.route.gatewayId)
     setModelId(selection.route.modelId)
   }, [selection])
 
-  const gatewayModels = models.data ?? []
+  const gatewayModels = task === 'TEXT_TO_SPEECH' ? (speechTargets.data ?? []) : (models.data ?? [])
+  const targetsLoading = task === 'TEXT_TO_SPEECH' ? speechTargets.isLoading : models.isLoading
   const dirty = gatewayId !== selection.route.gatewayId || modelId !== selection.route.modelId
   const label = AI_TASK_LABELS[task]
 
@@ -490,12 +496,12 @@ function AiRouteRow({
         >
           <SelectTrigger className="min-w-0" aria-label={`${label.title} gateway`}><SelectValue /></SelectTrigger>
           <SelectContent>
-            {gateways.map((gateway) => <SelectItem key={gateway.id} value={gateway.id}>{gateway.displayName}</SelectItem>)}
+            {compatibleGateways.map((gateway) => <SelectItem key={gateway.id} value={gateway.id}>{gateway.displayName}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={modelId} onValueChange={setModelId} disabled={models.isLoading || gatewayModels.length === 0}>
-          <SelectTrigger className="min-w-0" aria-label={`${label.title} model`}>
-            {models.isLoading ? <Loader2 className="size-4 animate-spin" /> : <SelectValue placeholder="Select model" />}
+        <Select value={modelId} onValueChange={setModelId} disabled={targetsLoading || gatewayModels.length === 0}>
+          <SelectTrigger className="min-w-0" aria-label={`${label.title} ${task === 'TEXT_TO_SPEECH' ? 'voice' : 'model'}`}>
+            {targetsLoading ? <Loader2 className="size-4 animate-spin" /> : <SelectValue placeholder={task === 'TEXT_TO_SPEECH' ? 'Select voice' : 'Select model'} />}
           </SelectTrigger>
           <SelectContent>
             {gatewayModels.map((model) => <SelectItem key={model.id} value={model.id}>{model.displayName}</SelectItem>)}

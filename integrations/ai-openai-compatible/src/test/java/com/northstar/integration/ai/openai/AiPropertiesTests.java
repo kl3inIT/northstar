@@ -18,6 +18,8 @@ class AiPropertiesTests {
         assertEquals("custom-router", properties.routeDefaults().get(AiTask.ASSISTANT).gatewayId());
         assertEquals("assistant-combo", properties.routeDefaults().get(AiTask.ASSISTANT).modelId());
         assertEquals("caption-combo", properties.routeDefaults().get(AiTask.IMAGE_CAPTION).modelId());
+        assertEquals("openai/gpt-4o-mini-tts/alloy",
+                properties.routeDefaults().get(AiTask.TEXT_TO_SPEECH).modelId());
     }
 
     @Test
@@ -42,7 +44,8 @@ class AiPropertiesTests {
                 "assistant-combo",
                 "fast-combo",
                 "grader-combo",
-                "caption-combo");
+                "caption-combo",
+                "openai/gpt-4o-mini-tts/alloy");
         return new AiProperties("custom-router", Map.of("custom-router", gateway), routes,
                 new AiProperties.Catalog(Duration.ofMinutes(2)),
                 new AiProperties.Credentials(""));
