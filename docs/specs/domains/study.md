@@ -197,7 +197,7 @@ skipped, never fatal.
   pause/resume/edit/delete, language/deck correction, live
   pronunciation assessment, and a keyboard-first weak-card reviewer. The
   reviewer supports typed or dictated answers, explicit semantic checking,
-  Space to reveal, 1-4 to rate, R to listen, Escape to exit, a completion
+  Space to flip between question and answer, 1-4 to rate, R to listen, Escape to exit, a completion
   tally, and an opt-in enrichment Sheet with preview/apply/discard. Writing:
   essays graded, latest estimate,
   trend vs previous essay, recurring-error strip, feedback table with a

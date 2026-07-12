@@ -64,7 +64,7 @@ The implementation is original and uses the repo's shadcn New York/zinc tokens:
 - progress and exit in a compact session header;
 - one dominant `Card`, with front and answer states instead of a chat thread;
 - reveal before rating;
-- keyboard shortcuts: Space reveal, 1-4 rate, R listen, Escape exit;
+- keyboard shortcuts: Space flips question/answer, 1-4 rate, R listen, Escape exit;
 - `Sheet` for opt-in enrichment and `Dialog` for editing/pronunciation;
 - mobile actions remain at least 44px and the enrichment Sheet occupies the
   viewport rather than compressing the card.

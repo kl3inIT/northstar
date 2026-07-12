@@ -17,8 +17,9 @@ test('review stays on the front until reveal and completes after the last rating
   assert.equal(reviewIsComplete(1, 1), true)
 })
 
-test('keyboard shortcuts respect reveal, typing, and enrichment states', () => {
-  assert.deepEqual(reviewKeyboardAction(' ', { enrichmentOpen: false, typing: false, revealed: false }), { type: 'reveal' })
+test('keyboard shortcuts flip both card sides and respect typing and enrichment states', () => {
+  assert.deepEqual(reviewKeyboardAction(' ', { enrichmentOpen: false, typing: false, revealed: false }), { type: 'flip' })
+  assert.deepEqual(reviewKeyboardAction(' ', { enrichmentOpen: false, typing: false, revealed: true }), { type: 'flip' })
   assert.deepEqual(reviewKeyboardAction('3', { enrichmentOpen: false, typing: false, revealed: true }), { type: 'rate', rating: 'GOOD' })
   assert.deepEqual(reviewKeyboardAction('r', { enrichmentOpen: false, typing: false, revealed: false }), { type: 'listen' })
   assert.deepEqual(reviewKeyboardAction('Escape', { enrichmentOpen: false, typing: true, revealed: false }), { type: 'exit' })

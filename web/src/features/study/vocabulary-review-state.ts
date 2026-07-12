@@ -7,7 +7,7 @@ export const EMPTY_TALLY: RatingTally = { AGAIN: 0, HARD: 0, GOOD: 0, EASY: 0 }
 export type ReviewKeyboardAction =
   | { type: 'exit' }
   | { type: 'listen' }
-  | { type: 'reveal' }
+  | { type: 'flip' }
   | { type: 'rate'; rating: VocabRating }
 
 const SHORTCUT_RATINGS: VocabRating[] = ['AGAIN', 'HARD', 'GOOD', 'EASY']
@@ -19,7 +19,7 @@ export function reviewKeyboardAction(
   if (context.enrichmentOpen) return null
   if (key === 'Escape') return { type: 'exit' }
   if (context.typing) return null
-  if (key === ' ' && !context.revealed) return { type: 'reveal' }
+  if (key === ' ') return { type: 'flip' }
   if (key.toLowerCase() === 'r') return { type: 'listen' }
   if (context.revealed && /^[1-4]$/.test(key)) {
     return { type: 'rate', rating: SHORTCUT_RATINGS[Number(key) - 1] }

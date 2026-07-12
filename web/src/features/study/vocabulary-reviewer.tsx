@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { AnimatePresence } from 'motion/react'
 import {
   ArrowLeft,
   BookOpen,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { MicButton } from '@/components/mic-button'
+import { m } from '@/components/motion-primitives'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -104,9 +106,14 @@ export function VocabularyReviewer({
   const complete = cards !== null && reviewIsComplete(index, cards.length)
   const progress = cards?.length ? Math.min(index / cards.length, 1) : 0
 
-  function reveal() {
+  function showAnswer() {
     if (!card || review.isPending) return
     setRevealed(true)
+  }
+
+  function flipCard() {
+    if (!card || review.isPending) return
+    setRevealed((current) => !current)
   }
 
   function listen() {
@@ -166,7 +173,7 @@ export function VocabularyReviewer({
       if (!action) return
       if (action.type === 'exit') return onExit()
       event.preventDefault()
-      if (action.type === 'reveal') reveal()
+      if (action.type === 'flip') flipCard()
       else if (action.type === 'listen') listen()
       else rate(action.rating)
     }
@@ -214,11 +221,15 @@ export function VocabularyReviewer({
 
       <Card className="overflow-hidden py-0">
         <CardHeader className="border-b bg-muted/20 px-5 py-4 sm:px-8">
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-              {revealed ? 'Answer' : 'Recall the meaning'}
-            </span>
-            <Button variant="ghost" size="sm" onClick={listen}><Volume2 /> Listen <kbd className="ml-1 text-[10px] text-muted-foreground">R</kbd></Button>
+          <div className="flex items-center justify-end gap-3">
+            <div className="flex items-center gap-1">
+              {revealed && (
+                <Button variant="ghost" size="sm" onClick={() => setRevealed(false)}>
+                  <RotateCcw /> Back to question <kbd className="ml-1 text-[10px] text-muted-foreground">Space</kbd>
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={listen}><Volume2 /> Listen <kbd className="ml-1 text-[10px] text-muted-foreground">R</kbd></Button>
+            </div>
           </div>
         </CardHeader>
 
@@ -233,60 +244,65 @@ export function VocabularyReviewer({
               )}
             </div>
 
-            {!revealed ? (
-              <div className="mx-auto mt-9 max-w-2xl space-y-3">
-                <Label htmlFor="vocab-answer">What does it mean?</Label>
-                <div className="relative">
-                  <Textarea id="vocab-answer" value={answer} onChange={(event) => setAnswer(event.target.value)}
-                    placeholder="Type or dictate your answer" className="min-h-24 pr-14 text-base"
-                    onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) submitAnswer() }} />
-                  <div className="absolute bottom-2 right-2"><MicButton value={answer} onChange={setAnswer} compact /></div>
-                </div>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Button variant="ghost" onClick={() => setHintVisible((visible) => !visible)}>
-                    <Lightbulb /> {hintVisible ? 'Hide hint' : 'Hint'}
-                  </Button>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={reveal}>Show answer <kbd className="ml-1 text-[10px]">Space</kbd></Button>
-                    <Button onClick={submitAnswer} disabled={!answer.trim() || checkAnswer.isPending}>
-                      {checkAnswer.isPending ? <Loader2 className="animate-spin" /> : <Check />}
-                      Check answer
+            <AnimatePresence mode="wait" initial={false}>
+              {!revealed ? (
+                <m.div key="question" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }} className="mx-auto mt-9 max-w-2xl space-y-3">
+                  <Label htmlFor="vocab-answer">What does it mean?</Label>
+                  <div className="relative">
+                    <Textarea id="vocab-answer" value={answer} onChange={(event) => setAnswer(event.target.value)}
+                      placeholder="Type or dictate your answer" className="min-h-24 pr-14 text-base"
+                      onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) submitAnswer() }} />
+                    <div className="absolute bottom-2 right-2"><MicButton value={answer} onChange={setAnswer} compact /></div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Button variant="ghost" onClick={() => setHintVisible((visible) => !visible)}>
+                      <Lightbulb /> {hintVisible ? 'Hide hint' : 'Hint'}
                     </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-8 space-y-6">
-                {checkAnswer.data && <AnswerAssessment verdict={checkAnswer.data.verdict} feedback={checkAnswer.data.feedback} answer={answer} />}
-                <Separator />
-                <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto]">
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                        {metadata.partOfSpeech && <Badge variant="outline">{metadata.partOfSpeech}</Badge>}
-                        {metadata.reading && <span>{metadata.reading}</span>}
-                      </div>
-                      <p className="mt-3 text-xl font-medium leading-relaxed">{card.back}</p>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={showAnswer}>Show answer <kbd className="ml-1 text-[10px]">Space</kbd></Button>
+                      <Button onClick={submitAnswer} disabled={!answer.trim() || checkAnswer.isPending}
+                        title={!answer.trim() ? 'Type an answer first' : undefined}>
+                        {checkAnswer.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+                        Check answer
+                      </Button>
                     </div>
-                    {metadata.example && <MetadataSection title="Example"><p>{metadata.example}</p></MetadataSection>}
-                    {metadata.collocations && <MetadataSection title="Collocations"><TagList values={metadata.collocations} /></MetadataSection>}
-                    {(metadata.synonyms || metadata.antonyms) && (
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        {metadata.synonyms && <MetadataSection title="Synonyms"><TagList values={metadata.synonyms} /></MetadataSection>}
-                        {metadata.antonyms && <MetadataSection title="Antonyms"><TagList values={metadata.antonyms} /></MetadataSection>}
+                  </div>
+                </m.div>
+              ) : (
+                <m.div key="answer" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }} className="mt-8 space-y-6">
+                  {checkAnswer.data && <AnswerAssessment verdict={checkAnswer.data.verdict} feedback={checkAnswer.data.feedback} answer={answer} />}
+                  <Separator />
+                  <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                          {metadata.partOfSpeech && <Badge variant="outline">{metadata.partOfSpeech}</Badge>}
+                          {metadata.reading && <span>{metadata.reading}</span>}
+                        </div>
+                        <p className="mt-3 text-xl font-medium leading-relaxed">{card.back}</p>
                       </div>
-                    )}
-                    {metadata.contrast && <MetadataSection title="Contrast"><p>{metadata.contrast}</p></MetadataSection>}
-                    {metadata.mnemonic && <MetadataSection title="Mnemonic"><p>{metadata.mnemonic}</p></MetadataSection>}
+                      {metadata.example && <MetadataSection title="Example"><p>{metadata.example}</p></MetadataSection>}
+                      {metadata.collocations && <MetadataSection title="Collocations"><TagList values={metadata.collocations} /></MetadataSection>}
+                      {(metadata.synonyms || metadata.antonyms) && (
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {metadata.synonyms && <MetadataSection title="Synonyms"><TagList values={metadata.synonyms} /></MetadataSection>}
+                          {metadata.antonyms && <MetadataSection title="Antonyms"><TagList values={metadata.antonyms} /></MetadataSection>}
+                        </div>
+                      )}
+                      {metadata.contrast && <MetadataSection title="Contrast"><p>{metadata.contrast}</p></MetadataSection>}
+                      {metadata.mnemonic && <MetadataSection title="Mnemonic"><p>{metadata.mnemonic}</p></MetadataSection>}
+                    </div>
+                    <div className="flex flex-row gap-2 md:flex-col">
+                      <Button variant="outline" onClick={() => setEnrichmentOpen(true)}><Sparkles /> Enrich card</Button>
+                      <Button variant="outline" onClick={() => onPronounce(card)}><Volume2 /> Practice pronunciation</Button>
+                      <Button variant="ghost" onClick={() => onEdit(card)}>Edit</Button>
+                    </div>
                   </div>
-                  <div className="flex flex-row gap-2 md:flex-col">
-                    <Button variant="outline" onClick={() => setEnrichmentOpen(true)}><Sparkles /> Enrich card</Button>
-                    <Button variant="outline" onClick={() => onPronounce(card)}><Volume2 /> Practice pronunciation</Button>
-                    <Button variant="ghost" onClick={() => onEdit(card)}>Edit</Button>
-                  </div>
-                </div>
-              </div>
-            )}
+                </m.div>
+              )}
+            </AnimatePresence>
           </div>
         </CardContent>
 
