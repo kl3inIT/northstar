@@ -36,6 +36,7 @@ class AiPropertiesTests {
                 "https://router.example/v1",
                 "secret-key",
                 List.of("assistant-combo", "caption-combo"),
+                List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
                 false,
                 Duration.ofSeconds(30));
         var routes = new AiProperties.Routes(
@@ -45,7 +46,10 @@ class AiPropertiesTests {
                 "fast-combo",
                 "grader-combo",
                 "caption-combo",
-                "openai/gpt-4o-mini-tts/alloy");
+                "openai/gpt-4o-mini-tts/alloy",
+                "whisper-1",
+                "gpt-image-1",
+                "text-embedding-3-large");
         return new AiProperties("custom-router", Map.of("custom-router", gateway), routes,
                 new AiProperties.Catalog(Duration.ofMinutes(2)),
                 new AiProperties.Credentials(""));

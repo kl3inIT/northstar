@@ -96,6 +96,9 @@ northstar:
       study-grader: ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
       image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-5.5}
       text-to-speech: ${NORTHSTAR_TTS_TARGET:openai/gpt-4o-mini-tts/alloy}
+      speech-to-text: ${NORTHSTAR_STT_TARGET:whisper-1}
+      image-generation: ${NORTHSTAR_IMAGE_TARGET:gpt-image-1}
+      embedding: ${NORTHSTAR_EMBEDDING_TARGET:text-embedding-3-large}
     catalog:
       cache-ttl: 5m
     credentials:

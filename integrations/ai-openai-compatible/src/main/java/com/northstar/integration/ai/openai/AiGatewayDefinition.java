@@ -11,6 +11,12 @@ record AiGatewayDefinition(
         String baseUrl,
         String apiKey,
         List<String> models,
+        List<String> ttsTargets,
+        List<String> webSearchTargets,
+        List<String> webFetchTargets,
+        List<String> sttTargets,
+        List<String> imageTargets,
+        List<String> embeddingTargets,
         boolean discoverModels,
         Duration timeout,
         AiGatewaySource source) {
@@ -21,7 +27,9 @@ record AiGatewayDefinition(
 
     AiGatewayDescriptor descriptor() {
         return new AiGatewayDescriptor(id, displayName, type, type.capabilities(), configured(), source,
-                source == AiGatewaySource.SETTINGS, baseUrl, models, discoverModels,
+                source == AiGatewaySource.SETTINGS, baseUrl, models, ttsTargets,
+                webSearchTargets, webFetchTargets, sttTargets, imageTargets, embeddingTargets,
+                discoverModels,
                 Math.toIntExact(timeout.toSeconds()));
     }
 }

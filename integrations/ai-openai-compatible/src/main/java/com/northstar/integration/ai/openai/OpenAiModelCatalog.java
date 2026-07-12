@@ -46,7 +46,7 @@ class OpenAiModelCatalog {
     }
 
     List<AiModelDescriptor> probe(AiGatewayDefinition gateway) {
-        return load(gateway.id(), gateway, true);
+        return load(gateway.id(), gateway, true, true);
     }
 
     void invalidate(String gatewayId) {
@@ -54,15 +54,15 @@ class OpenAiModelCatalog {
     }
 
     private List<AiModelDescriptor> load(String gatewayId, AiGatewayDefinition gateway) {
-        return load(gatewayId, gateway, false);
+        return load(gatewayId, gateway, false, false);
     }
 
     private List<AiModelDescriptor> load(String gatewayId, AiGatewayDefinition gateway,
-            boolean failFast) {
+            boolean failFast, boolean forceDiscovery) {
         Map<String, AiModelDescriptor> result = new LinkedHashMap<>();
         gateway.models().forEach(id -> result.put(id,
                 new AiModelDescriptor(gatewayId, id, displayName(id))));
-        if (!gateway.discoverModels()) {
+        if (!gateway.discoverModels() && !forceDiscovery) {
             return sorted(result);
         }
         try {

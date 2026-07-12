@@ -78,7 +78,11 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
         AiGatewayType type = input.type() == null ? AiGatewayType.OPENAI_CHAT_COMPATIBLE : input.type();
         return new AiGatewayDefinition(id, type,
                 required(input.displayName(), "displayName"), baseUrl(input.baseUrl()), apiKey,
-                models(input.models()), input.discoverModels(), timeout(input.timeoutSeconds()),
+                models(input.models()), models(input.ttsTargets()),
+                models(input.webSearchTargets()), models(input.webFetchTargets()),
+                models(input.sttTargets()), models(input.imageTargets()), models(input.embeddingTargets()),
+                input.discoverModels(),
+                timeout(input.timeoutSeconds()),
                 AiGatewaySource.SETTINGS);
     }
 
@@ -92,9 +96,17 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
         AiGatewaySetting setting = settings.findById(definition.id())
                 .orElseGet(() -> new AiGatewaySetting(definition.id(), definition.displayName(), definition.type(),
                         definition.baseUrl(), encrypted, encodeModels(definition.models()),
+                        encodeModels(definition.ttsTargets()),
+                        encodeModels(definition.webSearchTargets()), encodeModels(definition.webFetchTargets()),
+                        encodeModels(definition.sttTargets()), encodeModels(definition.imageTargets()),
+                        encodeModels(definition.embeddingTargets()),
                         definition.discoverModels(), Math.toIntExact(definition.timeout().toSeconds())));
         setting.apply(definition.displayName(), definition.type(), definition.baseUrl(), encrypted,
-                encodeModels(definition.models()), definition.discoverModels(),
+                encodeModels(definition.models()), encodeModels(definition.ttsTargets()),
+                encodeModels(definition.webSearchTargets()), encodeModels(definition.webFetchTargets()),
+                encodeModels(definition.sttTargets()), encodeModels(definition.imageTargets()),
+                encodeModels(definition.embeddingTargets()),
+                definition.discoverModels(),
                 Math.toIntExact(definition.timeout().toSeconds()));
         settings.save(setting);
         return definition.descriptor();
@@ -112,7 +124,11 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
 
     private AiGatewayDefinition deployment(String id, AiProperties.Gateway gateway) {
         return new AiGatewayDefinition(id, gateway.type(), gateway.displayName(), gateway.baseUrl(),
-                gateway.apiKey(), gateway.models(), gateway.discoverModels(), gateway.timeout(),
+                gateway.apiKey(), gateway.models(), gateway.ttsTargets(),
+                gateway.webSearchTargets(), gateway.webFetchTargets(), gateway.sttTargets(),
+                gateway.imageTargets(), gateway.embeddingTargets(),
+                gateway.discoverModels(),
+                gateway.timeout(),
                 AiGatewaySource.DEPLOYMENT);
     }
 
@@ -120,6 +136,10 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
         return new AiGatewayDefinition(setting.id(), setting.type(),
                 setting.displayName(), setting.baseUrl(),
                 cipher.decrypt(setting.apiKeyCiphertext(), setting.id()), decodeModels(setting.models()),
+                decodeModels(setting.ttsTargets()),
+                decodeModels(setting.webSearchTargets()), decodeModels(setting.webFetchTargets()),
+                decodeModels(setting.sttTargets()), decodeModels(setting.imageTargets()),
+                decodeModels(setting.embeddingTargets()),
                 setting.discoverModels(), Duration.ofSeconds(setting.timeoutSeconds()),
                 AiGatewaySource.SETTINGS);
     }
@@ -128,7 +148,11 @@ class AiGatewayRegistry implements AiGatewayConnectionResolver {
         return new AiGatewayDescriptor(setting.id(), setting.displayName(), setting.type(),
                 setting.type().capabilities(), true,
                 AiGatewaySource.SETTINGS, true, setting.baseUrl(),
-                decodeModels(setting.models()), setting.discoverModels(), setting.timeoutSeconds());
+                decodeModels(setting.models()), decodeModels(setting.ttsTargets()),
+                decodeModels(setting.webSearchTargets()), decodeModels(setting.webFetchTargets()),
+                decodeModels(setting.sttTargets()), decodeModels(setting.imageTargets()),
+                decodeModels(setting.embeddingTargets()),
+                setting.discoverModels(), setting.timeoutSeconds());
     }
 
     private static String normalizeId(String value) {

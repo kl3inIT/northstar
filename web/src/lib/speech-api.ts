@@ -10,6 +10,8 @@ export interface SpeechTarget {
   gatewayId: string
   id: string
   displayName: string
+  language: string
+  gender: string
 }
 
 export interface SpeechAsset {
@@ -31,7 +33,13 @@ export function useSpeechTargets(gatewayId?: string) {
         if (!target.gatewayId || !target.id || !target.displayName) {
           throw new Error('Speech target identity is incomplete')
         }
-        return { gatewayId: target.gatewayId, id: target.id, displayName: target.displayName }
+        return {
+          gatewayId: target.gatewayId,
+          id: target.id,
+          displayName: target.displayName,
+          language: target.language ?? '',
+          gender: target.gender ?? '',
+        }
       }),
   })
 }

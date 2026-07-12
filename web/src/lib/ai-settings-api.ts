@@ -5,6 +5,7 @@ import {
   getAiSettings,
   getAssistantConversationModel,
   listAiModels,
+  listAiCapabilityTargets,
   resetAiRoute,
   testAiGateway,
   testAiGatewayDraft,
@@ -25,6 +26,9 @@ export const AI_TASKS = [
   'STUDY_GRADER',
   'IMAGE_CAPTION',
   'TEXT_TO_SPEECH',
+  'SPEECH_TO_TEXT',
+  'IMAGE_GENERATION',
+  'EMBEDDING',
 ] as const
 
 export type AiTask = (typeof AI_TASKS)[number]
@@ -32,6 +36,7 @@ export type AiTask = (typeof AI_TASKS)[number]
 export interface AiRoute {
   gatewayId: string
   modelId: string
+  options?: Record<string, string>
 }
 
 export interface AiRouteSelection {
@@ -50,12 +55,18 @@ export interface AiGateway {
   editable: boolean
   baseUrl: string
   configuredModels: string[]
+  configuredTtsTargets: string[]
+  configuredWebSearchTargets: string[]
+  configuredWebFetchTargets: string[]
+  configuredSttTargets: string[]
+  configuredImageTargets: string[]
+  configuredEmbeddingTargets: string[]
   discoverModels: boolean
   timeoutSeconds: number
 }
 
 export type AiGatewayType = 'OPENAI' | 'NINE_ROUTER' | 'OPENAI_CHAT_COMPATIBLE'
-export type AiGatewayCapability = 'CHAT' | 'WEB_SEARCH' | 'WEB_FETCH' | 'SPEECH_TO_TEXT' | 'TEXT_TO_SPEECH' | 'REALTIME'
+export type AiGatewayCapability = 'CHAT' | 'WEB_SEARCH' | 'WEB_FETCH' | 'SPEECH_TO_TEXT' | 'TEXT_TO_SPEECH' | 'IMAGE_GENERATION' | 'EMBEDDING' | 'REALTIME'
 
 export interface AiGatewayInput {
   id: string
@@ -64,6 +75,12 @@ export interface AiGatewayInput {
   baseUrl: string
   apiKey?: string
   models: string[]
+  ttsTargets: string[]
+  webSearchTargets: string[]
+  webFetchTargets: string[]
+  sttTargets: string[]
+  imageTargets: string[]
+  embeddingTargets: string[]
   discoverModels: boolean
   timeoutSeconds: number
 }
@@ -72,6 +89,8 @@ export interface AiGatewayConnectionTest {
   success: boolean
   latencyMillis: number
   models: AiModel[]
+  ttsTargets: AiModel[]
+  capabilityTargets: Partial<Record<AiGatewayCapability, AiModel[]>>
   message: string
 }
 
@@ -88,7 +107,7 @@ export interface AiSettings {
 
 function route(value?: ApiAiRoute): AiRoute {
   if (!value?.gatewayId || !value.modelId) throw new Error('AI route is incomplete')
-  return { gatewayId: value.gatewayId, modelId: value.modelId }
+  return { gatewayId: value.gatewayId, modelId: value.modelId, options: value.options ?? {} }
 }
 
 function selection(value?: ApiAiRouteSelection): AiRouteSelection {
@@ -116,6 +135,12 @@ function settings(value: AiSettingsResponse): AiSettings {
         editable: gateway.editable ?? false,
         baseUrl: gateway.baseUrl ?? '',
         configuredModels: gateway.configuredModels ?? [],
+        configuredTtsTargets: gateway.configuredTtsTargets ?? [],
+        configuredWebSearchTargets: gateway.configuredWebSearchTargets ?? [],
+        configuredWebFetchTargets: gateway.configuredWebFetchTargets ?? [],
+        configuredSttTargets: gateway.configuredSttTargets ?? [],
+        configuredImageTargets: gateway.configuredImageTargets ?? [],
+        configuredEmbeddingTargets: gateway.configuredEmbeddingTargets ?? [],
         discoverModels: gateway.discoverModels ?? false,
         timeoutSeconds: gateway.timeoutSeconds ?? 60,
       }
@@ -135,6 +160,12 @@ function gateway(value: import('./hey-api').AiGatewayDescriptor): AiGateway {
     editable: value.editable ?? false,
     baseUrl: value.baseUrl ?? '',
     configuredModels: value.configuredModels ?? [],
+    configuredTtsTargets: value.configuredTtsTargets ?? [],
+    configuredWebSearchTargets: value.configuredWebSearchTargets ?? [],
+    configuredWebFetchTargets: value.configuredWebFetchTargets ?? [],
+    configuredSttTargets: value.configuredSttTargets ?? [],
+    configuredImageTargets: value.configuredImageTargets ?? [],
+    configuredEmbeddingTargets: value.configuredEmbeddingTargets ?? [],
     discoverModels: value.discoverModels ?? false,
     timeoutSeconds: value.timeoutSeconds ?? 60,
   }
@@ -149,6 +180,17 @@ function connectionTest(value: import('./hey-api').AiGatewayTestResult): AiGatew
       if (!model.gatewayId || !model.id || !model.displayName) throw new Error('AI model identity is incomplete')
       return { gatewayId: model.gatewayId, id: model.id, displayName: model.displayName }
     }),
+    ttsTargets: (value.ttsTargets ?? []).map((target) => {
+      if (!target.gatewayId || !target.id || !target.displayName) throw new Error('TTS target identity is incomplete')
+      return { gatewayId: target.gatewayId, id: target.id, displayName: target.displayName }
+    }),
+    capabilityTargets: Object.fromEntries(Object.entries(value.capabilityTargets ?? {}).map(([capability, targets]) => [
+      capability,
+      (targets ?? []).map((target) => {
+        if (!target.gatewayId || !target.id || !target.displayName) throw new Error('Capability target identity is incomplete')
+        return { gatewayId: target.gatewayId, id: target.id, displayName: target.displayName }
+      }),
+    ])) as Partial<Record<AiGatewayCapability, AiModel[]>>,
   }
 }
 
@@ -165,6 +207,20 @@ export function useAiModels(gatewayId?: string) {
     enabled: Boolean(gatewayId),
     staleTime: 5 * 60_000,
     queryFn: () => fetchAiModels(gatewayId!),
+  })
+}
+
+export function useAiCapabilityTargets(gatewayId?: string, capability?: AiGatewayCapability) {
+  return useQuery({
+    queryKey: ['settings', 'ai', 'targets', gatewayId, capability],
+    enabled: Boolean(gatewayId && capability),
+    staleTime: 5 * 60_000,
+    queryFn: async () => dataOrThrow(await listAiCapabilityTargets({
+      path: { gatewayId: gatewayId!, capability: capability! },
+    })).map((target) => {
+      if (!target.gatewayId || !target.id || !target.displayName) throw new Error('Capability target identity is incomplete')
+      return { gatewayId: target.gatewayId, id: target.id, displayName: target.displayName }
+    }),
   })
 }
 

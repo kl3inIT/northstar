@@ -6,5 +6,7 @@ public enum AiGatewayCapability {
     WEB_FETCH,
     SPEECH_TO_TEXT,
     TEXT_TO_SPEECH,
+    IMAGE_GENERATION,
+    EMBEDDING,
     REALTIME
 }

@@ -6,6 +6,9 @@ import com.northstar.core.ai.AiRouteSettingsService;
 import com.northstar.core.ai.AiRouteSettingsService.AiRouteSelection;
 import com.northstar.core.ai.AiTask;
 import com.northstar.core.ai.AiGatewayType;
+import com.northstar.core.ai.AiGatewayCapability;
+import com.northstar.integration.ai.openai.AiCapabilityCatalog;
+import com.northstar.integration.ai.openai.AiCapabilityTarget;
 import com.northstar.integration.ai.openai.AiCatalogService;
 import com.northstar.integration.ai.openai.AiGatewayDescriptor;
 import com.northstar.integration.ai.openai.AiGatewayInput;
@@ -37,13 +40,16 @@ class AiSettingsController {
     private final AiClientRouter router;
     private final AiCatalogService catalog;
     private final AiGatewayManagementService gateways;
+    private final AiCapabilityCatalog capabilities;
 
     AiSettingsController(AiRouteSettingsService settings, AiClientRouter router,
-            AiCatalogService catalog, AiGatewayManagementService gateways) {
+            AiCatalogService catalog, AiGatewayManagementService gateways,
+            AiCapabilityCatalog capabilities) {
         this.settings = settings;
         this.router = router;
         this.catalog = catalog;
         this.gateways = gateways;
+        this.capabilities = capabilities;
     }
 
     @GetMapping
@@ -55,7 +61,7 @@ class AiSettingsController {
     @PutMapping("/routes/{task}")
     @Operation(operationId = "updateAiRoute")
     AiRouteSelection update(@PathVariable AiTask task, @Valid @RequestBody AiRouteRequest request) {
-        return settings.update(task, new AiRoute(request.gatewayId(), request.modelId()), router);
+        return settings.update(task, new AiRoute(request.gatewayId(), request.modelId(), request.options()), router);
     }
 
     @DeleteMapping("/routes/{task}/override")
@@ -68,6 +74,13 @@ class AiSettingsController {
     @Operation(operationId = "listAiModels")
     List<AiModelDescriptor> models(@PathVariable String gatewayId) {
         return catalog.models(gatewayId);
+    }
+
+    @GetMapping("/gateways/{gatewayId}/targets/{capability}")
+    @Operation(operationId = "listAiCapabilityTargets")
+    List<AiCapabilityTarget> targets(@PathVariable String gatewayId,
+            @PathVariable AiGatewayCapability capability) {
+        return capabilities.targets(gatewayId, capability);
     }
 
     @PostMapping("/gateways")
@@ -101,7 +114,8 @@ class AiSettingsController {
         gateways.delete(gatewayId);
     }
 
-    record AiRouteRequest(@NotBlank String gatewayId, @NotBlank String modelId) {
+    record AiRouteRequest(@NotBlank String gatewayId, @NotBlank String modelId,
+            Map<String, String> options) {
     }
 
     record AiGatewayRequest(
@@ -111,11 +125,18 @@ class AiSettingsController {
             @NotBlank @Size(max = 500) String baseUrl,
             @Size(max = 1000) String apiKey,
             @Size(max = 200) List<@NotBlank @Size(max = 255) String> models,
+            @Size(max = 200) List<@NotBlank @Size(max = 255) String> ttsTargets,
+            @Size(max = 200) List<@NotBlank @Size(max = 255) String> webSearchTargets,
+            @Size(max = 200) List<@NotBlank @Size(max = 255) String> webFetchTargets,
+            @Size(max = 200) List<@NotBlank @Size(max = 255) String> sttTargets,
+            @Size(max = 200) List<@NotBlank @Size(max = 255) String> imageTargets,
+            @Size(max = 200) List<@NotBlank @Size(max = 255) String> embeddingTargets,
             boolean discoverModels,
             @Min(5) @Max(300) int timeoutSeconds) {
 
         AiGatewayInput input(String resolvedId) {
-            return new AiGatewayInput(resolvedId, displayName, type, baseUrl, apiKey, models,
+            return new AiGatewayInput(resolvedId, displayName, type, baseUrl, apiKey, models, ttsTargets,
+                    webSearchTargets, webFetchTargets, sttTargets, imageTargets, embeddingTargets,
                     discoverModels, timeoutSeconds);
         }
     }

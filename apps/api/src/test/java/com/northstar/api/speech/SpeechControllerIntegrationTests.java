@@ -9,7 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.northstar.core.ai.AiRoute;
 import com.northstar.core.speech.SpeechAudio;
-import com.northstar.core.speech.TextToSpeechGateway;
+import com.northstar.integration.ai.openai.OpenAiCompatibleTextToSpeechGateway;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -17,6 +17,8 @@ import java.net.http.HttpResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -35,10 +37,13 @@ class SpeechControllerIntegrationTests {
     static PostgreSQLContainer postgres = new PostgreSQLContainer("pgvector/pgvector:pg18");
 
     @MockitoBean
-    TextToSpeechGateway speechGateway;
+    OpenAiCompatibleTextToSpeechGateway speechGateway;
 
     @LocalServerPort
     int port;
+
+    @Autowired
+    JdbcClient jdbc;
 
     private final HttpClient http = HttpClient.newHttpClient();
 
@@ -73,6 +78,28 @@ class SpeechControllerIntegrationTests {
         HttpResponse<String> response = synthesize("x".repeat(4097));
 
         assertThat(response.statusCode()).isEqualTo(400);
+    }
+
+    @Test
+    void configuredLanguageIsUsedWhenSynthesisDoesNotOverrideIt() throws Exception {
+        byte[] mp3 = {0x49, 0x44, 0x33, 4, 5, 6};
+        when(speechGateway.synthesize(any(AiRoute.class), eq("Xin chao"), eq("vi-vn")))
+                .thenReturn(new SpeechAudio(mp3, "audio/mpeg", "mp3"));
+        jdbc.sql("""
+                INSERT INTO ai_route_setting(task, gateway_id, model_id, options)
+                VALUES ('TEXT_TO_SPEECH', 'openai', 'openai/gpt-4o-mini-tts/alloy',
+                        CAST(:options AS jsonb))
+                ON CONFLICT (task) DO UPDATE SET options = EXCLUDED.options
+                """).param("options", "{\"language\":\"vi-VN\"}").update();
+        HttpResponse<String> response;
+        try {
+            response = synthesize("Xin chao");
+        } finally {
+            jdbc.sql("DELETE FROM ai_route_setting WHERE task = 'TEXT_TO_SPEECH'").update();
+        }
+
+        assertThat(response.statusCode()).isEqualTo(200);
+        verify(speechGateway).synthesize(any(AiRoute.class), eq("Xin chao"), eq("vi-vn"));
     }
 
     private HttpResponse<String> synthesize(String text) throws Exception {

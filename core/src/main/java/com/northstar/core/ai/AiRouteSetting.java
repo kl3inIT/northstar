@@ -6,6 +6,9 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.util.Map;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "ai_route_setting")
@@ -22,6 +25,10 @@ class AiRouteSetting {
     @Column(name = "model_id", nullable = false, length = 255)
     private String modelId;
 
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(nullable = false, columnDefinition = "jsonb")
+    private Map<String, String> options;
+
     protected AiRouteSetting() {
         // for JPA
     }
@@ -34,9 +41,10 @@ class AiRouteSetting {
     void apply(AiRoute route) {
         gatewayId = route.gatewayId();
         modelId = route.modelId();
+        options = route.options();
     }
 
     AiRoute route() {
-        return new AiRoute(gatewayId, modelId);
+        return new AiRoute(gatewayId, modelId, options);
     }
 }

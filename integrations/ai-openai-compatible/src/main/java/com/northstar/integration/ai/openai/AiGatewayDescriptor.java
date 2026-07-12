@@ -15,6 +15,12 @@ public record AiGatewayDescriptor(
         boolean editable,
         String baseUrl,
         List<String> configuredModels,
+        List<String> configuredTtsTargets,
+        List<String> configuredWebSearchTargets,
+        List<String> configuredWebFetchTargets,
+        List<String> configuredSttTargets,
+        List<String> configuredImageTargets,
+        List<String> configuredEmbeddingTargets,
         boolean discoverModels,
         int timeoutSeconds) {
 }

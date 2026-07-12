@@ -10,6 +10,12 @@ public record AiGatewayInput(
         String baseUrl,
         String apiKey,
         List<String> models,
+        List<String> ttsTargets,
+        List<String> webSearchTargets,
+        List<String> webFetchTargets,
+        List<String> sttTargets,
+        List<String> imageTargets,
+        List<String> embeddingTargets,
         boolean discoverModels,
         int timeoutSeconds) {
 }
