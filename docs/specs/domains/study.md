@@ -46,6 +46,12 @@ the tool description, not a hard wall.
   `reading` and `partOfSpeech` are the base language fields. They travel in a
   `metadata` JSON string — never as columns — and remain empty when the model
   is unsure. Existing cards without either field remain valid.
+- Every card belongs to exactly one `ENGLISH` or `CHINESE` library and may
+  have one flat deck inside it. A missing deck is displayed as `General`;
+  `All decks` is a review scope, not stored data. Changing language or deck
+  never changes the card's Ebisu model or immutable review history. Existing
+  cards are backfilled deterministically (Han front → Chinese, otherwise
+  English), without an AI call.
 - Examples, collocations, synonyms, antonyms, easily-confused-word contrast,
   and mnemonics are optional enrichment. Creating, loading, or revealing a
   card never generates them. The learner selects fields and explicitly asks
@@ -54,8 +60,10 @@ the tool description, not a hard wall.
 - Re-capturing an existing front (accent- and case-insensitive) returns the
   existing card instead of duplicating it.
 - Focused reviews happen on the Vocabulary page; chat may still conduct a
-  quiz. A browser-owned 10/20/30-card snapshot takes the lowest-recall active
-  cards and never reveals the back first. Optional free-text answer checking
+  quiz. The learner first selects English or Chinese, then `All decks`,
+  `General`, or one saved deck such as IELTS/HSK4. A browser-owned 10/20/30-card
+  snapshot takes the lowest-recall active cards only inside that scope and
+  never mixes languages. Optional free-text answer checking
   returns `CORRECT`, `CLOSE`, or `MISSED` with a short explanation but does
   not select a rating or update memory. Only the learner's subsequent
   Again/Hard/Good/Easy action records a `MANUAL` review. Ratings map to Ebisu
@@ -162,8 +170,9 @@ skipped, never fatal.
 
 - Capture classifies `STUDY` (practice already done — multi-item, echo-back,
   undo, same contract as expenses) and `VOCAB` (words to memorize; the model
-  supplies reading and part of speech when known, but generates no optional
-  enrichment). An intention to study later stays a task.
+  supplies language plus reading and part of speech when known, preserves an
+  explicitly named deck, but invents neither a deck nor optional enrichment).
+  An intention to study later stays a task.
 - Assistant and MCP tools: `log_study_sessions`, `find_study_sessions`,
   `update_study_session`, `delete_study_session`, `study_summary`,
   `list_mock_results`, `save_vocab_cards`, `find_vocab_cards`, `quiz_vocab`,
@@ -181,9 +190,11 @@ skipped, never fatal.
 - `/study` has four tabs. Log: weekly stat strip, mock-trend line chart
   (score percentage per mock, one line per skill, hidden until two scored
   mocks exist), skill/kind filters, sessions table with edit/delete.
-  Vocabulary: tracked/at-risk/new-this-week stats, search across word,
-  meaning, reading, and part of speech; the table is sorted most-at-risk first
-  with suspended cards last. It provides pause/resume/edit/delete, live
+  Vocabulary: separate English/Chinese tabs, a deck selector, and scoped
+  tracked/at-risk/new-this-week stats plus search across word, meaning,
+  reading, and part of speech. Each table row shows its deck and the table is
+  sorted most-at-risk first with suspended cards last. It provides
+  pause/resume/edit/delete, language/deck correction, live
   pronunciation assessment, and a keyboard-first weak-card reviewer. The
   reviewer supports typed or dictated answers, explicit semantic checking,
   Space to reveal, 1-4 to rate, R to listen, Escape to exit, a completion
@@ -199,7 +210,8 @@ skipped, never fatal.
   an optional entry path for vocab quizzes. Writing grading remains in chat.
 - REST surface: `/api/study/sessions` (GET/POST/PUT/DELETE), `/summary`,
   `/mocks`, `/skills`, `/vocab` (GET/POST/PUT/DELETE),
-  `/vocab/review`, `/vocab/{id}/reviews`, `/vocab/{id}/answer-check`,
+  `/vocab/review` (required language, optional deck), `/vocab/{id}/reviews`,
+  `/vocab/{id}/answer-check`,
   `/vocab/{id}/enrichment`, `/vocab/{id}/pronunciation`, `/writing`
   (GET/DELETE), and `/speaking`
   history plus `/speaking/question` and `/speaking/attempts`. Week boundaries

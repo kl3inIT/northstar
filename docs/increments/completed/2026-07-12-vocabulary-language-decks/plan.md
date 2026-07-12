@@ -2,7 +2,7 @@
 
 ## Block A - Domain and persistence
 
-- Add decision 0025 and migration V39.
+- Add decision 0025 and migration V41.
 - Add required card language plus optional flat deck to domain records.
 - Backfill existing cards and pin detection/canonicalization/filter behavior.
 - End green on backend compile/core tests and web typecheck.

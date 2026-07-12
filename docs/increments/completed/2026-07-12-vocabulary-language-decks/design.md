@@ -24,7 +24,7 @@ deck-scoped without duplicating cards or changing Ebisu scheduling.
 
 `vocab_card.language` is required and constrained to `ENGLISH|CHINESE`.
 `vocab_card.deck` is nullable, trimmed, case-insensitively canonicalized from
-existing names, and capped at 80 characters. Migration V39 backfills existing
+existing names, and capped at 80 characters. Migration V41 backfills existing
 cards without an AI call.
 
 ## Gates
