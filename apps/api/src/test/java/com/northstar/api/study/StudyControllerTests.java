@@ -19,6 +19,7 @@ import com.northstar.core.study.VocabLanguage;
 import com.northstar.core.study.VocabReviewLog;
 import com.northstar.core.study.VocabReviewDirection;
 import com.northstar.core.study.VocabService;
+import com.northstar.core.study.VocabSchedulingState;
 import com.northstar.core.study.WritingService;
 import java.time.Instant;
 import java.util.List;
@@ -95,7 +96,8 @@ class StudyControllerTests {
         Instant now = Instant.parse("2026-07-12T00:00:00Z");
         return new VocabCardSummary(id, "meticulous", "tỉ mỉ",
                 "{\"reading\":\"/məˈtɪkjələs/\",\"partOfSpeech\":\"adjective\"}",
-                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24, now, 2, false, now, 1,
-                false, null, null);
+                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24.0, now, now,
+                VocabSchedulingState.REVIEW, 0, false, 2, false, now, 1,
+                false, null, null, null, null, null, null, null);
     }
 }

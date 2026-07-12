@@ -7,17 +7,14 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
-import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One vocabulary card plus its Ebisu memory model. {@code front} is the
- * prompt side (the word), {@code back} the answer (meaning); language
+ * One vocabulary content note. {@code front} is the prompt side (the word),
+ * {@code back} the answer (meaning); language
  * specifics — pinyin, example sentences, audio — travel in {@code metadata}
- * as a JSON string so new subjects never need schema changes. The model
- * triple ({@code alpha}, {@code beta}, {@code halflifeHours}) is anchored at
- * {@code lastReviewedAt}; there is deliberately NO due date — consumers rank
- * cards by predicted recall instead, so missed days never pile up a backlog.
+ * as a JSON string so new subjects never need schema changes. Independent
+ * recognition/production memory lives in {@link VocabSchedulingCard} rows.
  */
 @Entity
 @Table(name = "vocab_card")
@@ -45,42 +42,17 @@ public class VocabCard extends BaseEntity {
     private UUID disciplineId;
 
     @Column(nullable = false)
-    private double alpha;
-
-    @Column(nullable = false)
-    private double beta;
-
-    @Column(name = "halflife_hours", nullable = false)
-    private double halflifeHours;
-
-    @Column(name = "last_reviewed_at", nullable = false)
-    private Instant lastReviewedAt;
-
-    @Column(nullable = false)
     private boolean suspended;
 
     @Column(name = "production_enabled", nullable = false)
     private boolean productionEnabled;
-
-    @Column(name = "production_alpha")
-    private Double productionAlpha;
-
-    @Column(name = "production_beta")
-    private Double productionBeta;
-
-    @Column(name = "production_halflife_hours")
-    private Double productionHalflifeHours;
-
-    @Column(name = "production_last_reviewed_at")
-    private Instant productionLastReviewedAt;
 
     protected VocabCard() {
         // for JPA
     }
 
     public VocabCard(UUID id, String front, String back, String metadata,
-            VocabLanguage language, String deck, UUID disciplineId,
-            double alpha, double beta, double halflifeHours, Instant lastReviewedAt) {
+            VocabLanguage language, String deck, UUID disciplineId) {
         super(id);
         this.front = front;
         this.back = back;
@@ -88,10 +60,6 @@ public class VocabCard extends BaseEntity {
         this.language = language;
         this.deck = deck;
         this.disciplineId = disciplineId;
-        this.alpha = alpha;
-        this.beta = beta;
-        this.halflifeHours = halflifeHours;
-        this.lastReviewedAt = lastReviewedAt;
         this.suspended = false;
         this.productionEnabled = false;
     }
@@ -120,22 +88,6 @@ public class VocabCard extends BaseEntity {
         return disciplineId;
     }
 
-    public double getAlpha() {
-        return alpha;
-    }
-
-    public double getBeta() {
-        return beta;
-    }
-
-    public double getHalflifeHours() {
-        return halflifeHours;
-    }
-
-    public Instant getLastReviewedAt() {
-        return lastReviewedAt;
-    }
-
     public boolean isSuspended() {
         return suspended;
     }
@@ -144,23 +96,7 @@ public class VocabCard extends BaseEntity {
         return productionEnabled;
     }
 
-    public Double getProductionAlpha() {
-        return productionAlpha;
-    }
-
-    public Double getProductionBeta() {
-        return productionBeta;
-    }
-
-    public Double getProductionHalflifeHours() {
-        return productionHalflifeHours;
-    }
-
-    public Instant getProductionLastReviewedAt() {
-        return productionLastReviewedAt;
-    }
-
-    /** Edit the content sides; the memory model is only ever moved by a review. */
+    /** Edit the content sides; scheduling state is only ever moved by a review. */
     public void edit(String front, String back, String metadata, VocabLanguage language,
             String deck, UUID disciplineId, boolean suspended) {
         edit(front, back, metadata, language, deck, disciplineId, suspended, productionEnabled);
@@ -175,36 +111,11 @@ public class VocabCard extends BaseEntity {
         this.deck = deck;
         this.disciplineId = disciplineId;
         this.suspended = suspended;
-        setProductionEnabled(enableProduction, Instant.now());
+        setProductionEnabled(enableProduction);
     }
 
-    /** Fold a review into the memory model — the only writer of the triple. */
-    public void reviewed(double alpha, double beta, double halflifeHours, Instant reviewedAt) {
-        this.alpha = alpha;
-        this.beta = beta;
-        this.halflifeHours = halflifeHours;
-        this.lastReviewedAt = reviewedAt;
-    }
-
-    /** Enable/disable the production sibling while retaining learned state on disable. */
-    public void setProductionEnabled(boolean enabled, Instant now) {
+    /** Enable/disable the production sibling while its scheduling row retains learned state. */
+    public void setProductionEnabled(boolean enabled) {
         productionEnabled = enabled;
-        if (enabled && productionAlpha == null) {
-            productionAlpha = 2.0;
-            productionBeta = 2.0;
-            productionHalflifeHours = 24.0;
-            productionLastReviewedAt = now;
-        }
-    }
-
-    public void productionReviewed(double alpha, double beta, double halflifeHours,
-            Instant reviewedAt) {
-        if (!productionEnabled) {
-            throw new IllegalStateException("Production review is not enabled");
-        }
-        productionAlpha = alpha;
-        productionBeta = beta;
-        productionHalflifeHours = halflifeHours;
-        productionLastReviewedAt = reviewedAt;
     }
 }

@@ -29,6 +29,7 @@ dependencies {
     // flavor has no entity and ships the official Postgres DDL (copied into V15).
     implementation("org.springframework.modulith:spring-modulith-starter-jdbc")
     implementation("com.github.ben-manes.caffeine:caffeine")
+    implementation(libs.fsrs)
 
     testImplementation("org.springframework.modulith:spring-modulith-starter-test")
     testImplementation("org.junit.jupiter:junit-jupiter")
