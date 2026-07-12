@@ -19,7 +19,7 @@ import { m } from '@/components/motion-primitives'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
+import { Card, CardContent, CardFooter } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -219,24 +219,21 @@ export function VocabularyReviewer({
         </div>
       </header>
 
-      <Card className="overflow-hidden py-0">
-        <CardHeader className="border-b bg-muted/20 px-5 py-4 sm:px-8">
-          <div className="flex items-center justify-end gap-3">
-            <div className="flex items-center gap-1">
-              {revealed && (
-                <Button variant="ghost" size="sm" onClick={() => setRevealed(false)}>
-                  <RotateCcw /> Back to question <kbd className="ml-1 text-[10px] text-muted-foreground">Space</kbd>
-                </Button>
-              )}
-              <Button variant="ghost" size="sm" onClick={listen}><Volume2 /> Listen <kbd className="ml-1 text-[10px] text-muted-foreground">R</kbd></Button>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="px-5 py-8 sm:px-10 sm:py-10">
+      <Card className="overflow-hidden border-border/80 py-0 shadow-sm">
+        <CardContent className="relative px-5 pb-8 pt-16 sm:px-10 sm:pb-10 sm:pt-16">
+          <Button variant="ghost" size="sm" onClick={listen} className="absolute right-4 top-3 sm:right-6">
+            <Volume2 /> Listen <kbd className="ml-1 text-[10px] text-muted-foreground">R</kbd>
+          </Button>
           <div className="mx-auto max-w-3xl">
             <div className="text-center">
-              <h2 className="text-4xl font-semibold tracking-tight sm:text-6xl">{card.front}</h2>
+              <button type="button" onClick={flipCard}
+                aria-label={revealed ? `Show the question for ${card.front}` : `Show the answer for ${card.front}`}
+                className="group inline-flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
+                <span className="text-4xl font-semibold tracking-tight sm:text-6xl">{card.front}</span>
+                <RotateCcw aria-hidden="true"
+                  className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-60 group-focus-visible:opacity-60 motion-reduce:transition-none" />
+              </button>
+              <span className="sr-only" aria-live="polite">{revealed ? 'Answer shown' : 'Question shown'}</span>
               {!revealed && hintVisible && (
                 <p className="mt-3 text-sm text-muted-foreground">
                   {metadata.partOfSpeech || 'No saved part-of-speech hint'}
@@ -244,71 +241,75 @@ export function VocabularyReviewer({
               )}
             </div>
 
-            <AnimatePresence mode="wait" initial={false}>
-              {!revealed ? (
-                <m.div key="question" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }} className="mx-auto mt-9 max-w-2xl space-y-3">
-                  <Label htmlFor="vocab-answer">What does it mean?</Label>
-                  <div className="relative">
-                    <Textarea id="vocab-answer" value={answer} onChange={(event) => setAnswer(event.target.value)}
-                      placeholder="Type or dictate your answer" className="min-h-24 pr-14 text-base"
-                      onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) submitAnswer() }} />
-                    <div className="absolute bottom-2 right-2"><MicButton value={answer} onChange={setAnswer} compact /></div>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Button variant="ghost" onClick={() => setHintVisible((visible) => !visible)}>
-                      <Lightbulb /> {hintVisible ? 'Hide hint' : 'Hint'}
-                    </Button>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={showAnswer}>Show answer <kbd className="ml-1 text-[10px]">Space</kbd></Button>
-                      <Button onClick={submitAnswer} disabled={!answer.trim() || checkAnswer.isPending}
-                        title={!answer.trim() ? 'Type an answer first' : undefined}>
-                        {checkAnswer.isPending ? <Loader2 className="animate-spin" /> : <Check />}
-                        Check answer
+            <div style={{ perspective: '1200px' }}>
+              <AnimatePresence mode="wait" initial={false}>
+                {!revealed ? (
+                  <m.div key="question" initial={{ opacity: 0, rotateY: -8 }} animate={{ opacity: 1, rotateY: 0 }}
+                    exit={{ opacity: 0, rotateY: 8 }} className="mx-auto mt-9 max-w-2xl space-y-3"
+                    style={{ transformStyle: 'preserve-3d' }}>
+                    <Label htmlFor="vocab-answer">What does it mean?</Label>
+                    <div className="relative">
+                      <Textarea id="vocab-answer" value={answer} onChange={(event) => setAnswer(event.target.value)}
+                        placeholder="Type or dictate your answer" className="min-h-24 pr-14 text-base"
+                        onKeyDown={(event) => { if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) submitAnswer() }} />
+                      <div className="absolute bottom-2 right-2"><MicButton value={answer} onChange={setAnswer} compact /></div>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <Button variant="ghost" onClick={() => setHintVisible((visible) => !visible)}>
+                        <Lightbulb /> {hintVisible ? 'Hide hint' : 'Hint'}
                       </Button>
-                    </div>
-                  </div>
-                </m.div>
-              ) : (
-                <m.div key="answer" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }} className="mt-8 space-y-6">
-                  {checkAnswer.data && <AnswerAssessment verdict={checkAnswer.data.verdict} feedback={checkAnswer.data.feedback} answer={answer} />}
-                  <Separator />
-                  <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto]">
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                          {metadata.partOfSpeech && <Badge variant="outline">{metadata.partOfSpeech}</Badge>}
-                          {metadata.reading && <span>{metadata.reading}</span>}
-                        </div>
-                        <p className="mt-3 text-xl font-medium leading-relaxed">{card.back}</p>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={showAnswer}>Show answer <kbd className="ml-1 text-[10px]">Space</kbd></Button>
+                        <Button onClick={submitAnswer} disabled={!answer.trim() || checkAnswer.isPending}
+                          title={!answer.trim() ? 'Type an answer first' : undefined}>
+                          {checkAnswer.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+                          Check answer
+                        </Button>
                       </div>
-                      {metadata.example && <MetadataSection title="Example"><p>{metadata.example}</p></MetadataSection>}
-                      {metadata.collocations && <MetadataSection title="Collocations"><TagList values={metadata.collocations} /></MetadataSection>}
-                      {(metadata.synonyms || metadata.antonyms) && (
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          {metadata.synonyms && <MetadataSection title="Synonyms"><TagList values={metadata.synonyms} /></MetadataSection>}
-                          {metadata.antonyms && <MetadataSection title="Antonyms"><TagList values={metadata.antonyms} /></MetadataSection>}
+                    </div>
+                  </m.div>
+                ) : (
+                  <m.div key="answer" initial={{ opacity: 0, rotateY: 8 }} animate={{ opacity: 1, rotateY: 0 }}
+                    exit={{ opacity: 0, rotateY: -8 }} className="mt-8 space-y-6"
+                    style={{ transformStyle: 'preserve-3d' }}>
+                    {checkAnswer.data && <AnswerAssessment verdict={checkAnswer.data.verdict} feedback={checkAnswer.data.feedback} answer={answer} />}
+                    <Separator />
+                    <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto]">
+                      <div className="space-y-4">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                            {metadata.partOfSpeech && <Badge variant="outline">{metadata.partOfSpeech}</Badge>}
+                            {metadata.reading && <span>{metadata.reading}</span>}
+                          </div>
+                          <p className="mt-3 text-xl font-medium leading-relaxed">{card.back}</p>
                         </div>
-                      )}
-                      {metadata.contrast && <MetadataSection title="Contrast"><p>{metadata.contrast}</p></MetadataSection>}
-                      {metadata.mnemonic && <MetadataSection title="Mnemonic"><p>{metadata.mnemonic}</p></MetadataSection>}
+                        {metadata.example && <MetadataSection title="Example"><p>{metadata.example}</p></MetadataSection>}
+                        {metadata.collocations && <MetadataSection title="Collocations"><TagList values={metadata.collocations} /></MetadataSection>}
+                        {(metadata.synonyms || metadata.antonyms) && (
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            {metadata.synonyms && <MetadataSection title="Synonyms"><TagList values={metadata.synonyms} /></MetadataSection>}
+                            {metadata.antonyms && <MetadataSection title="Antonyms"><TagList values={metadata.antonyms} /></MetadataSection>}
+                          </div>
+                        )}
+                        {metadata.contrast && <MetadataSection title="Contrast"><p>{metadata.contrast}</p></MetadataSection>}
+                        {metadata.mnemonic && <MetadataSection title="Mnemonic"><p>{metadata.mnemonic}</p></MetadataSection>}
+                      </div>
+                      <div className="flex flex-row gap-2 md:flex-col">
+                        <Button variant="outline" onClick={() => setEnrichmentOpen(true)}><Sparkles /> Enrich card</Button>
+                        <Button variant="outline" onClick={() => onPronounce(card)}><Volume2 /> Practice pronunciation</Button>
+                        <Button variant="ghost" onClick={() => onEdit(card)}>Edit</Button>
+                      </div>
                     </div>
-                    <div className="flex flex-row gap-2 md:flex-col">
-                      <Button variant="outline" onClick={() => setEnrichmentOpen(true)}><Sparkles /> Enrich card</Button>
-                      <Button variant="outline" onClick={() => onPronounce(card)}><Volume2 /> Practice pronunciation</Button>
-                      <Button variant="ghost" onClick={() => onEdit(card)}>Edit</Button>
-                    </div>
-                  </div>
-                </m.div>
-              )}
-            </AnimatePresence>
+                  </m.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </CardContent>
 
         {revealed && (
           <CardFooter className="border-t bg-muted/20 px-5 py-5 sm:px-8">
-            <ButtonGroup className="grid w-full grid-cols-2 sm:grid-cols-4">
+            <ButtonGroup className="grid w-full grid-cols-2 sm:grid-cols-4" aria-label="Rate your recall">
               {RATINGS.map((item, ratingIndex) => (
                 <Button key={item.rating} variant={item.rating === 'GOOD' ? 'default' : 'outline'}
                   className="h-auto min-h-16 flex-col gap-0.5" disabled={review.isPending}
