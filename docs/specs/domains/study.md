@@ -97,18 +97,31 @@ and never persisted.
   types. Blank configuration leaves the API bootable and speech endpoints
   return 503.
 - Azure is authoritative only for delivery: transcript, pronunciation,
-  fluency, prosody, and word/phoneme accuracy. These are provider 0-100 values,
-  never an IELTS band and never combined into an overall speaking score.
+  fluency, prosody, and word/phoneme accuracy. These remain provider 0-100
+  values, are never relabelled or directly converted into an IELTS band, and
+  stay visibly separate from rubric-based estimates.
 - The selected `STUDY_GRADER` AI route scores vocabulary, grammar, and topic on
   a separate unofficial 0-100 practice scale. It receives the prior writing
   and speaking error corpus, must quote transcript fragments verbatim, and
   passes structural plus LLM faithfulness evaluation with one corrective
   retry. The evidence envelope contains the question, transcript, and measured
   delivery; the LLM cannot alter provider scores.
+- The same structured grading call assesses four IELTS-style criteria against
+  `prompts/rubrics/ielts-speaking.md`: Fluency and Coherence, Lexical Resource,
+  Grammatical Range and Accuracy, and Pronunciation. Each criterion is a
+  half-band range no wider than 1.0 with LOW or MEDIUM confidence and grounded
+  evidence. FC/LR/GRA evidence must quote the transcript; Pronunciation may
+  use only measured delivery values and low-accuracy words. Java validates the
+  evidence and deterministically averages the four bounds into an overall
+  range. It is always labelled `Unofficial one-answer IELTS-style estimate`
+  with LOW overall confidence; it is not an official score or a full Part 1-3
+  assessment.
 - A successful attempt persists question, transcript, both score groups,
   exact writing-compatible `topErrors` JSON (`label`, `quote`, `fix`), summary,
-  grader model, delivery provider and provider revision. It also logs one
-  `Speaking` / `PRACTICE` session rounded up to whole minutes.
+  grader model, delivery provider and provider revision, the complete estimate
+  snapshot, and `ielts-speaking-one-answer-v1` scorer version. Legacy rows have
+  no estimate and remain readable. It also logs one `Speaking` / `PRACTICE`
+  session rounded up to whole minutes.
 - History is newest-first with detail and delete. Provider identity is stored
   because different vendors' 0-100 scales are not assumed comparable.
 
@@ -157,8 +170,9 @@ skipped, never fatal.
   trend vs previous essay, recurring-error strip, feedback table with a
   detail dialog (per-criterion justifications, quote-to-fix errors, the
   essay) and delete. Speaking: attempt count and recent delivery trend,
-  question generation, 60-second recorder, separately-labelled delivery and
-  content scores, highlighted transcript errors, history detail, and delete.
+  question generation, 60-second recorder, separately-labelled delivery,
+  content, and unofficial IELTS-style ranges, grounded expandable evidence,
+  highlighted transcript errors, history detail, and delete.
 - Vocab reviews and writing grading remain in chat; speech assessment runs on
   the focused page because chat has no audio attachment/output workflow.
 - REST surface: `/api/study/sessions` (GET/POST/PUT/DELETE), `/summary`,
