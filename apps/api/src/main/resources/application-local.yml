@@ -10,12 +10,8 @@ spring:
 northstar:
   auth:
     enabled: ${NORTHSTAR_AUTH_ENABLED:false}
-
-server:
-  servlet:
-    session:
-      cookie:
-        secure: false
+    web-session:
+      secure: false
 
 management:
   endpoints:

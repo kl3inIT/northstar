@@ -16,7 +16,9 @@ class ApiApplicationProfileTests {
     void localProfileEnablesOnlyDeveloperConveniences() {
         runner.withPropertyValues("spring.profiles.active=local").run(context -> {
             Environment environment = context.getEnvironment();
-            assertThat(environment.getProperty("server.servlet.session.cookie.secure", Boolean.class)).isFalse();
+            assertThat(environment.getProperty("northstar.auth.web-session.secure", Boolean.class)).isFalse();
+            assertThat(environment.getProperty("spring.session.timeout")).isEqualTo("30d");
+            assertThat(environment.getProperty("northstar.auth.web-session.cookie-max-age")).isEqualTo("30d");
             assertThat(environment.getProperty(
                     "logging.level.org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor"))
                     .isEqualTo("DEBUG");
@@ -35,6 +37,8 @@ class ApiApplicationProfileTests {
                     .isEqualTo(8);
             assertThat(environment.getProperty("logging.structured.format.console")).isEqualTo("ecs");
             assertThat(environment.getProperty("server.forward-headers-strategy")).isEqualTo("native");
+            assertThat(environment.getProperty("spring.session.jdbc.initialize-schema"))
+                    .isEqualTo("never");
             assertThat(environment.getProperty("management.endpoints.web.exposure.include"))
                     .isEqualTo("health");
         });

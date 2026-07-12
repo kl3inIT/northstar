@@ -1,6 +1,11 @@
 northstar:
   auth:
     enabled: false
+    web-session:
+      cookie-max-age: 30d
+      http-only: true
+      same-site: Lax
+      secure: false
 
 spring:
   datasource:
@@ -11,3 +16,7 @@ spring:
       minimum-idle: 0
       maximum-pool-size: 3
       connection-timeout: 2000
+  session:
+    timeout: 30d
+    jdbc:
+      initialize-schema: never

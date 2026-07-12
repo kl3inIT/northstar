@@ -16,10 +16,11 @@ spring:
 
 server:
   forward-headers-strategy: native
-  servlet:
-    session:
-      cookie:
-        secure: ${NORTHSTAR_COOKIE_SECURE:true}
+
+northstar:
+  auth:
+    web-session:
+      secure: ${NORTHSTAR_COOKIE_SECURE:true}
 
 management:
   endpoints:

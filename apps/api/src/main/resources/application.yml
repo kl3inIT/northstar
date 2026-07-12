@@ -58,6 +58,11 @@ spring:
       # Completed publications are deleted, not kept — nothing reads the history
       # and the outbox table stays lean.
       completion-mode: delete
+  session:
+    timeout: ${NORTHSTAR_WEB_SESSION_TIMEOUT:30d}
+    jdbc:
+      # Flyway owns the schema (V41); sessions must survive API restarts.
+      initialize-schema: never
   servlet:
     multipart:
       # Voice capture uploads; Whisper's own cap is 25MB.
@@ -112,6 +117,11 @@ northstar:
     enabled: ${NORTHSTAR_AUTH_ENABLED:true}
     username: ${NORTHSTAR_AUTH_USERNAME:}
     password-hash: ${NORTHSTAR_AUTH_PASSWORD_HASH:}
+    web-session:
+      cookie-max-age: ${NORTHSTAR_WEB_SESSION_TIMEOUT:30d}
+      http-only: true
+      same-site: Lax
+      secure: ${NORTHSTAR_COOKIE_SECURE:true}
     mobile:
       enabled: ${NORTHSTAR_MOBILE_AUTH_ENABLED:false}
       issuer: ${NORTHSTAR_MOBILE_AUTH_ISSUER:northstar-api}
@@ -166,13 +176,6 @@ northstar:
 
 server:
   port: ${NORTHSTAR_API_PORT:8888}
-  servlet:
-    session:
-      cookie:
-        http-only: true
-        same-site: lax
-        # Fail-safe default. The local profile disables Secure for local HTTP.
-        secure: ${NORTHSTAR_COOKIE_SECURE:true}
 
 management:
   endpoints:

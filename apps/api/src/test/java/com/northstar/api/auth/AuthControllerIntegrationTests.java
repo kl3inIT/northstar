@@ -14,11 +14,11 @@ import com.jayway.jsonpath.JsonPath;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
-import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -46,6 +46,9 @@ class AuthControllerIntegrationTests {
 
     @Autowired
     MockMvc mvc;
+
+    @Autowired
+    JdbcClient jdbc;
 
     @Test
     void unauthenticatedApiRequestsReturnProblemJsonInsteadOfRedirects() throws Exception {
@@ -80,15 +83,27 @@ class AuthControllerIntegrationTests {
                 .andExpect(jsonPath("$.username").value("datph"))
                 .andReturn();
 
-        MockHttpSession session = (MockHttpSession) loggedIn.getRequest().getSession(false);
+        Cookie session = loggedIn.getResponse().getCookie("SESSION");
         org.assertj.core.api.Assertions.assertThat(session).isNotNull();
-        mvc.perform(get("/api/notes").session(session))
+        org.assertj.core.api.Assertions.assertThat(session.getMaxAge()).isEqualTo(30 * 24 * 60 * 60);
+        org.assertj.core.api.Assertions.assertThat(jdbc.sql("""
+                        SELECT max_inactive_interval
+                        FROM spring_session
+                        WHERE principal_name = :username
+                        ORDER BY creation_time DESC
+                        LIMIT 1
+                        """)
+                .param("username", "datph")
+                .query(Integer.class)
+                .single()).isEqualTo(30 * 24 * 60 * 60);
+
+        mvc.perform(get("/api/notes").cookie(session))
                 .andExpect(status().isOk());
 
-        mvc.perform(post("/api/auth/logout").with(csrf()).session(session))
+        mvc.perform(post("/api/auth/logout").with(csrf()).cookie(session))
                 .andExpect(status().isNoContent());
 
-        mvc.perform(get("/api/auth/me").session(session))
+        mvc.perform(get("/api/auth/me").cookie(session))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.authenticated").value(false));
     }
