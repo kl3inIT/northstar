@@ -95,12 +95,18 @@ cp .env.example .env
 docker compose up -d
 
 # 2. backend API
-./gradlew :apps:api:bootRun
+SPRING_PROFILES_ACTIVE=local ./gradlew :apps:api:bootRun
 
 # 3. web app
 pnpm -C web install
 pnpm -C web dev
 ```
+
+The checked-in IntelliJ run configurations already activate `local`. In
+PowerShell, use
+`$env:SPRING_PROFILES_ACTIVE='local'; ./gradlew :apps:api:bootRun`.
+Production containers activate `prod` in Compose; do not run production with
+the local profile.
 
 Local URLs:
 

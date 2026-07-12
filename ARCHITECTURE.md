@@ -49,12 +49,12 @@ Northstar is one domain with three backend deployables:
   emits OpenAPI, and talks to the same PostgreSQL
   database as the other apps.
 - `apps/mcp` exposes MCP tools over streamable HTTP at `/mcp`. It scans
-  `com.northstar.core`, reads the already-migrated schema, and does not run
-  Flyway in production.
+  `com.northstar.core`, reads the already-migrated schema, and does not carry
+  Flyway on its production runtime classpath.
 - `apps/worker` is a non-web process with scheduling enabled. It owns heavy
   indexing work such as embeddings and image captions plus durable user
   automation execution through db-scheduler. It uses the same schema and does
-  not run Flyway in production.
+  not carry Flyway on its production runtime classpath.
 - `integrations/ai-openai-compatible` owns the reusable Spring AI adapter,
   model-catalog discovery, and runtime task router shared by API and worker.
   Gateway ids are configuration. Each gateway also declares a protocol type
@@ -105,8 +105,8 @@ verification in `:core:test` is the boundary check.
 - PostgreSQL is the source of truth.
 - Flyway migrations live in `core/src/main/resources/db/migration` and travel on
   the `:core` classpath.
-- `apps/api` runs Flyway at startup. `apps/mcp` and `apps/worker` have Flyway
-  disabled in production and validate the already-migrated schema.
+- `apps/api` runs Flyway at startup. `apps/mcp` and `apps/worker` omit the
+  runtime Flyway dependency and validate the already-migrated schema.
 - JPA uses `ddl-auto: validate`; every mapped entity/column must match a Flyway
   migration.
 - Note bodies are Markdown in the database. Wiki links/backlinks and vector
@@ -141,6 +141,23 @@ verification in `:core:test` is the boundary check.
 - `apps/worker` wires OpenAI and pgvector for indexing jobs that should not
   compete with API request threads.
 - Search combines durable PostgreSQL data with derived keyword/vector indexes.
+
+## Runtime Configuration
+
+- Each Spring Boot deployable owns `application.yml` for safe common behavior,
+  `application-local.yml` for developer-only `.env` imports and diagnostics,
+  and `application-prod.yml` for production pool, logging, proxy, actuator, and
+  shutdown policy.
+- IntelliJ run configurations activate `local`; production Compose activates
+  `prod` explicitly. Tests activate neither unless a test is specifically
+  exercising profile composition.
+- Production Hikari pools are process-budgeted and environment-overridable:
+  API 8/2, MCP 4/1, and worker 6/2 maximum/minimum connections by default.
+  Virtual-thread concurrency does not increase those database budgets.
+- Production emits ECS JSON to stdout, while Docker owns size-based retention.
+  Full Spring AI prompt/response logging is disabled outside `local`.
+- Spring Boot graceful shutdown is paired with Compose stop grace periods; the
+  worker receives a longer drain window for in-flight db-scheduler jobs.
   Derived indexes are disposable and can be rebuilt from source records.
 
 ## Client Contract
