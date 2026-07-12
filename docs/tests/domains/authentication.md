@@ -9,6 +9,7 @@ Reusable testing mechanics live in
 | JSON login requires CSRF and rejects bad credentials | Automated | `AuthControllerIntegrationTests` covers missing CSRF, wrong password, and successful login. |
 | Successful login persists a server-side session | Automated | `AuthControllerIntegrationTests` logs in, then reads `/api/notes` with the saved session. |
 | Logout clears the authenticated session view | Automated | `AuthControllerIntegrationTests` logs out, then verifies `/api/auth/me` is anonymous. |
+| Auth-disabled local development bypasses the SPA login screen | Automated | `AuthControllerTests` verifies `/api/auth/me` exposes the synthetic `local` session only when `northstar.auth.enabled=false`. |
 | SPA CSRF bootstrap exposes `XSRF-TOKEN` | Automated | `AuthControllerIntegrationTests` covers `/api/auth/csrf` and the browser-readable cookie. |
 | Existing domain tests can run without auth boilerplate | Automated | `apps/api/src/test/resources/application.yml` disables auth for the default test context. |
 | Browser login/logout flow | Gap | Needs Playwright coverage once the app has a stable authenticated test fixture. |

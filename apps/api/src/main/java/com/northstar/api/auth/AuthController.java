@@ -34,20 +34,24 @@ import org.springframework.security.authentication.AuthenticationManager;
 class AuthController {
 
     private final AuthenticationManager authenticationManager;
+    private final AuthProperties auth;
 
     private final SecurityContextRepository securityContextRepository;
 
     private final SecurityContextHolderStrategy securityContextHolderStrategy =
             SecurityContextHolder.getContextHolderStrategy();
 
-    AuthController(AuthenticationManager authenticationManager, SecurityContextRepository securityContextRepository) {
+    AuthController(AuthenticationManager authenticationManager,
+            SecurityContextRepository securityContextRepository, AuthProperties auth) {
         this.authenticationManager = authenticationManager;
         this.securityContextRepository = securityContextRepository;
+        this.auth = auth;
     }
 
     @GetMapping("/me")
     @Operation(operationId = "getAuthSession")
     AuthSession me(@Nullable Authentication authentication, @Parameter(hidden = true) @Nullable CsrfToken csrfToken) {
+        if (!auth.enabled()) return new AuthSession(true, "local");
         return sessionOf(authentication);
     }
 
