@@ -147,9 +147,9 @@ function SpeakingStats({ rows, trend }: { rows: SpeakingFeedback[]; trend: numbe
   const latestEstimate = parseSpeakingIeltsEstimate(rows[0]?.ieltsEstimate)
   const stats = [
     { label: 'Attempts', value: String(rows.length), caption: 'saved practice', icon: Mic, tone: 'text-primary', bg: 'bg-primary/10' },
-    { label: 'Latest estimate', value: shownBandRange(latestEstimate?.overallMin, latestEstimate?.overallMax), caption: 'one answer · low confidence', icon: Sparkles, tone: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-500/10' },
-    { label: 'Latest pronunciation', value: shownScore(rows[0]?.pronunciation), caption: 'provider score · 0–100', icon: Mic, tone: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-500/10' },
-    { label: 'Recent change', value: trend === null ? '—' : `${trend > 0 ? '+' : ''}${Math.round(trend)}`, caption: 'vs previous attempt', icon: TrendIcon, tone: trend !== null && trend > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground', bg: trend !== null && trend > 0 ? 'bg-emerald-500/10' : 'bg-muted' },
+    { label: 'Latest estimate', value: shownBandRange(latestEstimate?.overallMin, latestEstimate?.overallMax), caption: 'one answer · low confidence', icon: Sparkles, tone: 'text-info', bg: 'bg-info/10' },
+    { label: 'Latest pronunciation', value: shownScore(rows[0]?.pronunciation), caption: 'provider score · 0–100', icon: Mic, tone: 'text-insight', bg: 'bg-insight/10' },
+    { label: 'Recent change', value: trend === null ? '—' : `${trend > 0 ? '+' : ''}${Math.round(trend)}`, caption: 'vs previous attempt', icon: TrendIcon, tone: trend !== null && trend > 0 ? 'text-success' : 'text-muted-foreground', bg: trend !== null && trend > 0 ? 'bg-success/10' : 'bg-muted' },
   ]
   return (
     <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
@@ -195,18 +195,18 @@ const CRITERION_LABELS: Record<SpeakingIeltsEstimate['criteria'][number]['key'],
 
 function IeltsEstimateCard({ estimate, version }: { estimate: SpeakingIeltsEstimate; version: string }) {
   return (
-    <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
+    <div className="rounded-lg border border-info/30 bg-info/5 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">{estimate.label}</p>
-            <Badge variant="outline" className="border-sky-500/40 text-sky-700 dark:text-sky-300">{estimate.confidence.toLowerCase()} confidence</Badge>
+            <p className="text-xs font-semibold uppercase tracking-wide text-info">{estimate.label}</p>
+            <Badge variant="outline" className="border-info/40 text-info">{estimate.confidence.toLowerCase()} confidence</Badge>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">One answer only · not an official IELTS result</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">Overall estimate</p>
-          <p className="text-2xl font-semibold tabular-nums text-sky-700 dark:text-sky-300">{shownBandRange(estimate.overallMin, estimate.overallMax)}</p>
+          <p className="text-2xl font-semibold tabular-nums text-info">{shownBandRange(estimate.overallMin, estimate.overallMax)}</p>
         </div>
       </div>
       <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
@@ -240,8 +240,8 @@ function ScoreGroup({ title, scores }: { title: string; scores: [string, number 
 
 function scoreTone(score: number | undefined): string {
   if (score === undefined) return ''
-  if (score >= 80) return 'border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
-  if (score >= 60) return 'border-amber-500/40 text-amber-700 dark:text-amber-300'
+  if (score >= 80) return 'border-success/40 text-success'
+  if (score >= 60) return 'border-warning/40 text-warning'
   return 'border-destructive/40 text-destructive'
 }
 
@@ -250,7 +250,7 @@ function Transcript({ text, errors }: { text: string; errors: WritingError[] }) 
   if (quotes.length === 0) return <p className="rounded-lg bg-muted/30 p-3 text-sm leading-relaxed">{text}</p>
   const pattern = new RegExp(`(${quotes.map((quote) => quote.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
   const matches = new Set(quotes.map((quote) => quote.toLocaleLowerCase()))
-  return <p className="rounded-lg bg-muted/30 p-3 text-sm leading-relaxed">{text.split(pattern).map((part, index) => matches.has(part.toLocaleLowerCase()) ? <mark key={index} className="rounded bg-amber-200/70 px-0.5 text-inherit dark:bg-amber-800/60">{part}</mark> : part)}</p>
+  return <p className="rounded-lg bg-muted/30 p-3 text-sm leading-relaxed">{text.split(pattern).map((part, index) => matches.has(part.toLocaleLowerCase()) ? <mark key={index} className="rounded bg-warning/25 px-0.5 text-inherit">{part}</mark> : part)}</p>
 }
 
 function SpeakingHistory({ rows, isLoading, onView, onDelete }: { rows: SpeakingFeedback[]; isLoading: boolean; onView: (row: SpeakingFeedback) => void; onDelete: (row: SpeakingFeedback) => void }) {
@@ -265,7 +265,7 @@ function SpeakingDetailDialog({ feedback, onClose }: { feedback: SpeakingFeedbac
   const errors = feedback ? parseWritingErrors(feedback.topErrors) : []
   const content = feedback ? parseSpeakingContentScores(feedback.contentScores) : null
   const estimate = feedback ? parseSpeakingIeltsEstimate(feedback.ieltsEstimate) : null
-  return <Dialog open={Boolean(feedback)} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">{feedback && <><DialogHeader><DialogTitle className="pr-6">{feedback.question}</DialogTitle></DialogHeader><div className="flex flex-col gap-4"><p className="text-xs text-muted-foreground">Unofficial practice · {feedback.deliveryProvider} {feedback.providerRevision} · content by {feedback.graderModel}</p>{estimate && <IeltsEstimateCard estimate={estimate} version={feedback.estimateVersion} />}<ScoreGroup title="Measured delivery · 0–100" scores={[["Pronunciation", feedback.pronunciation], ["Fluency", feedback.fluency], ["Prosody", feedback.prosody]]} /><ScoreGroup title="AI content · 0–100 · unofficial" scores={[["Vocabulary", content?.vocabulary], ["Grammar", content?.grammar], ["Topic", content?.topic]]} /><p className="text-sm leading-relaxed">{feedback.summary}</p><Transcript text={feedback.transcript} errors={errors} />{errors.length > 0 && <div className="space-y-2">{errors.map((error, index) => <div key={index} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs"><p className="font-medium">{error.label}</p><p className="text-muted-foreground"><span className="line-through">{error.quote}</span> {' → '} <span className="text-foreground">{error.fix}</span></p></div>)}</div>}</div></>}</DialogContent></Dialog>
+  return <Dialog open={Boolean(feedback)} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">{feedback && <><DialogHeader><DialogTitle className="pr-6">{feedback.question}</DialogTitle></DialogHeader><div className="flex flex-col gap-4"><p className="text-xs text-muted-foreground">Unofficial practice · {feedback.deliveryProvider} {feedback.providerRevision} · content by {feedback.graderModel}</p>{estimate && <IeltsEstimateCard estimate={estimate} version={feedback.estimateVersion} />}<ScoreGroup title="Measured delivery · 0–100" scores={[["Pronunciation", feedback.pronunciation], ["Fluency", feedback.fluency], ["Prosody", feedback.prosody]]} /><ScoreGroup title="AI content · 0–100 · unofficial" scores={[["Vocabulary", content?.vocabulary], ["Grammar", content?.grammar], ["Topic", content?.topic]]} /><p className="text-sm leading-relaxed">{feedback.summary}</p><Transcript text={feedback.transcript} errors={errors} />{errors.length > 0 && <div className="space-y-2">{errors.map((error, index) => <div key={index} className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-xs"><p className="font-medium">{error.label}</p><p className="text-muted-foreground"><span className="line-through">{error.quote}</span> {' → '} <span className="text-foreground">{error.fix}</span></p></div>)}</div>}</div></>}</DialogContent></Dialog>
 }
 
 function DeleteSpeakingDialog({ feedback, onClose }: { feedback: SpeakingFeedback | null; onClose: () => void }) {

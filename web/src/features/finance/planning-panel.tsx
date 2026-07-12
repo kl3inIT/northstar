@@ -215,10 +215,10 @@ function BudgetRingCard({ budget, onEdit, onDelete }: { budget: Budget; onEdit: 
             initial={{ strokeDashoffset: CIRCUMFERENCE }}
             animate={{ strokeDashoffset: offset }}
             transition={{ duration: 0.2 }}
-            className={cn(budget.overBudget ? 'text-destructive' : nearLimit ? 'text-amber-500' : 'text-primary')}
+            className={cn(budget.overBudget ? 'text-destructive' : nearLimit ? 'text-warning' : 'text-primary')}
           />
         </svg>
-        <div className={cn('absolute inset-0 flex flex-col items-center justify-center', budget.overBudget ? 'text-destructive' : nearLimit ? 'text-amber-600' : 'text-primary')}>
+        <div className={cn('absolute inset-0 flex flex-col items-center justify-center', budget.overBudget ? 'text-destructive' : nearLimit ? 'text-warning' : 'text-primary')}>
           <Icon className="size-5" />
           <span className="mt-1 text-[11px] font-semibold tabular-nums">{budget.progressPercent}%</span>
         </div>
@@ -260,7 +260,7 @@ function SavingsGoalCard({ goal, onContribute, onEdit, onDelete }: {
             <Badge variant={status.variant} className="shrink-0 rounded text-[10px]">{status.label}</Badge>
           </div>
           <div className="mt-3 flex items-baseline gap-1"><span className="text-lg font-semibold tabular-nums">{vnd(goal.savedAmount)}</span><span className="text-xs text-muted-foreground">/ {vnd(goal.targetAmount)}</span></div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`${goal.name} savings progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={width}><div className={cn('h-full rounded-full transition-[width] duration-500', goal.completed ? 'bg-emerald-500' : 'bg-primary')} style={{ width: `${width}%` }} /></div>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label={`${goal.name} savings progress`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={width}><div className={cn('h-full rounded-full transition-[width] duration-500', goal.completed ? 'bg-success' : 'bg-primary')} style={{ width: `${width}%` }} /></div>
           <div className="mt-2 flex items-center justify-between gap-3 text-[11px] text-muted-foreground"><span>{goal.progressPercent}% saved</span><span>{goal.monthlyContribution > 0 ? `${vnd(goal.monthlyContribution)}/month` : `${vnd(goal.remainingAmount)} left`}</span></div>
         </div>
       </div>

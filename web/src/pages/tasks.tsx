@@ -39,12 +39,12 @@ function addDays(isoDate: string, days: number): string {
  * simply rewrites its due date.
  */
 const BUCKETS = [
-  { id: 'overdue', name: 'Overdue', tone: 'danger', dot: 'bg-red-600' },
-  { id: 'today', name: 'Today', tone: undefined, dot: 'bg-orange-500' },
-  { id: 'week', name: 'This week', tone: undefined, dot: 'bg-blue-600' },
-  { id: 'later', name: 'Later', tone: undefined, dot: 'bg-sky-400' },
-  { id: 'someday', name: 'Someday', tone: 'muted', dot: 'bg-neutral-400' },
-  { id: 'done', name: 'Done', tone: 'muted', dot: 'bg-green-600' },
+  { id: 'overdue', name: 'Overdue', tone: 'danger', dot: 'bg-destructive' },
+  { id: 'today', name: 'Today', tone: undefined, dot: 'bg-warning' },
+  { id: 'week', name: 'This week', tone: undefined, dot: 'bg-info' },
+  { id: 'later', name: 'Later', tone: undefined, dot: 'bg-info/60' },
+  { id: 'someday', name: 'Someday', tone: 'muted', dot: 'bg-muted-foreground' },
+  { id: 'done', name: 'Done', tone: 'muted', dot: 'bg-success' },
 ] as const
 
 type Bucket = (typeof BUCKETS)[number]
@@ -352,7 +352,7 @@ function StarButton({ task, className }: { task: Task; className?: string }) {
       <Star
         className={cn(
           'size-4',
-          starred ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/50 hover:text-amber-400',
+          starred ? 'fill-warning text-warning' : 'text-muted-foreground/50 hover:text-warning',
         )}
       />
     </button>

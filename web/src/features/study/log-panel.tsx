@@ -202,21 +202,21 @@ function LogStats({ summary }: { summary?: ReturnType<typeof useStudySummary>['d
   const topSkill = values.bySkill[0]
   const stats = [
     { label: 'This week', value: formatMinutes(values.totalMinutes), icon: Timer, tone: 'text-primary', bg: 'bg-primary/10' },
-    { label: 'Sessions', value: String(values.sessionCount), icon: CalendarClock, tone: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-500/10' },
+    { label: 'Sessions', value: String(values.sessionCount), icon: CalendarClock, tone: 'text-info', bg: 'bg-info/10' },
     {
       label: 'vs last week',
       value: `${delta >= 0 ? '+' : '−'}${formatMinutes(Math.abs(delta))}`,
       icon: Hourglass,
-      tone: delta >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400',
-      bg: delta >= 0 ? 'bg-emerald-500/10' : 'bg-amber-500/10',
+      tone: delta >= 0 ? 'text-success' : 'text-warning',
+      bg: delta >= 0 ? 'bg-success/10' : 'bg-warning/10',
     },
     {
       label: 'Most practiced',
       value: topSkill ? topSkill.skill : '—',
       caption: topSkill ? `${formatMinutes(topSkill.minutes)} · ${topSkill.sessions} ${topSkill.sessions === 1 ? 'session' : 'sessions'}` : 'No sessions yet this week',
       icon: Target,
-      tone: 'text-violet-600 dark:text-violet-400',
-      bg: 'bg-violet-500/10',
+      tone: 'text-insight',
+      bg: 'bg-insight/10',
     },
   ]
   return (
@@ -291,7 +291,7 @@ function SessionsTable({ rows, isLoading, onEdit, onDelete }: {
                     {session.notes ? <span className="font-normal text-muted-foreground"> · {session.notes}</span> : null}
                   </p>
                   {session.kind === 'MOCK' && (
-                    <Badge variant="outline" className="mt-1 h-5 rounded border-violet-400/50 px-1.5 text-[10px] font-normal text-violet-700 dark:text-violet-300">
+                    <Badge variant="outline" className="mt-1 h-5 rounded border-insight/50 px-1.5 text-[10px] font-normal text-insight">
                       mock test
                     </Badge>
                   )}

@@ -41,7 +41,7 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000
 
 function recallTone(probability: number): string {
   if (probability < 0.5) return 'text-destructive'
-  if (probability < 0.7) return 'text-amber-600 dark:text-amber-400'
+  if (probability < 0.7) return 'text-warning'
   return 'text-muted-foreground'
 }
 
@@ -218,10 +218,10 @@ function VocabStats({ tracked, atRisk, newThisWeek }: { tracked: number; atRisk:
       value: String(atRisk),
       caption: 'recall under 70%',
       icon: Flame,
-      tone: atRisk > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground',
-      bg: atRisk > 0 ? 'bg-amber-500/10' : 'bg-muted',
+      tone: atRisk > 0 ? 'text-warning' : 'text-muted-foreground',
+      bg: atRisk > 0 ? 'bg-warning/10' : 'bg-muted',
     },
-    { label: 'New this week', value: String(newThisWeek), caption: 'pace ~10 a day', icon: Sparkles, tone: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-500/10' },
+    { label: 'New this week', value: String(newThisWeek), caption: 'pace ~10 a day', icon: Sparkles, tone: 'text-insight', bg: 'bg-insight/10' },
   ]
   return (
     <div className="grid grid-cols-3 gap-2">
@@ -539,7 +539,7 @@ function PronunciationScore({ label, value }: { label: string; value: number | u
 
 function pronunciationTone(value: number | undefined): string {
   if (value === undefined) return 'text-muted-foreground'
-  if (value >= 80) return 'border-emerald-500/40 text-emerald-700 dark:text-emerald-300'
-  if (value >= 60) return 'border-amber-500/40 text-amber-700 dark:text-amber-300'
+  if (value >= 80) return 'border-success/40 text-success'
+  if (value >= 60) return 'border-warning/40 text-warning'
   return 'border-destructive/40 text-destructive'
 }

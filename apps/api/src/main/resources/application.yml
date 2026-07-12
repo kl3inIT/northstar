@@ -101,6 +101,13 @@ northstar:
     azure:
       key: ${AZURE_SPEECH_KEY:}
       region: ${AZURE_SPEECH_REGION:}
+  briefs:
+    huggingnews:
+      base-url: https://huggingnews.com
+      connect-timeout: 5s
+      request-timeout: 15s
+      feed-cache-ttl: 5m
+      detail-cache-ttl: 30m
   auth:
     enabled: ${NORTHSTAR_AUTH_ENABLED:true}
     username: ${NORTHSTAR_AUTH_USERNAME:}

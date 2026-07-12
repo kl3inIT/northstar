@@ -581,8 +581,8 @@ function ProjectBoardCard({
                 className={cn(
                   'size-4',
                   starred
-                    ? 'fill-amber-400 text-amber-400'
-                    : 'text-muted-foreground/50 hover:text-amber-400',
+                    ? 'fill-warning text-warning'
+                    : 'text-muted-foreground/50 hover:text-warning',
                 )}
               />
             </button>

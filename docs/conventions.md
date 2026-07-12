@@ -58,6 +58,9 @@
 
 - Use the existing Vite, React 19, Tailwind v4, shadcn/ui, TanStack Router, and
   TanStack Query patterns.
+- Follow [guidelines/frontend-design-system.md](guidelines/frontend-design-system.md):
+  use semantic intent tokens in feature components and keep raw categorical
+  palettes centralized rather than scattering hue classes across the UI.
 - Run `pnpm -C web typecheck`; Vite/esbuild does not typecheck by itself.
 
 ## Commits

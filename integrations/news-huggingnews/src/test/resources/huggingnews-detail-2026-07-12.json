@@ -1,0 +1,79 @@
+{
+  "nodes": [
+    {
+      "data": [
+        { "feedLive": 1, "focusedStory": 2, "focusedStoryDetail": 19 },
+        false,
+        { "data": 3 },
+        {
+          "authorCount": 4,
+          "isFreshStory": 1,
+          "isSuperseded": 1,
+          "isUpdateStory": 1,
+          "publishedAt": 5,
+          "routingTopicKeys": 6,
+          "slug": 9,
+          "storyId": 10,
+          "storyScore": 11,
+          "title": 12,
+          "topicTags": 13,
+          "tweetCount": 18
+        },
+        66,
+        1783834486749,
+        [7, 8],
+        "ai",
+        "tech",
+        "apple-trade-secrets-lawsuit-threatens-to-delay-openai-hardware-launch-to-a846ee45",
+        "m57e4kyfbqfcx8xbhg99q6awws8acm6m",
+        0.76,
+        "Apple Trade Secrets Lawsuit Threatens to Delay OpenAI Hardware Launch to February 2027",
+        [14, 16],
+        { "name": 15, "slug": 7 },
+        "AI",
+        { "name": 17, "slug": 8 },
+        "Tech",
+        127,
+        { "data": 20 },
+        { "entities": 21, "selectedTweets": 27, "summary": 35, "supersededStory": 36 },
+        [22, 25],
+        { "text": 23, "type": 24 },
+        "Apple",
+        "ORG",
+        { "text": 26, "type": 24 },
+        "OpenAI",
+        [28],
+        {
+          "authorHandle": 29,
+          "bestBit": 30,
+          "label": 31,
+          "text": 32,
+          "tweetedAt": 33,
+          "url": 34
+        },
+        "jukan05",
+        "OpenAI's device could launch as early as next February.",
+        "Source",
+        "The Information reported that OpenAI's device could launch as early as next February.",
+        1783818304000,
+        "https://x.com/jukan05/status/2076110560077492272",
+        "Apple filed a trade-secrets lawsuit against OpenAI that threatens to disrupt the planned launch of its first hardware device.",
+        {
+          "authorCount": 37,
+          "publishedAt": 38,
+          "routingTopicKeys": 6,
+          "slug": 39,
+          "storyId": 40,
+          "title": 41,
+          "tweetCount": 42
+        },
+        65,
+        1783813130713,
+        "update-apple-court-filing-shows-video-of-ex-employee-leaving-headquarter-d55ac1c1",
+        "m57ef5bmpm7q5syqw5krrqxfzx8abaax",
+        "UPDATE: Apple Court Filing Shows Video of Ex-Employee Leaving Headquarters With OpenAI Hardware Secrets",
+        122
+      ]
+    }
+  ]
+}

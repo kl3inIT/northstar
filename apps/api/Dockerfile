@@ -37,6 +37,7 @@ COPY integrations/web-firecrawl/build.gradle.kts integrations/web-firecrawl/buil
 COPY integrations/web-nine-router/build.gradle.kts integrations/web-nine-router/build.gradle.kts
 COPY integrations/ai-openai-compatible/build.gradle.kts integrations/ai-openai-compatible/build.gradle.kts
 COPY integrations/speech-azure/build.gradle.kts integrations/speech-azure/build.gradle.kts
+COPY integrations/news-huggingnews/build.gradle.kts integrations/news-huggingnews/build.gradle.kts
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     chmod +x gradlew && \
@@ -54,6 +55,7 @@ COPY integrations/web-firecrawl/src/main/ integrations/web-firecrawl/src/main/
 COPY integrations/web-nine-router/src/main/ integrations/web-nine-router/src/main/
 COPY integrations/ai-openai-compatible/src/main/ integrations/ai-openai-compatible/src/main/
 COPY integrations/speech-azure/src/main/ integrations/speech-azure/src/main/
+COPY integrations/news-huggingnews/src/main/ integrations/news-huggingnews/src/main/
 
 RUN --mount=type=cache,id=northstar-gradle,target=/cache/.gradle,sharing=locked \
     ./gradlew :apps:api:bootJar --no-daemon --parallel --console=plain -x test && \

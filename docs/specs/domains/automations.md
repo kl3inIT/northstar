@@ -32,7 +32,7 @@ The API owns automation CRUD and run-now requests. The worker owns execution:
 `scheduled_tasks` is an infrastructure projection and application code accesses
 it only through `SchedulerClient`.
 
-## Morning Brief V2
+## Northstar Brief
 
 `morning-brief.v1` remains the stable type id; its configuration schema is now
 version 2. Runtime configuration contains language, lookback hours, maximum
@@ -67,22 +67,40 @@ The handler renders Markdown itself and optionally upserts a `STAGING` note in
 the same automation/day updates that note; distinct automation names do not
 overwrite one another.
 
-`/briefs` is the dedicated single-column reading surface for these output
-notes. A compact issue selector sits above a Kibo Typography-derived article
-layout; note working-state labels remain visible and Automation Settings stays
-one action away. Successful run-history entries also link to the Briefs
-surface.
+`/briefs` is a first-class newsroom with two intentionally separate tabs.
+`HuggingNews` is a read-only live feed owned by the external provider;
+`Northstar Brief` is the user's durable, scheduled brief. Both use a dense
+editorial structure: filters, a TL;DR area, day-grouped ranked rows, and one
+inline-expanded story at a time. Provider content is not copied into Northstar
+notes merely because it was viewed.
+
+The HuggingNews adapter reads only public SvelteKit page-data routes, normalizes
+them behind `core.brief.BriefFeedProvider`, bounds response sizes, caches the
+feed for five minutes and story details for thirty minutes, and serves the
+last feed snapshot as explicitly stale when a refresh fails. It does not call
+HuggingNews's internal Convex backend, reuse Clerk credentials, or persist
+provider stories. The API exposes:
+
+- `GET /api/briefs/huggingnews`;
+- `GET /api/briefs/huggingnews/{topic}/{slug}`.
+
+The Northstar tab keeps the issue selector, Staging status, parsed source
+sections, inline story summaries, schedule/source configuration, `Run now`,
+and the five most recent durable runs together. The existing worker handler,
+retry policy, scheduler projection, and note output remain unchanged.
 
 ## Settings Contract
 
-`Settings > Automations` lists jobs with active/paused and projection-sync
+`Settings > Automations` lists generic jobs with active/paused and projection-sync
 status, a human-readable local schedule, enable switch, run-now, edit, delete,
 and the five most recent runs. Creation begins with a workflow-type catalog
 loaded from `GET /api/automations/types`; choosing a supported type opens its
 type-specific editor with defaults supplied by the handler descriptor. The
-Morning Brief editor is a full-height Sheet with Schedule, Content, and Sources
-tabs. It configures trigger and workflow fields without exposing raw cron or
-secrets. Each source is enabled with a Switch and reveals a full-width
+`morning-brief.v1` entry and its type are intentionally hidden from this generic
+surface because Northstar Brief owns its configuration and history inside
+`/briefs`. Its full-height Sheet still has Schedule, Content, and Sources tabs.
+It configures trigger and workflow fields without exposing raw cron or secrets.
+Each source is enabled with a Switch and reveals a full-width
 repository/feed/person editor; the Firecrawl key and optional GitHub token stay
 in worker environment configuration. The layout is responsive and the Sheet
 body scrolls independently while its actions remain available.
@@ -115,5 +133,6 @@ REST endpoints are:
 - `apps.worker.automation`
 - `apps.worker.brief`
 - `integrations.web-openai`
+- `integrations.news-huggingnews`
 - `web/components/settings/automations-section`
 - `web/pages/briefs`

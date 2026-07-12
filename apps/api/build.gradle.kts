@@ -9,6 +9,7 @@ dependencies {
     implementation(project(":integrations:web-nine-router"))
     implementation(project(":integrations:ai-openai-compatible"))
     implementation(project(":integrations:speech-azure"))
+    implementation(project(":integrations:news-huggingnews"))
 
     implementation("org.springframework.boot:spring-boot-starter-webmvc")
     implementation("org.springframework.boot:spring-boot-starter-security")
