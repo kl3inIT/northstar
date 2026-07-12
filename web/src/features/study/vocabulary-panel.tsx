@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
@@ -26,7 +27,9 @@ import {
   useAssessVocabPronunciation,
   useDeleteVocabCard,
   useUpdateVocabCard,
+  useUpdateVocabDeckSettings,
   useVocabCards,
+  useVocabDeckSettings,
   type VocabCard,
   type VocabLanguage,
   type PronunciationAssessment,
@@ -53,12 +56,14 @@ export function VocabularyPanel() {
   const [pronouncing, setPronouncing] = useState<VocabCard | null>(null)
   const [reviewLimit, setReviewLimit] = useState<number | null>(null)
   const update = useUpdateVocabCard()
+  const selectedDeck = deck === 'ALL' ? undefined : deck
+  const deckSettings = useVocabDeckSettings(language, selectedDeck)
+  const updateDeckSettings = useUpdateVocabDeckSettings()
 
-  const deckOptions = useMemo(() => [
+  const deckOptions = useMemo(() => [...new Set([
     'General',
-    ...[...new Set(cards.map((card) => card.deck).filter((value): value is string => Boolean(value)))]
-      .sort((a, b) => a.localeCompare(b)),
-  ], [cards])
+    ...cards.map((card) => card.deck).filter((value): value is string => Boolean(value)),
+  ])].sort((a, b) => a.localeCompare(b)), [cards])
   const scopedCards = useMemo(() => cards.filter((card) => cardMatchesDeck(card.deck, deck)), [cards, deck])
   const active = useMemo(() => scopedCards.filter((c) => !c.suspended), [scopedCards])
   const atRiskCount = useMemo(
@@ -96,6 +101,7 @@ export function VocabularyPanel() {
         deck: card.deck,
         disciplineId: card.disciplineId ?? undefined,
         suspended: !card.suspended,
+        productionEnabled: card.productionEnabled,
       },
       {
         onSuccess: () => toast.success(card.suspended ? `Resumed “${card.front}”` : `Paused “${card.front}”`),
@@ -109,7 +115,8 @@ export function VocabularyPanel() {
       <>
         <VocabularyReviewer limit={reviewLimit} language={language}
           deck={deckQuery(deck)} onExit={() => setReviewLimit(null)}
-          onEdit={setEditing} onPronounce={setPronouncing} />
+          onEdit={(reviewCard) => setEditing(cards.find((item) => item.id === reviewCard.id) ?? null)}
+          onPronounce={(reviewCard) => setPronouncing(cards.find((item) => item.id === reviewCard.id) ?? null)} />
         <EditCardDialog key={editing?.id ?? 'none'} card={editing} onClose={() => setEditing(null)} />
         <PronunciationDialog key={pronouncing?.id ?? 'no-pronunciation'} card={pronouncing} onClose={() => setPronouncing(null)} />
       </>
@@ -138,6 +145,17 @@ export function VocabularyPanel() {
               {deckOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
             </SelectContent>
           </Select>
+          {selectedDeck && (
+            <Label className="ml-2 flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-xs font-normal">
+              <Switch size="sm" checked={deckSettings.data?.productionDefault ?? false}
+                disabled={deckSettings.isLoading || updateDeckSettings.isPending}
+                onCheckedChange={(productionDefault) => updateDeckSettings.mutate(
+                  { language, deck: selectedDeck, productionDefault },
+                  { onError: (error) => toast.error(error.message) },
+                )} />
+              New cards: two directions
+            </Label>
+          )}
         </div>
       </div>
       <VocabStats tracked={active.length} atRisk={atRiskCount} newThisWeek={newThisWeek} />
@@ -274,6 +292,7 @@ function CardsTable({ rows, isLoading, onEdit, onDelete, onPronounce, onToggleSu
                     <p className="text-sm font-medium">{card.front}</p>
                     {(meta.reading || meta.partOfSpeech) && <p className="text-xs text-muted-foreground">{[meta.reading, meta.partOfSpeech].filter(Boolean).join(' · ')}</p>}
                     <Badge variant="outline" className="mt-1 h-5 rounded px-1.5 text-[10px] font-normal">{card.deck ?? 'General'}</Badge>
+                    {card.productionEnabled && <Badge variant="secondary" className="ml-1 mt-1 h-5 rounded px-1.5 text-[10px] font-normal">2 directions</Badge>}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -344,6 +363,7 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
   const [example, setExample] = useState(meta.example ?? '')
   const [language, setLanguage] = useState<VocabLanguage>(card.language)
   const [deck, setDeck] = useState(card.deck ?? '')
+  const [productionEnabled, setProductionEnabled] = useState(card.productionEnabled)
   const update = useUpdateVocabCard()
 
   function save() {
@@ -361,6 +381,7 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
         deck: deck.trim() || undefined,
         disciplineId: card.disciplineId ?? undefined,
         suspended: card.suspended,
+        productionEnabled,
       },
       {
         onSuccess: () => { toast.success('Card updated'); onClose() },
@@ -408,6 +429,10 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
           <Label htmlFor="card-example">Example</Label>
           <Input id="card-example" placeholder="One sentence — translation" value={example} onChange={(event) => setExample(event.target.value)} />
         </div>
+        <Label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border p-3 font-normal">
+          <span><span className="block text-sm font-medium">Practice both directions</span><span className="block text-xs text-muted-foreground">Meaning → word gets its own memory schedule.</span></span>
+          <Switch checked={productionEnabled} onCheckedChange={setProductionEnabled} />
+        </Label>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancel</Button>
