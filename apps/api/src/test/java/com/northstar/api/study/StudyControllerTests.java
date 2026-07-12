@@ -51,19 +51,20 @@ class StudyControllerTests {
     @Test
     void manualRatingIsTheOnlyReviewEndpointMemoryWrite() {
         UUID id = UUID.randomUUID();
+        Instant previewedAt = Instant.parse("2026-07-12T00:00:00Z");
         VocabCardSummary expected = card(id);
-        when(vocab.recordReview(id, VocabReviewDirection.RECOGNITION, 0.6,
-                VocabReviewLog.Rating.HARD,
-                VocabReviewLog.ReviewSource.MANUAL)).thenReturn(expected);
+        when(vocab.recordReview(id, VocabReviewDirection.RECOGNITION,
+                VocabReviewLog.Rating.HARD, VocabReviewLog.ReviewSource.MANUAL,
+                previewedAt, 3, java.time.ZoneId.of("Asia/Bangkok"))).thenReturn(expected);
 
         VocabCardSummary actual = controller.recordVocabReview(id,
                 new StudyRequest.VocabReviewRequest(VocabReviewLog.Rating.HARD,
-                        VocabReviewDirection.RECOGNITION));
+                        VocabReviewDirection.RECOGNITION, previewedAt, 3), "Asia/Bangkok");
 
         assertThat(actual).isSameAs(expected);
-        verify(vocab).recordReview(id, VocabReviewDirection.RECOGNITION, 0.6,
-                VocabReviewLog.Rating.HARD,
-                VocabReviewLog.ReviewSource.MANUAL);
+        verify(vocab).recordReview(id, VocabReviewDirection.RECOGNITION,
+                VocabReviewLog.Rating.HARD, VocabReviewLog.ReviewSource.MANUAL,
+                previewedAt, 3, java.time.ZoneId.of("Asia/Bangkok"));
     }
 
     @Test

@@ -160,7 +160,7 @@ class StudyController {
         return vocab.cards(language);
     }
 
-    /** Active cards with the lowest predicted recall right now; there are no due dates. */
+    /** Due FSRS cards in learning/relearning/review/new order. */
     @GetMapping("/vocab/review")
     @Operation(operationId = "listVocabReviewCards")
     List<VocabReviewCardSummary> vocabReviewCards(
@@ -170,14 +170,15 @@ class StudyController {
         return vocab.reviewQueue(language, deck, limit, null);
     }
 
-    /** A learner-chosen rating is the only page action that updates the memory model. */
+    /** A learner-chosen rating is the only page action that updates the FSRS schedule. */
     @PostMapping("/vocab/{id}/reviews")
     @Operation(operationId = "recordVocabReview")
     VocabCardSummary recordVocabReview(@PathVariable("id") UUID id,
-            @Valid @RequestBody StudyRequest.VocabReviewRequest request) {
-        VocabReviewLog.Rating rating = request.rating();
-        return vocab.recordReview(id, request.direction(), rating.success(), rating,
-                VocabReviewLog.ReviewSource.MANUAL);
+            @Valid @RequestBody StudyRequest.VocabReviewRequest request,
+            @RequestHeader(name = "X-Timezone", required = false) String tz) {
+        return vocab.recordReview(id, request.direction(), request.rating(),
+                VocabReviewLog.ReviewSource.MANUAL, request.previewedAt(),
+                request.schedulingVersion(), zone(tz));
     }
 
     /** Explicit semantic feedback only; this endpoint never records a review. */
