@@ -26,8 +26,7 @@ public class AiCapabilityCatalog {
     private static final Logger log = LoggerFactory.getLogger(AiCapabilityCatalog.class);
     private static final Map<AiGatewayCapability, List<String>> OPENAI_DEFAULTS = Map.of(
             AiGatewayCapability.SPEECH_TO_TEXT, List.of("whisper-1", "gpt-4o-mini-transcribe", "gpt-4o-transcribe"),
-            AiGatewayCapability.IMAGE_GENERATION,
-            List.of("gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"),
+            AiGatewayCapability.IMAGE_GENERATION, List.of("gpt-image-2"),
             AiGatewayCapability.EMBEDDING, List.of("text-embedding-3-small", "text-embedding-3-large"));
 
     private final Function<String, AiGatewayDefinition> definitions;

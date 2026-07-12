@@ -15,6 +15,21 @@ import org.springframework.web.client.RestClient;
 class AiCapabilityCatalogTests {
 
     @Test
+    void openAiImageCatalogUsesTheCurrentImageModel() {
+        AiGatewayDefinition definition = new AiGatewayDefinition(
+                "openai", AiGatewayType.OPENAI, "OpenAI", "https://api.openai.com/v1",
+                "secret", List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+                List.of(), false, Duration.ofSeconds(5), AiGatewaySource.DEPLOYMENT);
+        AiCapabilityCatalog catalog = new AiCapabilityCatalog(id -> definition, RestClient.builder());
+
+        List<AiCapabilityTarget> targets = catalog.targets(
+                "openai", AiGatewayCapability.IMAGE_GENERATION);
+
+        assertEquals(List.of("gpt-image-2"),
+                targets.stream().map(AiCapabilityTarget::id).toList());
+    }
+
+    @Test
     void nineRouterMergesManualAndDiscoveredImageTargets() throws Exception {
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/models/image", exchange -> {

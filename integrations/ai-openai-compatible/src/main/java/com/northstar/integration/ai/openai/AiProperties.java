@@ -107,9 +107,10 @@ public record AiProperties(
             String embedding) {
 
         static Routes empty() {
-            return new Routes("gpt-5.5", "gpt-5.5", "gpt-5.5", "gpt-5.5",
-                    "gpt-5.5", "gpt-5.5", "openai/gpt-4o-mini-tts/alloy",
-                    "whisper-1", "gpt-image-2", "text-embedding-3-large");
+            return new Routes("gpt-5.6-luna", "gpt-5.6-luna", "gpt-5.6-luna",
+                    "gpt-4o-mini", "gpt-5.6-sol", "gpt-4o-mini",
+                    "openai/tts-1-hd/alloy", "gpt-4o-mini-transcribe", "gpt-image-2",
+                    "text-embedding-3-large");
         }
 
         Map<AiTask, String> byTask() {

@@ -183,8 +183,10 @@ verification in `:core:test` is the boundary check.
 
 ## Authentication
 
-- The web app uses Spring Security 7 servlet security with a server-side HTTP
-  session and a single configured user.
+- The web app uses Spring Security 7 servlet security with a single configured
+  user. Spring Session JDBC stores browser sessions in PostgreSQL so they
+  survive API restarts; the default idle timeout and persistent HttpOnly cookie
+  lifetime are both 30 days (`NORTHSTAR_WEB_SESSION_TIMEOUT`).
 - Credentials are supplied through `NORTHSTAR_AUTH_USERNAME` and
   `NORTHSTAR_AUTH_PASSWORD_HASH`; plaintext passwords are not stored in the
   repository.

@@ -7,7 +7,7 @@ Reusable testing mechanics live in
 | --- | --- | --- |
 | Protected API requests reject anonymous callers with ProblemDetail JSON | Automated | `apps/api/src/test/java/com/northstar/api/auth/AuthControllerIntegrationTests.java` |
 | JSON login requires CSRF and rejects bad credentials | Automated | `AuthControllerIntegrationTests` covers missing CSRF, wrong password, and successful login. |
-| Successful login persists a server-side session | Automated | `AuthControllerIntegrationTests` logs in, then reads `/api/notes` with the saved session. |
+| Successful login persists a durable server-side session | Automated | `AuthControllerIntegrationTests` verifies the 30-day `SESSION` cookie, the 30-day JDBC session row, then reads `/api/notes` with that cookie. Flyway creates the Spring Session schema in PostgreSQL. |
 | Logout clears the authenticated session view | Automated | `AuthControllerIntegrationTests` logs out, then verifies `/api/auth/me` is anonymous. |
 | Auth-disabled local development bypasses the SPA login screen | Automated | `AuthControllerTests` verifies `/api/auth/me` exposes the synthetic `local` session only when `northstar.auth.enabled=false`. |
 | SPA CSRF bootstrap exposes `XSRF-TOKEN` | Automated | `AuthControllerIntegrationTests` covers `/api/auth/csrf` and the browser-readable cookie. |

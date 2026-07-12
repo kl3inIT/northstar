@@ -103,7 +103,7 @@ per browser review session.
 ## Completion evidence
 
 - Java compile, Spring Modulith/core tests, image-adapter tests, API job/controller
-  tests, web typecheck/tests/build, Flyway V42 clean-schema boot, and Hibernate
+  tests, web typecheck/tests/build, Flyway V43 clean-schema boot, and Hibernate
   validation are green locally.
 - A real browser pass verified deck defaults, recognition followed by production
   on a later snapshot, hidden production listening, reversible Space, background

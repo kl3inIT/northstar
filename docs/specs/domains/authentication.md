@@ -8,9 +8,14 @@
   `northstar.auth.username` and `northstar.auth.password-hash` from environment
   properties and fails startup if either is missing while auth is enabled.
 - The web app signs in through `POST /api/auth/login` and stores authentication
-  only in the server-side HTTP session.
+  only in a server-side HTTP session backed by PostgreSQL through Spring
+  Session JDBC.
+- Web sessions expire after 30 days without activity by default. The HttpOnly
+  session cookie also lives for 30 days, so closing the browser or restarting
+  or redeploying the API does not immediately sign the user out. Operators can
+  override the duration with `NORTHSTAR_WEB_SESSION_TIMEOUT`.
 - `POST /api/auth/logout` clears the Spring Security context for the current
-  session.
+  session and deletes its persisted session state.
 - `GET /api/auth/me` reports whether the current request is authenticated.
 - `GET /api/auth/csrf` exposes the SPA CSRF token metadata and causes the
   browser-readable `XSRF-TOKEN` cookie to be available.

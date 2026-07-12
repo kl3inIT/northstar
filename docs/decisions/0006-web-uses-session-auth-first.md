@@ -16,8 +16,12 @@ more moving parts than the current single-user product needs.
 ## Decision
 
 The web app authenticates with a server-side HTTP session managed by Spring
-Security 7. Login and logout are JSON endpoints, not form pages. State-changing
-same-origin requests use Spring Security's SPA CSRF support.
+Security 7. Spring Session JDBC persists sessions in PostgreSQL so an API
+restart or deployment does not force a new login. Login and logout are JSON
+endpoints, not form pages. State-changing same-origin requests use Spring
+Security's SPA CSRF support. The default browser session idle timeout and
+cookie lifetime are 30 days and can be changed with
+`NORTHSTAR_WEB_SESSION_TIMEOUT`.
 
 The single user is configured by environment:
 
@@ -37,5 +41,10 @@ The web app gets HttpOnly session cookies, CSRF protection, and simple
 deployment operations for a personal system. API tests can disable auth by
 default and keep focused domain coverage, while auth behavior is covered in its
 own integration test.
+
+Persisted sessions add two Flyway-owned tables and use the existing PostgreSQL
+database. Explicit logout still invalidates the current session immediately;
+the longer browser lifetime does not change mobile access or refresh-token
+lifetimes.
 
 Mobile credentials never enter the browser session or browser storage model.

@@ -26,9 +26,9 @@ spring:
       timeout: 60s
       max-retries: 2
       # Spring AI 2.0 dropped the `.options` layer (chat.options.model -> chat.model).
-      # No temperature: gpt-5.5 is a reasoning model and rejects any value but 1.
+      # No temperature: reasoning-model defaults reject unsupported values.
       chat:
-        model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
+        model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.6-luna}
       # Spring AI 2.0 binds embedding model options directly below `embedding`.
       # 3-large is shortened to 1536 dimensions (Matryoshka):
       # best multilingual quality (Vietnamese notes) at a pgvector-indexable width.
@@ -58,6 +58,11 @@ spring:
       # Completed publications are deleted, not kept — nothing reads the history
       # and the outbox table stays lean.
       completion-mode: delete
+  session:
+    timeout: ${NORTHSTAR_WEB_SESSION_TIMEOUT:30d}
+    jdbc:
+      # Flyway owns the schema (V41); sessions must survive API restarts.
+      initialize-schema: never
   servlet:
     multipart:
       # Voice capture uploads; Whisper's own cap is 25MB.
@@ -83,20 +88,23 @@ northstar:
         base-url: https://api.openai.com/v1
         api-key: ${OPENAI_API_KEY:}
         models:
-          - ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.5}
-          - ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
-          - ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
+          - ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.6-luna}
+          - ${NORTHSTAR_CAPTURE_MODEL:gpt-5.6-luna}
+          - ${NORTHSTAR_ALIGNMENT_MODEL:gpt-5.6-luna}
+          - ${NORTHSTAR_TITLE_MODEL:gpt-4o-mini}
+          - ${NORTHSTAR_GRADER_MODEL:gpt-5.6-sol}
+          - ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-4o-mini}
         discover-models: false
         timeout: 60s
     routes:
-      assistant: ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.5}
-      capture: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
-      alignment: ${NORTHSTAR_ALIGNMENT_MODEL:gpt-5.5}
-      title: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
-      study-grader: ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
-      image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-5.5}
-      text-to-speech: ${NORTHSTAR_TTS_TARGET:openai/gpt-4o-mini-tts/alloy}
-      speech-to-text: ${NORTHSTAR_STT_TARGET:whisper-1}
+      assistant: ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.6-luna}
+      capture: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.6-luna}
+      alignment: ${NORTHSTAR_ALIGNMENT_MODEL:gpt-5.6-luna}
+      title: ${NORTHSTAR_TITLE_MODEL:gpt-4o-mini}
+      study-grader: ${NORTHSTAR_GRADER_MODEL:gpt-5.6-sol}
+      image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-4o-mini}
+      text-to-speech: ${NORTHSTAR_TTS_TARGET:openai/tts-1-hd/alloy}
+      speech-to-text: ${NORTHSTAR_STT_TARGET:gpt-4o-mini-transcribe}
       image-generation: ${NORTHSTAR_IMAGE_TARGET:gpt-image-2}
       embedding: ${NORTHSTAR_EMBEDDING_TARGET:text-embedding-3-large}
     catalog:
@@ -112,6 +120,11 @@ northstar:
     enabled: ${NORTHSTAR_AUTH_ENABLED:true}
     username: ${NORTHSTAR_AUTH_USERNAME:}
     password-hash: ${NORTHSTAR_AUTH_PASSWORD_HASH:}
+    web-session:
+      cookie-max-age: ${NORTHSTAR_WEB_SESSION_TIMEOUT:30d}
+      http-only: true
+      same-site: Lax
+      secure: ${NORTHSTAR_COOKIE_SECURE:true}
     mobile:
       enabled: ${NORTHSTAR_MOBILE_AUTH_ENABLED:false}
       issuer: ${NORTHSTAR_MOBILE_AUTH_ISSUER:northstar-api}
@@ -137,7 +150,7 @@ northstar:
     enabled: ${NORTHSTAR_WEB_ENABLED:true}
     default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}
     default-search-gateway: ${NORTHSTAR_WEB_SEARCH_GATEWAY:openai}
-    default-search-target: ${NORTHSTAR_WEB_SEARCH_TARGET:gpt-5.5}
+    default-search-target: ${NORTHSTAR_WEB_SEARCH_TARGET:gpt-5.6-luna}
     default-page-reader: ${NORTHSTAR_WEB_PAGE_READER:direct}
     fallback-enabled: false
     search-fallback-order: []
@@ -146,7 +159,7 @@ northstar:
     cache-max-size: 200
     openai:
       api-key: ${OPENAI_API_KEY:}
-      model: ${NORTHSTAR_WEB_MODEL:gpt-5.5}
+      model: ${NORTHSTAR_WEB_MODEL:gpt-5.6-luna}
       search-context-size: medium
       connect-timeout: 5s
       request-timeout: 60s
@@ -166,13 +179,6 @@ northstar:
 
 server:
   port: ${NORTHSTAR_API_PORT:8888}
-  servlet:
-    session:
-      cookie:
-        http-only: true
-        same-site: lax
-        # Fail-safe default. The local profile disables Secure for local HTTP.
-        secure: ${NORTHSTAR_COOKIE_SECURE:true}
 
 management:
   endpoints:

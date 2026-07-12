@@ -13,6 +13,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Planning baseline | Done | Disciplines, projects/milestones, tasks, calendar events, recurrence, free-slot lookup. |
 | Assistant and MCP tools | Done | In-app assistant tools, reactive Vercel streaming with structured sources, encrypted typed gateways with explicit OpenAI/9Router/chat-compatible capabilities, per-conversation searchable model selection, native AI Elements attachments/actions/citations, and streamable-http MCP exposure. |
 | Web authentication baseline | Done | Single-user Spring Security session login, SPA CSRF, auth guard, logout. |
+| Durable web sessions | Done | 30-day persistent cookie and PostgreSQL-backed Spring Session survive browser/API restarts. |
 | Finance tracking V1.5 | Done | Capture-first VND ledger, balance reconciliation, learned category corrections, budgets, savings goals, subscription auto-post/detection, CSV, Insights, receipt/SMS extraction, assistant/MCP tools, and weekly review facts. |
 | Web research V1 | Done | Provider-neutral runtime routing, shared-gateway OpenAI and 9Router search, 9Router fetch combos, safe direct page reading, Assistant-only tools, citations, and Settings routes without duplicate credentials. YouTube/PDF/browser readers remain deferred. |
 | Automation foundation and Morning Brief V2 | Done | Persisted typed schedules, run history/retries, free GitHub/RSS/Hacker News/Bluesky discovery, budgeted Firecrawl enrichment, sourced Staging notes, Settings management, and a dedicated Briefs reader. Raw cron, Reddit OAuth, and extra delivery channels remain deferred. |
@@ -29,7 +30,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Speech assessment V1 | Done | Provider-neutral speech port with Azure Speech SDK delivery measurement, live card pronunciation, one-question Speaking practice, routed AI content coaching, shared grammar corpus, and four-tab Study UI. The UI keeps provider 0-100 measurements separate from a rubric-grounded, LOW-confidence unofficial one-answer IELTS-style range with criterion evidence and scorer version; no provider score is converted into a band. Live provider/grader and browser flows are verified. |
 | AI capability catalogs and on-demand text to speech | Done | Explicit Assistant read-aloud, isolated Chat/TTS/STT/Image/Embedding route catalogs, OpenAI/9Router discovery with manual fallback, TTS language/voice selection, persisted content-addressed MP3 reuse, and responsive AI Elements selectors/playback. No automatic generation or playback. |
 | Today dashboard | Deferred | Assistant/chat is the daily cockpit for composing tasks, calendar, projects, finance, and review context. Revisit only if a zero-prompt glance surface becomes necessary. |
-| Repository documentation harness | In progress | Apply repo-as-system-of-record structure and consolidate existing guidance. |
+| Repository documentation harness | Done | Thin agent map, architecture source of truth, domain specs/tests, decisions, increment history, and testing guidance are consolidated and maintained with code changes. |
 
 ## Backlog
 

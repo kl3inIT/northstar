@@ -31,8 +31,8 @@ spring:
       timeout: 60s
       max-retries: 2
       chat:
-        # Vision captions for image attachments (reasoning model, no temperature).
-        model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
+        # Short vision captions for image attachments.
+        model: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-4o-mini}
       embedding:
         model: text-embedding-3-large
         dimensions: 1536
@@ -71,20 +71,23 @@ northstar:
         base-url: https://api.openai.com/v1
         api-key: ${OPENAI_API_KEY:}
         models:
-          - ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.5}
-          - ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
-          - ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
+          - ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.6-luna}
+          - ${NORTHSTAR_CAPTURE_MODEL:gpt-5.6-luna}
+          - ${NORTHSTAR_ALIGNMENT_MODEL:gpt-5.6-luna}
+          - ${NORTHSTAR_TITLE_MODEL:gpt-4o-mini}
+          - ${NORTHSTAR_GRADER_MODEL:gpt-5.6-sol}
+          - ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-4o-mini}
         discover-models: false
         timeout: 60s
     routes:
-      assistant: ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.5}
-      capture: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
-      alignment: ${NORTHSTAR_ALIGNMENT_MODEL:gpt-5.5}
-      title: ${NORTHSTAR_TITLE_MODEL:gpt-5.5}
-      study-grader: ${NORTHSTAR_GRADER_MODEL:gpt-5.5}
-      image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-5.5}
-      text-to-speech: ${NORTHSTAR_TTS_TARGET:openai/gpt-4o-mini-tts/alloy}
-      speech-to-text: ${NORTHSTAR_STT_TARGET:whisper-1}
+      assistant: ${NORTHSTAR_ASSISTANT_MODEL:gpt-5.6-luna}
+      capture: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.6-luna}
+      alignment: ${NORTHSTAR_ALIGNMENT_MODEL:gpt-5.6-luna}
+      title: ${NORTHSTAR_TITLE_MODEL:gpt-4o-mini}
+      study-grader: ${NORTHSTAR_GRADER_MODEL:gpt-5.6-sol}
+      image-caption: ${NORTHSTAR_IMAGE_CAPTION_MODEL:gpt-4o-mini}
+      text-to-speech: ${NORTHSTAR_TTS_TARGET:openai/tts-1-hd/alloy}
+      speech-to-text: ${NORTHSTAR_STT_TARGET:gpt-4o-mini-transcribe}
       image-generation: ${NORTHSTAR_IMAGE_TARGET:gpt-image-2}
       embedding: ${NORTHSTAR_EMBEDDING_TARGET:text-embedding-3-large}
     catalog:
@@ -113,7 +116,7 @@ northstar:
     cache-max-size: 200
     openai:
       api-key: ${OPENAI_API_KEY:}
-      model: ${NORTHSTAR_WEB_MODEL:gpt-5.5}
+      model: ${NORTHSTAR_WEB_MODEL:gpt-5.6-luna}
       search-context-size: medium
       connect-timeout: 5s
       request-timeout: 60s

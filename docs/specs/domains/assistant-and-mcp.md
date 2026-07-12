@@ -29,6 +29,10 @@ YAML supplies defaults and a database override from Settings wins without
 restarting either API or worker. Chat, text-to-speech, speech-to-text, image
 generation, and embedding routes validate against isolated capability catalogs,
 so a target discovered for one protocol cannot be selected for another.
+Deployment defaults are workload-specific: the cost-efficient reasoning tier handles
+Assistant, Capture, Alignment, and web research; the strongest tier handles Study
+grading; economical multimodal models handle titles and image captions; and
+speech, image generation, and embedding use their dedicated current models.
 Gateway instances declare `OPENAI`, `NINE_ROUTER`, or
 `OPENAI_CHAT_COMPATIBLE`. OpenAI and 9Router reuse the shared chat transport but
 advertise the additional capability protocols Northstar has implemented;
