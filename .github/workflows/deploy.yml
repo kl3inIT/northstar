@@ -112,7 +112,8 @@ jobs:
             fi
             if [[ $attempt -eq 60 ]]; then
               echo "::error::api failed readiness within 120s"
-              docker compose -f docker/docker-compose.yml logs --tail=200 api web
+              docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
+                --env-file .env logs --tail=200 api web
               exit 1
             fi
             sleep 2
@@ -126,7 +127,8 @@ jobs:
             fi
             if [[ $attempt -eq 60 ]]; then
               echo "::error::mcp failed readiness within 120s"
-              docker compose -f docker/docker-compose.yml logs --tail=200 mcp
+              docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
+                --env-file .env logs --tail=200 mcp
               exit 1
             fi
             sleep 2
@@ -141,7 +143,8 @@ jobs:
             if [[ "$state" == "healthy" ]]; then echo "worker healthy"; break; fi
             if [[ $attempt -eq 60 ]]; then
               echo "::error::worker not healthy within 120s (state=$state)"
-              docker compose -f docker/docker-compose.yml logs --tail=100 worker
+              docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
+                --env-file .env logs --tail=100 worker
               exit 1
             fi
             sleep 2

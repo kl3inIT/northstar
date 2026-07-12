@@ -7,6 +7,7 @@ dependencies {
     implementation(project(":integrations:web-openai"))
     implementation(project(":integrations:ai-openai-compatible"))
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    implementation("org.springframework.boot:spring-boot-starter-jackson")
 
     // The worker owns search indexing (SearchIndexingWorker): OpenAI for the
     // vision captions + embeddings, PgVectorStore for the vectors it writes.
