@@ -102,7 +102,7 @@ public class SpeakingCoach {
                 .user("Part " + part)
                 .call()
                 .entity(SpeakingQuestion.class, ChatClient.EntityParamSpec::useProviderStructuredOutput);
-        return new SpeakingQuestion(requireQuestion(generated.question()));
+        return new SpeakingQuestion(requireQuestion(generated == null ? null : generated.question()));
     }
 
     public SpeakingAttemptResult assess(String question, byte[] wavAudio) {
@@ -137,7 +137,7 @@ public class SpeakingCoach {
         SpeakingFeedbackSummary saved = speaking.save(feedback);
         int minutes = Math.max(1, (int) Math.ceil(audio.durationSeconds() / 60.0));
         study.record(new NewStudySession(LocalDate.now(zone), "Speaking", StudyKind.PRACTICE,
-                minutes, null, null, "Speaking practice: " + abbreviate(prompt, 180), null),
+                minutes, null, null, "Speaking practice: " + abbreviate(prompt), null),
                 StudySource.ASSISTANT);
         return new SpeakingAttemptResult(saved, delivery);
     }
@@ -152,10 +152,10 @@ public class SpeakingCoach {
                 .append(delivery.pronunciation()).append(", fluency=").append(delivery.fluency())
                 .append(", prosody=").append(delivery.prosody())
                 .append("\nRecording evidence:\ndurationSeconds=")
-                .append("%.1f".formatted(Locale.ROOT, metrics.durationSeconds()))
+                .append(String.format(Locale.ROOT, "%.1f", metrics.durationSeconds()))
                 .append(", wordCount=").append(metrics.wordCount())
                 .append(", wordsPerMinute=")
-                .append("%.1f".formatted(Locale.ROOT, metrics.wordsPerMinute()))
+                .append(String.format(Locale.ROOT, "%.1f", metrics.wordsPerMinute()))
                 .append("\nLow-accuracy words:\n").append(lowWords(delivery));
         if (correction != null) {
             user.append("\n\nThe previous output failed validation:\n").append(correction)
@@ -279,8 +279,8 @@ public class SpeakingCoach {
         return text.replaceAll("\\s+", " ").strip();
     }
 
-    private static String abbreviate(String text, int maximum) {
-        return text.length() <= maximum ? text : text.substring(0, maximum - 1).stripTrailing() + "…";
+    private static String abbreviate(String text) {
+        return text.length() <= 180 ? text : text.substring(0, 179).stripTrailing() + "…";
     }
 
     private static String contentScoresJson(SpeakingContentFeedback feedback) {

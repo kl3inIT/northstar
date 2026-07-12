@@ -33,7 +33,7 @@ final class SpeakingEstimatePolicy {
             } else if (byKey.putIfAbsent(key, criterion) != null) {
                 problems.append("- Duplicate IELTS-style criterion key: ").append(key).append(".\n");
             }
-            if (!validBand(criterion.minBand()) || !validBand(criterion.maxBand())
+            if (invalidBand(criterion.minBand()) || invalidBand(criterion.maxBand())
                     || criterion.minBand() > criterion.maxBand()
                     || criterion.maxBand() - criterion.minBand() > 1.0) {
                 problems.append("- Invalid band range for ").append(key).append(": ")
@@ -82,9 +82,9 @@ final class SpeakingEstimatePolicy {
         return new SpeakingIeltsEstimate(ordered, overallMin, overallMax, "LOW", LABEL);
     }
 
-    private static boolean validBand(double band) {
-        return Double.isFinite(band) && band >= 1.0 && band <= 9.0
-                && band * 2 == Math.rint(band * 2);
+    private static boolean invalidBand(double band) {
+        return !Double.isFinite(band) || band < 1.0 || band > 9.0
+                || band * 2 != Math.rint(band * 2);
     }
 
     private static double halfBand(double value) {

@@ -283,9 +283,9 @@ export function useAssessSpeakingAttempt() {
     mutationFn: async ({ question, audio }: { question: string; audio: Blob }) =>
       dataOrThrow(await assessSpeakingAttempt({ body: { question, audio } })),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['study-speaking'] })
-      queryClient.invalidateQueries({ queryKey: ['study'] })
-      queryClient.invalidateQueries({ queryKey: ['study-summary'] })
+      void queryClient.invalidateQueries({ queryKey: ['study-speaking'] })
+      void queryClient.invalidateQueries({ queryKey: ['study'] })
+      void queryClient.invalidateQueries({ queryKey: ['study-summary'] })
     },
   })
 }
@@ -303,11 +303,11 @@ export function useDeleteSpeakingFeedback() {
 function useInvalidateStudy() {
   const queryClient = useQueryClient()
   return () => {
-    queryClient.invalidateQueries({ queryKey: ['study'] })
-    queryClient.invalidateQueries({ queryKey: ['study-summary'] })
-    queryClient.invalidateQueries({ queryKey: ['study-mocks'] })
-    queryClient.invalidateQueries({ queryKey: ['study-skills'] })
-    queryClient.invalidateQueries({ queryKey: ['study-vocab'] })
+    void queryClient.invalidateQueries({ queryKey: ['study'] })
+    void queryClient.invalidateQueries({ queryKey: ['study-summary'] })
+    void queryClient.invalidateQueries({ queryKey: ['study-mocks'] })
+    void queryClient.invalidateQueries({ queryKey: ['study-skills'] })
+    void queryClient.invalidateQueries({ queryKey: ['study-vocab'] })
   }
 }
 
