@@ -43,6 +43,11 @@ facts here.
   restates user-facing behavior so the in-app assistant can answer "how does
   my app handle X". When consolidation changes a spec's user-facing behavior,
   update that note too (via Northstar MCP `update_note`).
+- Treat "Northstar App Behavior" as a concise behavior index, not an unlimited
+  dump. When a domain section needs more than a short summary, create or update
+  a focused RESOURCE note through Northstar MCP and link it from the index with
+  `[[Exact Note Title]]`. Search first and update the existing focused note
+  instead of creating duplicates.
 
 ## Documentation Hygiene
 

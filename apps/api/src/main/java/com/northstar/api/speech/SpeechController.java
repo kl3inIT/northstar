@@ -49,7 +49,10 @@ class SpeechController {
         AiRoute route = request.gatewayId() == null && request.targetId() == null
                 ? configured
                 : request.routeOverride();
-        SpeechAssetResult result = speech.synthesize(route, request.text(), request.locale());
+        String locale = request.locale() == null || request.locale().isBlank()
+                ? route.options().getOrDefault("language", "auto")
+                : request.locale();
+        SpeechAssetResult result = speech.synthesize(route, request.text(), locale);
         var asset = result.asset();
         return new SpeechAssetResponse(asset.id(), "/api/speech/assets/" + asset.id() + "/audio",
                 asset.gatewayId(), asset.targetId(), asset.locale(), asset.format(), asset.mimeType(),
@@ -87,7 +90,9 @@ class SpeechController {
             if (gatewayId == null || gatewayId.isBlank() || targetId == null || targetId.isBlank()) {
                 throw new IllegalArgumentException("gatewayId and targetId must be provided together");
             }
-            return new AiRoute(gatewayId, targetId);
+            return new AiRoute(gatewayId, targetId,
+                    locale == null || locale.isBlank() ? java.util.Map.of()
+                            : java.util.Map.of("language", locale));
         }
     }
 

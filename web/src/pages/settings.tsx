@@ -1,7 +1,19 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { BrainCircuit, CheckCircle2, Clock3, Eye, EyeOff, Globe2, Loader2, Pencil, Plus, PlugZap, RotateCcw, Save, Search, Trash2, Waypoints } from 'lucide-react'
+import { BrainCircuit, Check, CheckCircle2, ChevronsUpDown, Clock3, Eye, EyeOff, Globe2, Loader2, Pencil, Plus, PlugZap, RotateCcw, Save, Search, Trash2, Waypoints } from 'lucide-react'
 import { toast } from 'sonner'
 import { AutomationsSection } from '@/components/settings/automations-section'
+import {
+  ModelSelector,
+  ModelSelectorContent,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorName,
+  ModelSelectorTrigger,
+} from '@/components/ai-elements/model-selector'
+import { ModelProviderMark } from '@/components/model-provider-mark'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -35,6 +47,7 @@ import {
 import { cn } from '@/lib/utils'
 import {
   AI_TASKS,
+  useAiCapabilityTargets,
   useAiModels,
   useAiSettings,
   useDeleteAiGateway,
@@ -112,6 +125,9 @@ const AI_TASK_LABELS: Record<AiTask, { title: string; description: string }> = {
   STUDY_GRADER: { title: 'Study grader', description: 'Writing grading and faithfulness checks.' },
   IMAGE_CAPTION: { title: 'Image indexing', description: 'Describe images before search indexing.' },
   TEXT_TO_SPEECH: { title: 'Text to speech', description: 'Generate reusable audio for Assistant and study.' },
+  SPEECH_TO_TEXT: { title: 'Speech to text', description: 'Transcribe capture and study audio.' },
+  IMAGE_GENERATION: { title: 'Image generation', description: 'Generate visual study and assistant assets.' },
+  EMBEDDING: { title: 'Embeddings', description: 'Index notes and app knowledge for retrieval.' },
 }
 
 function AiSettingsSection() {
@@ -270,6 +286,12 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
     baseUrl: gateway.baseUrl,
     apiKey: '',
     models: gateway.configuredModels,
+    ttsTargets: gateway.configuredTtsTargets,
+    webSearchTargets: gateway.configuredWebSearchTargets,
+    webFetchTargets: gateway.configuredWebFetchTargets,
+    sttTargets: gateway.configuredSttTargets,
+    imageTargets: gateway.configuredImageTargets,
+    embeddingTargets: gateway.configuredEmbeddingTargets,
     discoverModels: gateway.discoverModels,
     timeoutSeconds: gateway.timeoutSeconds,
   } : presetForm('nineRouter'))
@@ -290,6 +312,19 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
       setResult(value)
       if (value.success && value.models.length > 0) {
         setForm((current) => ({ ...current, models: value.models.map((model) => model.id) }))
+      }
+      if (value.success && value.ttsTargets.length > 0) {
+        setForm((current) => ({ ...current, ttsTargets: value.ttsTargets.map((target) => target.id) }))
+      }
+      if (value.success) {
+        setForm((current) => ({
+          ...current,
+          webSearchTargets: value.capabilityTargets.WEB_SEARCH?.map((target) => target.id) ?? current.webSearchTargets,
+          webFetchTargets: value.capabilityTargets.WEB_FETCH?.map((target) => target.id) ?? current.webFetchTargets,
+          sttTargets: value.capabilityTargets.SPEECH_TO_TEXT?.map((target) => target.id) ?? current.sttTargets,
+          imageTargets: value.capabilityTargets.IMAGE_GENERATION?.map((target) => target.id) ?? current.imageTargets,
+          embeddingTargets: value.capabilityTargets.EMBEDDING?.map((target) => target.id) ?? current.embeddingTargets,
+        }))
       }
     },
     onError: (error) => toast.error(error.message),
@@ -361,10 +396,35 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
             </div>
           </Field>
 
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
-            <Field label="Manual models" htmlFor="gateway-models" hint="One model ID per line. Discovered models replace this list after a successful test.">
+          <div className={cn('grid gap-4', form.type !== 'OPENAI_CHAT_COMPATIBLE' && 'sm:grid-cols-2')}>
+            <Field label="Manual chat models" htmlFor="gateway-models" hint="One chat model ID per line. A successful test fills this catalog from /models.">
               <Textarea id="gateway-models" className="min-h-24 resize-y font-mono text-xs" value={form.models.join('\n')} onChange={(event) => update('models', lines(event.target.value))} />
             </Field>
+            {form.type !== 'OPENAI_CHAT_COMPATIBLE' && (
+              <Field label="Manual TTS targets" htmlFor="gateway-tts-targets" hint="One speech target per line. Used when capability discovery is empty or disabled.">
+                <Textarea id="gateway-tts-targets" className="min-h-24 resize-y font-mono text-xs" placeholder="edge-tts/vi-VN-HoaiMyNeural" value={form.ttsTargets.join('\n')} onChange={(event) => update('ttsTargets', lines(event.target.value))} />
+              </Field>
+            )}
+          </div>
+          {form.type !== 'OPENAI_CHAT_COMPATIBLE' && (
+            <details className="group rounded-md border" open={form.type === 'NINE_ROUTER'}>
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium [&::-webkit-details-marker]:hidden">
+                Capability catalogs
+                <span className="ml-2 text-xs font-normal text-muted-foreground">Manual fallbacks for empty discovery endpoints</span>
+              </summary>
+              <div className="grid gap-4 border-t p-4 sm:grid-cols-2">
+                <CatalogField label="Web search" field="webSearchTargets" value={form.webSearchTargets} update={update} placeholder="searxng" />
+                <CatalogField label="Web fetch" field="webFetchTargets" value={form.webFetchTargets} update={update} placeholder="jina-reader" />
+                <CatalogField label="Speech to text" field="sttTargets" value={form.sttTargets} update={update} placeholder="whisper-1" />
+                <CatalogField label="Image generation" field="imageTargets" value={form.imageTargets} update={update} placeholder="provider/image-model" />
+                <CatalogField label="Embeddings" field="embeddingTargets" value={form.embeddingTargets} update={update} placeholder="text-embedding-3-large" />
+              </div>
+            </details>
+          )}
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-end">
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Each catalog is isolated by capability, so a voice or image model cannot appear in chat.
+            </p>
             <Field label="Timeout" htmlFor="gateway-timeout" hint="5-300 seconds.">
               <Input id="gateway-timeout" type="number" min={5} max={300} value={form.timeoutSeconds} onChange={(event) => update('timeoutSeconds', Number(event.target.value))} />
             </Field>
@@ -373,7 +433,7 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
           <div className="flex items-center justify-between gap-4 border-y py-4">
             <div>
               <Label htmlFor="gateway-discovery">Discover models</Label>
-              <p className="mt-1 text-xs text-muted-foreground">Load available IDs from the gateway&apos;s /models endpoint.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Merge manual catalogs with available IDs from capability endpoints.</p>
             </div>
             <Switch id="gateway-discovery" checked={form.discoverModels} onCheckedChange={(value) => update('discoverModels', value)} />
           </div>
@@ -381,7 +441,7 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
           {result && (
             <div className={cn('flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm', result.success ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-300' : 'border-destructive/30 bg-destructive/5 text-destructive')}>
               {result.success ? <CheckCircle2 className="mt-0.5 size-4 shrink-0" /> : <PlugZap className="mt-0.5 size-4 shrink-0" />}
-              <span>{result.message} · {result.latencyMillis} ms{result.models.length ? ` · ${result.models.length} models` : ''}</span>
+              <span>{result.message} · {result.latencyMillis} ms · {result.models.length} chat · {result.ttsTargets.length} TTS · {Object.values(result.capabilityTargets).reduce((total, targets) => total + (targets?.length ?? 0), 0)} other</span>
             </div>
           )}
         </div>
@@ -412,9 +472,29 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: str
   )
 }
 
+function CatalogField<K extends 'webSearchTargets' | 'webFetchTargets' | 'sttTargets' | 'imageTargets' | 'embeddingTargets'>({
+  label, field, value, update, placeholder,
+}: {
+  label: string
+  field: K
+  value: string[]
+  update: <T extends keyof AiGatewayInput>(key: T, value: AiGatewayInput[T]) => void
+  placeholder: string
+}) {
+  return (
+    <Field label={label} htmlFor={`gateway-${field}`} hint="One target ID per line.">
+      <Textarea id={`gateway-${field}`} className="min-h-20 resize-y font-mono text-xs" placeholder={placeholder} value={value.join('\n')} onChange={(event) => update(field, lines(event.target.value))} />
+    </Field>
+  )
+}
+
 function presetForm(preset: GatewayPreset): AiGatewayInput {
   const item = GATEWAY_PRESETS[preset]
-  return { id: item.id, displayName: item.name, type: item.type, baseUrl: item.baseUrl, apiKey: '', models: [], discoverModels: true, timeoutSeconds: 60 }
+  return {
+    id: item.id, displayName: item.name, type: item.type, baseUrl: item.baseUrl, apiKey: '',
+    models: [], ttsTargets: [], webSearchTargets: [], webFetchTargets: [], sttTargets: [],
+    imageTargets: [], embeddingTargets: [], discoverModels: true, timeoutSeconds: 60,
+  }
 }
 
 function gatewayTypeLabel(type: AiGatewayType) {
@@ -436,6 +516,8 @@ function gatewayCapabilityLabel(capability: AiGatewayCapability) {
     WEB_FETCH: 'Fetch',
     SPEECH_TO_TEXT: 'STT',
     TEXT_TO_SPEECH: 'TTS',
+    IMAGE_GENERATION: 'Image',
+    EMBEDDING: 'Embedding',
     REALTIME: 'Realtime',
   }
   return labels[capability]
@@ -462,19 +544,35 @@ function AiRouteRow({
   const reset = useResetAiRoute()
   const [gatewayId, setGatewayId] = useState(selection.route.gatewayId)
   const [modelId, setModelId] = useState(selection.route.modelId)
-  const capability: AiGatewayCapability = task === 'TEXT_TO_SPEECH' ? 'TEXT_TO_SPEECH' : 'CHAT'
+  const [language, setLanguage] = useState(selection.route.options?.language ?? 'auto')
+  const capability = taskCapability(task)
   const compatibleGateways = gateways.filter((gateway) => gateway.capabilities.includes(capability))
-  const models = useAiModels(task === 'TEXT_TO_SPEECH' ? undefined : gatewayId)
+  const models = useAiModels(capability === 'CHAT' ? gatewayId : undefined)
   const speechTargets = useSpeechTargets(task === 'TEXT_TO_SPEECH' ? gatewayId : undefined)
+  const capabilityTargets = useAiCapabilityTargets(
+    !['CHAT', 'TEXT_TO_SPEECH'].includes(capability) ? gatewayId : undefined,
+    !['CHAT', 'TEXT_TO_SPEECH'].includes(capability) ? capability : undefined,
+  )
 
   useEffect(() => {
     setGatewayId(selection.route.gatewayId)
     setModelId(selection.route.modelId)
+    setLanguage(selection.route.options?.language ?? 'auto')
   }, [selection])
 
-  const gatewayModels = task === 'TEXT_TO_SPEECH' ? (speechTargets.data ?? []) : (models.data ?? [])
-  const targetsLoading = task === 'TEXT_TO_SPEECH' ? speechTargets.isLoading : models.isLoading
+  const speechModels = speechTargets.data ?? []
+  const languages = [...new Set(speechModels.map((target) => target.language).filter(Boolean))]
+  const filteredSpeechModels = language === 'auto'
+    ? speechModels
+    : speechModels.filter((target) => !target.language || target.language === 'multi' || target.language === language)
+  const gatewayModels = capability === 'TEXT_TO_SPEECH'
+    ? filteredSpeechModels
+    : capability === 'CHAT' ? (models.data ?? []) : (capabilityTargets.data ?? [])
+  const targetsLoading = capability === 'TEXT_TO_SPEECH'
+    ? speechTargets.isLoading
+    : capability === 'CHAT' ? models.isLoading : capabilityTargets.isLoading
   const dirty = gatewayId !== selection.route.gatewayId || modelId !== selection.route.modelId
+    || (task === 'TEXT_TO_SPEECH' && language !== (selection.route.options?.language ?? 'auto'))
   const label = AI_TASK_LABELS[task]
 
   return (
@@ -486,28 +584,46 @@ function AiRouteRow({
         </div>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{label.description}</p>
       </div>
-      <div className="grid min-w-0 grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto] gap-2">
+      <div className={cn(
+        'grid min-w-0 gap-2',
+        task === 'TEXT_TO_SPEECH'
+          ? 'sm:grid-cols-[minmax(0,0.7fr)_minmax(0,0.7fr)_minmax(0,1.1fr)_auto]'
+          : 'sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto]',
+      )}>
         <Select
           value={gatewayId}
           onValueChange={(value) => {
             setGatewayId(value)
             setModelId('')
+            setLanguage('auto')
           }}
         >
-          <SelectTrigger className="min-w-0" aria-label={`${label.title} gateway`}><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full min-w-0" aria-label={`${label.title} gateway`}><SelectValue /></SelectTrigger>
           <SelectContent>
             {compatibleGateways.map((gateway) => <SelectItem key={gateway.id} value={gateway.id}>{gateway.displayName}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={modelId} onValueChange={setModelId} disabled={targetsLoading || gatewayModels.length === 0}>
-          <SelectTrigger className="min-w-0" aria-label={`${label.title} ${task === 'TEXT_TO_SPEECH' ? 'voice' : 'model'}`}>
-            {targetsLoading ? <Loader2 className="size-4 animate-spin" /> : <SelectValue placeholder={task === 'TEXT_TO_SPEECH' ? 'Select voice' : 'Select model'} />}
-          </SelectTrigger>
-          <SelectContent>
-            {gatewayModels.map((model) => <SelectItem key={model.id} value={model.id}>{model.displayName}</SelectItem>)}
-            {modelId && !gatewayModels.some((model) => model.id === modelId) && <SelectItem value={modelId}>{modelId}</SelectItem>}
-          </SelectContent>
-        </Select>
+        {task === 'TEXT_TO_SPEECH' && (
+          <Select value={language} onValueChange={(value) => {
+            setLanguage(value)
+            if (value !== 'auto' && !filteredSpeechModels.some((target) => target.id === modelId)) setModelId('')
+          }}>
+            <SelectTrigger className="w-full min-w-0" aria-label="Text to speech language"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="auto">Auto language</SelectItem>
+              {languages.map((value) => <SelectItem key={value} value={value}>{languageName(value)}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
+        <RouteTargetSelector
+          gateway={compatibleGateways.find((gateway) => gateway.id === gatewayId)}
+          modelId={modelId}
+          models={gatewayModels}
+          loading={targetsLoading}
+          kind={task === 'TEXT_TO_SPEECH' ? 'voice' : 'model'}
+          label={label.title}
+          onChange={setModelId}
+        />
         <div className="flex items-center gap-1">
           <Button
             size="icon"
@@ -524,7 +640,11 @@ function AiRouteRow({
             title={`Save ${label.title} route`}
             aria-label={`Save ${label.title} route`}
             disabled={!dirty || !modelId || update.isPending}
-            onClick={() => update.mutate({ task, route: { gatewayId, modelId } }, {
+            onClick={() => update.mutate({ task, route: {
+              gatewayId,
+              modelId,
+              options: task === 'TEXT_TO_SPEECH' ? { language } : {},
+            } }, {
               onSuccess: () => toast.success(`${label.title} route saved`),
               onError: (error) => toast.error(error.message),
             })}
@@ -534,6 +654,93 @@ function AiRouteRow({
         </div>
       </div>
     </div>
+  )
+}
+
+function taskCapability(task: AiTask): AiGatewayCapability {
+  if (task === 'TEXT_TO_SPEECH') return 'TEXT_TO_SPEECH'
+  if (task === 'SPEECH_TO_TEXT') return 'SPEECH_TO_TEXT'
+  if (task === 'IMAGE_GENERATION') return 'IMAGE_GENERATION'
+  if (task === 'EMBEDDING') return 'EMBEDDING'
+  return 'CHAT'
+}
+
+function languageName(language: string) {
+  try {
+    return new Intl.DisplayNames(undefined, { type: 'language' }).of(language) ?? language
+  } catch {
+    return language
+  }
+}
+
+function RouteTargetSelector({
+  gateway,
+  modelId,
+  models,
+  loading,
+  kind,
+  label,
+  onChange,
+}: {
+  gateway?: AiGateway
+  modelId: string
+  models: Array<{ id: string; displayName: string }>
+  loading: boolean
+  kind: 'model' | 'voice'
+  label: string
+  onChange: (modelId: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const current = models.find((model) => model.id === modelId)
+  const items = modelId && !current
+    ? [...models, { id: modelId, displayName: modelId }]
+    : models
+  const placeholder = kind === 'voice' ? 'Select voice' : 'Select model'
+
+  return (
+    <ModelSelector open={open} onOpenChange={setOpen}>
+      <ModelSelectorTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full min-w-0 justify-between px-3 font-normal"
+          aria-label={`${label} ${kind}`}
+          disabled={loading || !gateway || items.length === 0}
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            {loading
+              ? <Loader2 className="size-4 shrink-0 animate-spin" />
+              : modelId && <ModelProviderMark modelId={modelId} gatewayName={gateway?.id} />}
+            <span className={cn('truncate', !modelId && 'text-muted-foreground')}>
+              {current?.displayName ?? (modelId || placeholder)}
+            </span>
+          </span>
+          <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
+        </Button>
+      </ModelSelectorTrigger>
+      <ModelSelectorContent title={`Choose ${label} ${kind}`} className="sm:max-w-lg">
+        <ModelSelectorInput placeholder={`Search ${kind === 'voice' ? 'voices' : 'models'}...`} />
+        <ModelSelectorList>
+          <ModelSelectorEmpty>No {kind === 'voice' ? 'voices' : 'models'} found.</ModelSelectorEmpty>
+          <ModelSelectorGroup heading={gateway?.displayName ?? 'Gateway'}>
+            {items.map((model) => (
+              <ModelSelectorItem
+                key={model.id}
+                value={`${gateway?.displayName ?? ''} ${model.displayName} ${model.id}`}
+                onSelect={() => {
+                  onChange(model.id)
+                  setOpen(false)
+                }}
+              >
+                <ModelProviderMark modelId={model.id} gatewayName={gateway?.id} />
+                <ModelSelectorName>{model.displayName}</ModelSelectorName>
+                {model.id === modelId && <Check className="size-4" />}
+              </ModelSelectorItem>
+            ))}
+          </ModelSelectorGroup>
+        </ModelSelectorList>
+      </ModelSelectorContent>
+    </ModelSelector>
   )
 }
 

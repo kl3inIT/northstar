@@ -13,6 +13,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Component;
+import com.northstar.core.speech.TextToSpeechGateway;
 
 @Component
 public class SpringAiClientRouter implements AiClientRouter {
@@ -21,15 +22,21 @@ public class SpringAiClientRouter implements AiClientRouter {
     private final AiGatewayRegistry gateways;
     private final AiRouteSettingsService routes;
     private final OpenAiModelCatalog catalog;
+    private final AiCapabilityCatalog capabilityCatalog;
+    private final TextToSpeechGateway speechCatalog;
     private final Map<String, ChatModel> models = new ConcurrentHashMap<>();
     private final Map<String, ChatClient> clients = new ConcurrentHashMap<>();
 
     SpringAiClientRouter(AiProperties properties, AiGatewayRegistry gateways,
-            AiRouteSettingsService routes, OpenAiModelCatalog catalog) {
+            AiRouteSettingsService routes, OpenAiModelCatalog catalog,
+            AiCapabilityCatalog capabilityCatalog,
+            TextToSpeechGateway speechCatalog) {
         this.properties = properties;
         this.gateways = gateways;
         this.routes = routes;
         this.catalog = catalog;
+        this.capabilityCatalog = capabilityCatalog;
+        this.speechCatalog = speechCatalog;
     }
 
     @Override
@@ -67,12 +74,23 @@ public class SpringAiClientRouter implements AiClientRouter {
             throw new IllegalArgumentException("Gateway " + route.gatewayId()
                     + " does not support " + task.requiredCapability());
         }
+        if (task.requiredCapability() == com.northstar.core.ai.AiGatewayCapability.TEXT_TO_SPEECH) {
+            var available = speechCatalog.targets(route.gatewayId());
+            validateTarget(route, available.stream().map(com.northstar.core.speech.SpeechTarget::id).toList());
+            return;
+        }
         if (task.requiredCapability() != com.northstar.core.ai.AiGatewayCapability.CHAT) {
+            var available = capabilityCatalog.targets(route.gatewayId(), task.requiredCapability());
+            validateTarget(route, available.stream().map(AiCapabilityTarget::id).toList());
             return;
         }
         List<AiModelDescriptor> available = catalog.models(route.gatewayId());
-        if (!available.isEmpty() && available.stream().noneMatch(model -> model.id().equals(route.modelId()))) {
-            throw new IllegalArgumentException("Model is not available from gateway "
+        validateTarget(route, available.stream().map(AiModelDescriptor::id).toList());
+    }
+
+    private static void validateTarget(AiRoute route, List<String> available) {
+        if (!available.isEmpty() && !available.contains(route.modelId())) {
+            throw new IllegalArgumentException("Target is not available from gateway "
                     + route.gatewayId() + ": " + route.modelId());
         }
     }

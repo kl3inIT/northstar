@@ -7,11 +7,18 @@ public enum AiTask {
     TITLE,
     STUDY_GRADER,
     IMAGE_CAPTION,
-    TEXT_TO_SPEECH;
+    TEXT_TO_SPEECH,
+    SPEECH_TO_TEXT,
+    IMAGE_GENERATION,
+    EMBEDDING;
 
     public AiGatewayCapability requiredCapability() {
-        return this == TEXT_TO_SPEECH
-                ? AiGatewayCapability.TEXT_TO_SPEECH
-                : AiGatewayCapability.CHAT;
+        return switch (this) {
+            case TEXT_TO_SPEECH -> AiGatewayCapability.TEXT_TO_SPEECH;
+            case SPEECH_TO_TEXT -> AiGatewayCapability.SPEECH_TO_TEXT;
+            case IMAGE_GENERATION -> AiGatewayCapability.IMAGE_GENERATION;
+            case EMBEDDING -> AiGatewayCapability.EMBEDDING;
+            default -> AiGatewayCapability.CHAT;
+        };
     }
 }

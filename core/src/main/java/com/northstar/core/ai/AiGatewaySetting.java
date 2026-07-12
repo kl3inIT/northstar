@@ -33,6 +33,24 @@ public class AiGatewaySetting {
     @Column(nullable = false, columnDefinition = "text")
     private String models;
 
+    @Column(name = "tts_targets", nullable = false, columnDefinition = "text")
+    private String ttsTargets;
+
+    @Column(name = "web_search_targets", nullable = false, columnDefinition = "text")
+    private String webSearchTargets;
+
+    @Column(name = "web_fetch_targets", nullable = false, columnDefinition = "text")
+    private String webFetchTargets;
+
+    @Column(name = "stt_targets", nullable = false, columnDefinition = "text")
+    private String sttTargets;
+
+    @Column(name = "image_targets", nullable = false, columnDefinition = "text")
+    private String imageTargets;
+
+    @Column(name = "embedding_targets", nullable = false, columnDefinition = "text")
+    private String embeddingTargets;
+
     @Column(name = "discover_models", nullable = false)
     private boolean discoverModels;
 
@@ -53,19 +71,32 @@ public class AiGatewaySetting {
     }
 
     public AiGatewaySetting(String id, String displayName, AiGatewayType type, String baseUrl,
-            byte[] apiKeyCiphertext, String models, boolean discoverModels,
+            byte[] apiKeyCiphertext, String models, String ttsTargets,
+            String webSearchTargets, String webFetchTargets, String sttTargets,
+            String imageTargets, String embeddingTargets, boolean discoverModels,
             int timeoutSeconds) {
         this.id = id;
-        apply(displayName, type, baseUrl, apiKeyCiphertext, models, discoverModels, timeoutSeconds);
+        apply(displayName, type, baseUrl, apiKeyCiphertext, models, ttsTargets,
+                webSearchTargets, webFetchTargets,
+                sttTargets, imageTargets, embeddingTargets,
+                discoverModels, timeoutSeconds);
     }
 
     public void apply(String displayName, AiGatewayType type, String baseUrl, byte[] apiKeyCiphertext,
-            String models, boolean discoverModels, int timeoutSeconds) {
+            String models, String ttsTargets, String webSearchTargets, String webFetchTargets,
+            String sttTargets, String imageTargets, String embeddingTargets,
+            boolean discoverModels, int timeoutSeconds) {
         this.displayName = displayName;
         this.type = type.name();
         this.baseUrl = baseUrl;
         this.apiKeyCiphertext = Arrays.copyOf(apiKeyCiphertext, apiKeyCiphertext.length);
         this.models = models;
+        this.ttsTargets = ttsTargets;
+        this.webSearchTargets = webSearchTargets;
+        this.webFetchTargets = webFetchTargets;
+        this.sttTargets = sttTargets;
+        this.imageTargets = imageTargets;
+        this.embeddingTargets = embeddingTargets;
         this.discoverModels = discoverModels;
         this.timeoutSeconds = timeoutSeconds;
     }
@@ -88,6 +119,12 @@ public class AiGatewaySetting {
     public String baseUrl() { return baseUrl; }
     public byte[] apiKeyCiphertext() { return Arrays.copyOf(apiKeyCiphertext, apiKeyCiphertext.length); }
     public String models() { return models; }
+    public String ttsTargets() { return ttsTargets; }
+    public String webSearchTargets() { return webSearchTargets; }
+    public String webFetchTargets() { return webFetchTargets; }
+    public String sttTargets() { return sttTargets; }
+    public String imageTargets() { return imageTargets; }
+    public String embeddingTargets() { return embeddingTargets; }
     public boolean discoverModels() { return discoverModels; }
     public int timeoutSeconds() { return timeoutSeconds; }
 }

@@ -24,8 +24,11 @@ or a tool workflow part. This keeps the first turn and pre-tool-call gap from
 looking frozen.
 
 Model-backed workloads resolve an `AiTask` route at call time. Each route is a
-configured gateway id plus model id; application YAML supplies defaults and a
-database override from Settings wins without restarting either API or worker.
+configured gateway id, capability target id, and optional metadata; application
+YAML supplies defaults and a database override from Settings wins without
+restarting either API or worker. Chat, text-to-speech, speech-to-text, image
+generation, and embedding routes validate against isolated capability catalogs,
+so a target discovered for one protocol cannot be selected for another.
 Gateway instances declare `OPENAI`, `NINE_ROUTER`, or
 `OPENAI_CHAT_COMPATIBLE`. OpenAI and 9Router reuse the shared chat transport but
 advertise the additional capability protocols Northstar has implemented;
@@ -36,7 +39,9 @@ OpenAI, 9Router, OpenRouter, LiteLLM, or Custom presets. Presets provide form
 defaults and select the gateway contract. Runtime API keys
 are encrypted with AES-256-GCM using a deployment key and are never returned to
 clients. The route editor and web/Flutter Chat offer models discovered from the
-selected gateway. Chat selection is persisted per conversation; a new
+selected gateway. Manual Chat, TTS, STT, image, embedding, web-search, and
+web-fetch catalogs are stored separately and remain available when an optional
+discovery endpoint is empty or unavailable. Chat selection is persisted per conversation; a new
 conversation inherits the most recently used Assistant selection before falling
 back to the Assistant task default.
 
@@ -71,7 +76,11 @@ MP3 audio is stored as an immutable attachment; the same normalized text,
 gateway, target, locale, and format returns the persisted asset without
 validating or spending against the provider again. The TTS route is independent
 from chat model selection. OpenAI targets combine a speech model and voice,
-while 9Router discovers its normalized targets from `/models/tts`. The speech
+while 9Router discovers its normalized targets from `/models/tts` and may enrich
+voice name, language, and gender through `/audio/voices`. Manual voice targets
+remain usable when that optional voice catalog is unavailable. Settings persists
+the TTS language in route options; a synthesis request without an explicit locale
+uses that configured language. The speech
 asset contract deliberately has no Assistant-message ownership so Study cards
 and shadowing can reuse it later.
 

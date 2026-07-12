@@ -30,7 +30,8 @@ public record AiProperties(
     Map<AiTask, AiRoute> routeDefaults() {
         Map<AiTask, String> models = routes.byTask();
         Map<AiTask, AiRoute> result = new EnumMap<>(AiTask.class);
-        models.forEach((task, model) -> result.put(task, new AiRoute(activeGateway, model)));
+        models.forEach((task, model) -> result.put(task, new AiRoute(activeGateway, model,
+                task == AiTask.TEXT_TO_SPEECH ? Map.of("language", "auto") : Map.of())));
         return result;
     }
 
@@ -40,6 +41,12 @@ public record AiProperties(
             String baseUrl,
             String apiKey,
             List<String> models,
+            List<String> ttsTargets,
+            List<String> webSearchTargets,
+            List<String> webFetchTargets,
+            List<String> sttTargets,
+            List<String> imageTargets,
+            List<String> embeddingTargets,
             boolean discoverModels,
             Duration timeout) {
 
@@ -53,6 +60,16 @@ public record AiProperties(
                     .map(String::strip)
                     .distinct()
                     .toList();
+            ttsTargets = ttsTargets == null ? List.of() : ttsTargets.stream()
+                    .filter(value -> value != null && !value.isBlank())
+                    .map(String::strip)
+                    .distinct()
+                    .toList();
+            webSearchTargets = normalizedTargets(webSearchTargets);
+            webFetchTargets = normalizedTargets(webFetchTargets);
+            sttTargets = normalizedTargets(sttTargets);
+            imageTargets = normalizedTargets(imageTargets);
+            embeddingTargets = normalizedTargets(embeddingTargets);
             timeout = timeout == null ? Duration.ofSeconds(60) : timeout;
         }
 
@@ -62,9 +79,18 @@ public record AiProperties(
 
         @Override
         public String toString() {
-            return "Gateway[type=%s, displayName=%s, baseUrl=%s, apiKey=%s, models=%s, discoverModels=%s, timeout=%s]"
+            return "Gateway[type=%s, displayName=%s, baseUrl=%s, apiKey=%s, models=%s, ttsTargets=%s, webSearchTargets=%s, webFetchTargets=%s, sttTargets=%s, imageTargets=%s, embeddingTargets=%s, discoverModels=%s, timeout=%s]"
                     .formatted(type, displayName, baseUrl, apiKey.isBlank() ? "" : "***", models,
-                            discoverModels, timeout);
+                            ttsTargets, webSearchTargets, webFetchTargets, sttTargets, imageTargets,
+                            embeddingTargets, discoverModels, timeout);
+        }
+
+        private static List<String> normalizedTargets(List<String> values) {
+            return values == null ? List.of() : values.stream()
+                    .filter(value -> value != null && !value.isBlank())
+                    .map(String::strip)
+                    .distinct()
+                    .toList();
         }
     }
 
@@ -75,11 +101,15 @@ public record AiProperties(
             String title,
             String studyGrader,
             String imageCaption,
-            String textToSpeech) {
+            String textToSpeech,
+            String speechToText,
+            String imageGeneration,
+            String embedding) {
 
         static Routes empty() {
             return new Routes("gpt-5.5", "gpt-5.5", "gpt-5.5", "gpt-5.5",
-                    "gpt-5.5", "gpt-5.5", "openai/gpt-4o-mini-tts/alloy");
+                    "gpt-5.5", "gpt-5.5", "openai/gpt-4o-mini-tts/alloy",
+                    "whisper-1", "gpt-image-1", "text-embedding-3-large");
         }
 
         Map<AiTask, String> byTask() {
@@ -91,6 +121,9 @@ public record AiProperties(
             result.put(AiTask.STUDY_GRADER, required(studyGrader, "routes.study-grader"));
             result.put(AiTask.IMAGE_CAPTION, required(imageCaption, "routes.image-caption"));
             result.put(AiTask.TEXT_TO_SPEECH, required(textToSpeech, "routes.text-to-speech"));
+            result.put(AiTask.SPEECH_TO_TEXT, required(speechToText, "routes.speech-to-text"));
+            result.put(AiTask.IMAGE_GENERATION, required(imageGeneration, "routes.image-generation"));
+            result.put(AiTask.EMBEDDING, required(embedding, "routes.embedding"));
             return result;
         }
     }

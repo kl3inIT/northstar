@@ -56,7 +56,10 @@ Northstar is one domain with three backend deployables:
   automation execution through db-scheduler. It uses the same schema and does
   not carry Flyway on its production runtime classpath.
 - `integrations/ai-openai-compatible` owns the reusable Spring AI adapter,
-  model-catalog discovery, and runtime task router shared by API and worker.
+  capability-specific catalog discovery, and runtime task router shared by API
+  and worker. Chat, TTS, STT, image-generation, embedding, web-search, and
+  web-fetch identifiers are stored as separate catalogs; route options carry
+  capability metadata such as the selected TTS language.
   Gateway ids are configuration. Each gateway also declares a protocol type
   and its supported capabilities so chat compatibility is never assumed to
   imply web, speech, or realtime compatibility.

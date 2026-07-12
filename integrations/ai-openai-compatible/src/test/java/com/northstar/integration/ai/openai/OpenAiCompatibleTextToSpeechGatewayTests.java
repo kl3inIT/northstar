@@ -54,13 +54,26 @@ class OpenAiCompatibleTextToSpeechGatewayTests {
                           {"id":"google-tts/vi"}
                         ]}
                         """.getBytes(StandardCharsets.UTF_8)))) {
+            server.context("/v1/audio/voices", exchange -> respond(exchange, "application/json", """
+                    {"object":"list","data":[{
+                      "id":"vi-VN-HoaiMyNeural","name":"Hoai My",
+                      "lang":"vi-VN","gender":"Female",
+                      "model":"edge-tts/vi-VN-HoaiMyNeural"
+                    }]}
+                    """.getBytes(StandardCharsets.UTF_8)));
             AiGatewayConnection connection = connection(server, AiGatewayType.NINE_ROUTER);
             var gateway = new OpenAiCompatibleTextToSpeechGateway(id -> connection, RestClient.builder());
 
             List<SpeechTarget> targets = gateway.targets("nine-router");
 
-            assertEquals(List.of("edge-tts/vi-VN-HoaiMyNeural", "google-tts/vi"),
+            assertEquals(List.of("google-tts/vi", "edge-tts/vi-VN-HoaiMyNeural"),
                     targets.stream().map(SpeechTarget::id).toList());
+            SpeechTarget hoaiMy = targets.stream()
+                    .filter(target -> target.id().contains("HoaiMy"))
+                    .findFirst().orElseThrow();
+            assertEquals("Hoai My", hoaiMy.displayName());
+            assertEquals("vi-VN", hoaiMy.language());
+            assertEquals("Female", hoaiMy.gender());
         }
     }
 
@@ -78,6 +91,25 @@ class OpenAiCompatibleTextToSpeechGatewayTests {
                             new AiRoute("openai", "openai/gpt-4o-mini-tts/alloy"),
                             "Hello", "auto"));
         }
+    }
+
+    @Test
+    void manualTtsTargetsRemainAvailableWhenDiscoveryIsDisabled() {
+        AiGatewayDefinition definition = new AiGatewayDefinition(
+                "nine-router", AiGatewayType.NINE_ROUTER, "9Router",
+                "https://router.example/v1", "secret", List.of(),
+                List.of("edge-tts/vi-VN-HoaiMyNeural"), List.of(), List.of(), List.of(),
+                List.of(), List.of(), false,
+                Duration.ofSeconds(5), AiGatewaySource.SETTINGS);
+        var gateway = new OpenAiCompatibleTextToSpeechGateway(
+                id -> new AiGatewayConnection(id, "9Router", AiGatewayType.NINE_ROUTER,
+                        "https://router.example/v1", "secret", Duration.ofSeconds(5)),
+                RestClient.builder());
+
+        List<SpeechTarget> targets = gateway.configuredTargets(definition);
+
+        assertEquals(List.of("edge-tts/vi-VN-HoaiMyNeural"),
+                targets.stream().map(SpeechTarget::id).toList());
     }
 
     private static AiGatewayConnection connection(TestServer server, AiGatewayType type) {
@@ -109,6 +141,10 @@ class OpenAiCompatibleTextToSpeechGatewayTests {
 
         String baseUrl() {
             return "http://127.0.0.1:" + server.getAddress().getPort() + "/v1";
+        }
+
+        void context(String path, com.sun.net.httpserver.HttpHandler handler) {
+            server.createContext(path, handler);
         }
 
         @Override

@@ -8,13 +8,17 @@ public enum AiGatewayType {
             AiGatewayCapability.WEB_SEARCH,
             AiGatewayCapability.SPEECH_TO_TEXT,
             AiGatewayCapability.TEXT_TO_SPEECH,
+            AiGatewayCapability.IMAGE_GENERATION,
+            AiGatewayCapability.EMBEDDING,
             AiGatewayCapability.REALTIME)),
     NINE_ROUTER(Set.of(
             AiGatewayCapability.CHAT,
             AiGatewayCapability.WEB_SEARCH,
             AiGatewayCapability.WEB_FETCH,
             AiGatewayCapability.SPEECH_TO_TEXT,
-            AiGatewayCapability.TEXT_TO_SPEECH)),
+            AiGatewayCapability.TEXT_TO_SPEECH,
+            AiGatewayCapability.IMAGE_GENERATION,
+            AiGatewayCapability.EMBEDDING)),
     OPENAI_CHAT_COMPATIBLE(Set.of(AiGatewayCapability.CHAT));
 
     private final Set<AiGatewayCapability> capabilities;

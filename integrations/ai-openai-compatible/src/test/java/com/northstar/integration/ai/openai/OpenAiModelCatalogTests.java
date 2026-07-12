@@ -31,7 +31,9 @@ class OpenAiModelCatalogTests {
             OpenAiModelCatalog catalog = new OpenAiModelCatalog(properties(), null,
                     RestClient.builder());
             AiGatewayDefinition gateway = new AiGatewayDefinition("router", AiGatewayType.NINE_ROUTER,
-                    "9Router", server.baseUrl(), "secret", List.of(), true, Duration.ofSeconds(5),
+                    "9Router", server.baseUrl(), "secret", List.of(), List.of(), List.of(),
+                    List.of(), List.of(), List.of(), List.of(), false,
+                    Duration.ofSeconds(5),
                     AiGatewaySource.SETTINGS);
 
             List<AiModelDescriptor> models = catalog.probe(gateway);
