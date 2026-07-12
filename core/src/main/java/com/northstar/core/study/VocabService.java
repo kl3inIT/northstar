@@ -77,6 +77,8 @@ public class VocabService {
             byFront.put(identity, card);
             result.add(card);
         }
+        // Fire auditing callbacks before building the required createdAt response field.
+        schedules.flush();
         return summarize(result, now);
     }
 
