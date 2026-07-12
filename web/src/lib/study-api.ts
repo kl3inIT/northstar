@@ -59,6 +59,23 @@ export interface SpeakingContentScores {
   topic: number
 }
 
+export interface SpeakingBandCriterion {
+  key: 'FC' | 'LR' | 'GRA' | 'P'
+  minBand: number
+  maxBand: number
+  confidence: 'LOW' | 'MEDIUM'
+  evidenceQuote: string
+  justification: string
+}
+
+export interface SpeakingIeltsEstimate {
+  criteria: SpeakingBandCriterion[]
+  overallMin: number
+  overallMax: number
+  confidence: 'LOW'
+  label: string
+}
+
 export function parseSpeakingContentScores(value: string | undefined | null): SpeakingContentScores | null {
   if (!value) return null
   try {
@@ -67,6 +84,42 @@ export function parseSpeakingContentScores(value: string | undefined | null): Sp
       return null
     }
     return { vocabulary: parsed.vocabulary, grammar: parsed.grammar, topic: parsed.topic }
+  } catch {
+    return null
+  }
+}
+
+/** Parse the persisted one-answer estimate; legacy and malformed rows deliberately return null. */
+export function parseSpeakingIeltsEstimate(value: string | undefined | null): SpeakingIeltsEstimate | null {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>
+    if (!Array.isArray(parsed.criteria)
+      || typeof parsed.overallMin !== 'number'
+      || typeof parsed.overallMax !== 'number'
+      || parsed.confidence !== 'LOW'
+      || typeof parsed.label !== 'string') return null
+
+    const allowedKeys = new Set(['FC', 'LR', 'GRA', 'P'])
+    const criteria = parsed.criteria.filter((criterion): criterion is SpeakingBandCriterion => {
+      if (typeof criterion !== 'object' || criterion === null) return false
+      const candidate = criterion as Record<string, unknown>
+      return typeof candidate.key === 'string'
+        && allowedKeys.has(candidate.key)
+        && typeof candidate.minBand === 'number'
+        && typeof candidate.maxBand === 'number'
+        && (candidate.confidence === 'LOW' || candidate.confidence === 'MEDIUM')
+        && typeof candidate.evidenceQuote === 'string'
+        && typeof candidate.justification === 'string'
+    })
+    if (criteria.length !== 4 || new Set(criteria.map((criterion) => criterion.key)).size !== 4) return null
+    return {
+      criteria,
+      overallMin: parsed.overallMin,
+      overallMax: parsed.overallMax,
+      confidence: parsed.confidence,
+      label: parsed.label,
+    }
   } catch {
     return null
   }

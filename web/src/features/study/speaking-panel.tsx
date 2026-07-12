@@ -22,6 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import {
   parseSpeakingContentScores,
+  parseSpeakingIeltsEstimate,
   parseWritingErrors,
   useAssessSpeakingAttempt,
   useDeleteSpeakingFeedback,
@@ -29,6 +30,7 @@ import {
   useSpeakingFeedback,
   type SpeakingAttempt,
   type SpeakingFeedback,
+  type SpeakingIeltsEstimate,
   type WritingError,
 } from '@/lib/study-api'
 import { useWavRecorder } from '@/lib/use-wav-recorder'
@@ -38,6 +40,11 @@ const EMPTY_FEEDBACK: SpeakingFeedback[] = []
 
 function shownScore(value: number | undefined | null): string {
   return typeof value === 'number' ? String(Math.round(value)) : '—'
+}
+
+function shownBandRange(minimum: number | undefined, maximum: number | undefined): string {
+  if (minimum === undefined || maximum === undefined) return '—'
+  return minimum === maximum ? minimum.toFixed(1) : `${minimum.toFixed(1)}–${maximum.toFixed(1)}`
 }
 
 export function SpeakingPanel() {
@@ -137,13 +144,15 @@ export function SpeakingPanel() {
 
 function SpeakingStats({ rows, trend }: { rows: SpeakingFeedback[]; trend: number | null }) {
   const TrendIcon = trend === null || trend === 0 ? Minus : trend > 0 ? TrendingUp : TrendingDown
+  const latestEstimate = parseSpeakingIeltsEstimate(rows[0]?.ieltsEstimate)
   const stats = [
     { label: 'Attempts', value: String(rows.length), caption: 'saved practice', icon: Mic, tone: 'text-primary', bg: 'bg-primary/10' },
+    { label: 'Latest estimate', value: shownBandRange(latestEstimate?.overallMin, latestEstimate?.overallMax), caption: 'one answer · low confidence', icon: Sparkles, tone: 'text-sky-600 dark:text-sky-400', bg: 'bg-sky-500/10' },
     { label: 'Latest pronunciation', value: shownScore(rows[0]?.pronunciation), caption: 'provider score · 0–100', icon: Mic, tone: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-500/10' },
     { label: 'Recent change', value: trend === null ? '—' : `${trend > 0 ? '+' : ''}${Math.round(trend)}`, caption: 'vs previous attempt', icon: TrendIcon, tone: trend !== null && trend > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground', bg: trend !== null && trend > 0 ? 'bg-emerald-500/10' : 'bg-muted' },
   ]
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
       {stats.map((stat) => (
         <div key={stat.label} className="flex min-w-0 items-center gap-3 rounded-lg border bg-card p-3">
           <div className={cn('hidden size-9 shrink-0 items-center justify-center rounded-full xl:flex', stat.bg)}><stat.icon className={cn('size-4', stat.tone)} /></div>
@@ -156,10 +165,12 @@ function SpeakingStats({ rows, trend }: { rows: SpeakingFeedback[]; trend: numbe
 
 function AttemptResultCard({ attempt }: { attempt: SpeakingAttempt }) {
   const content = parseSpeakingContentScores(attempt.feedback.contentScores)
+  const estimate = parseSpeakingIeltsEstimate(attempt.feedback.ieltsEstimate)
   const errors = parseWritingErrors(attempt.feedback.topErrors)
   return (
     <section className="flex flex-col gap-4 rounded-lg border bg-card p-4">
-      <div><h2 className="text-sm font-semibold">Latest result</h2><p className="text-xs text-muted-foreground">No overall score or IELTS band is calculated.</p></div>
+      <div><h2 className="text-sm font-semibold">Latest result</h2><p className="text-xs text-muted-foreground">Practice estimate and provider measurements stay separate.</p></div>
+      {estimate && <IeltsEstimateCard estimate={estimate} version={attempt.feedback.estimateVersion} />}
       <ScoreGroup title={`${attempt.feedback.deliveryProvider} delivery · unofficial`} scores={[
         ['Pronunciation', attempt.delivery.pronunciation], ['Fluency', attempt.delivery.fluency], ['Prosody', attempt.delivery.prosody],
       ]} />
@@ -172,6 +183,54 @@ function AttemptResultCard({ attempt }: { attempt: SpeakingAttempt }) {
         <details className="rounded-lg border p-3"><summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted-foreground">Word delivery</summary><div className="mt-2 flex flex-wrap gap-1.5">{attempt.delivery.words.map((word, index) => <Badge key={`${word.word}-${index}`} variant="outline" className={scoreTone(word.accuracy)}>{word.word} {shownScore(word.accuracy)}</Badge>)}</div></details>
       )}
     </section>
+  )
+}
+
+const CRITERION_LABELS: Record<SpeakingIeltsEstimate['criteria'][number]['key'], string> = {
+  FC: 'Fluency & coherence',
+  LR: 'Lexical resource',
+  GRA: 'Grammar range & accuracy',
+  P: 'Pronunciation',
+}
+
+function IeltsEstimateCard({ estimate, version }: { estimate: SpeakingIeltsEstimate; version: string }) {
+  return (
+    <div className="rounded-lg border border-sky-500/30 bg-sky-500/5 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-sky-700 dark:text-sky-300">{estimate.label}</p>
+            <Badge variant="outline" className="border-sky-500/40 text-sky-700 dark:text-sky-300">{estimate.confidence.toLowerCase()} confidence</Badge>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">One answer only · not an official IELTS result</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground">Overall estimate</p>
+          <p className="text-2xl font-semibold tabular-nums text-sky-700 dark:text-sky-300">{shownBandRange(estimate.overallMin, estimate.overallMax)}</p>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {estimate.criteria.map((criterion) => (
+          <div key={criterion.key} className="rounded-md border bg-background/70 p-3">
+            <p className="text-xs text-muted-foreground">{CRITERION_LABELS[criterion.key]}</p>
+            <p className="text-lg font-semibold tabular-nums">{shownBandRange(criterion.minBand, criterion.maxBand)}</p>
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{criterion.confidence.toLowerCase()} confidence</p>
+          </div>
+        ))}
+      </div>
+      <details className="mt-3 rounded-md border bg-background/50 p-3">
+        <summary className="cursor-pointer text-xs font-semibold">Why these ranges?</summary>
+        <div className="mt-3 space-y-3">
+          {estimate.criteria.map((criterion) => (
+            <div key={criterion.key} className="text-xs leading-relaxed">
+              <p className="font-medium">{CRITERION_LABELS[criterion.key]} · {shownBandRange(criterion.minBand, criterion.maxBand)}</p>
+              <p className="text-muted-foreground">“{criterion.evidenceQuote}” — {criterion.justification}</p>
+            </div>
+          ))}
+          <p className="text-[11px] text-muted-foreground">Scorer {version}</p>
+        </div>
+      </details>
+    </div>
   )
 }
 
@@ -195,17 +254,18 @@ function Transcript({ text, errors }: { text: string; errors: WritingError[] }) 
 }
 
 function SpeakingHistory({ rows, isLoading, onView, onDelete }: { rows: SpeakingFeedback[]; isLoading: boolean; onView: (row: SpeakingFeedback) => void; onDelete: (row: SpeakingFeedback) => void }) {
-  return <div className="overflow-hidden rounded-lg border bg-card"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Question</TableHead><TableHead className="text-right">Pronunciation</TableHead><TableHead className="hidden text-right sm:table-cell">Fluency</TableHead><TableHead /></TableRow></TableHeader><TableBody>
-    {isLoading && Array.from({ length: 3 }, (_, index) => <TableRow key={index}><TableCell><Skeleton className="h-4 w-20" /></TableCell><TableCell><Skeleton className="h-4 w-64" /></TableCell><TableCell><Skeleton className="ml-auto h-4 w-10" /></TableCell><TableCell className="hidden sm:table-cell"><Skeleton className="ml-auto h-4 w-10" /></TableCell><TableCell><Skeleton className="h-8 w-8" /></TableCell></TableRow>)}
+  return <div className="overflow-hidden rounded-lg border bg-card"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Question</TableHead><TableHead className="text-right">Estimate</TableHead><TableHead className="hidden text-right sm:table-cell">Pronunciation</TableHead><TableHead /></TableRow></TableHeader><TableBody>
+    {isLoading && Array.from({ length: 3 }, (_, index) => <TableRow key={index}><TableCell><Skeleton className="h-4 w-20" /></TableCell><TableCell><Skeleton className="h-4 w-64" /></TableCell><TableCell><Skeleton className="ml-auto h-4 w-16" /></TableCell><TableCell className="hidden sm:table-cell"><Skeleton className="ml-auto h-4 w-10" /></TableCell><TableCell><Skeleton className="h-8 w-8" /></TableCell></TableRow>)}
     {!isLoading && rows.length === 0 && <TableRow><TableCell colSpan={5} className="h-36 text-center"><p className="text-sm font-medium">No speaking attempts yet</p><p className="text-xs text-muted-foreground">Generate a question and record a short answer above.</p></TableCell></TableRow>}
-    {!isLoading && rows.map((row) => <TableRow key={row.id}><TableCell className="whitespace-nowrap text-sm text-muted-foreground">{new Date(row.submittedAt).toLocaleDateString()}</TableCell><TableCell><button type="button" onClick={() => onView(row)} className="max-w-xs truncate text-left text-sm font-medium hover:underline sm:max-w-lg">{row.question}</button></TableCell><TableCell className="text-right tabular-nums">{shownScore(row.pronunciation)}</TableCell><TableCell className="hidden text-right tabular-nums sm:table-cell">{shownScore(row.fluency)}</TableCell><TableCell><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8" aria-label="Speaking attempt actions"><Ellipsis className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => onView(row)}><Eye className="size-4" /> View feedback</DropdownMenuItem><DropdownMenuItem variant="destructive" onClick={() => onDelete(row)}><Trash2 className="size-4" /> Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow>)}
+    {!isLoading && rows.map((row) => { const estimate = parseSpeakingIeltsEstimate(row.ieltsEstimate); return <TableRow key={row.id}><TableCell className="whitespace-nowrap text-sm text-muted-foreground">{new Date(row.submittedAt).toLocaleDateString()}</TableCell><TableCell><button type="button" onClick={() => onView(row)} className="max-w-xs truncate text-left text-sm font-medium hover:underline sm:max-w-lg">{row.question}</button></TableCell><TableCell className="text-right font-medium tabular-nums">{shownBandRange(estimate?.overallMin, estimate?.overallMax)}</TableCell><TableCell className="hidden text-right tabular-nums sm:table-cell">{shownScore(row.pronunciation)}</TableCell><TableCell><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="size-8" aria-label="Speaking attempt actions"><Ellipsis className="size-4" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem onClick={() => onView(row)}><Eye className="size-4" /> View feedback</DropdownMenuItem><DropdownMenuItem variant="destructive" onClick={() => onDelete(row)}><Trash2 className="size-4" /> Delete</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell></TableRow> })}
   </TableBody></Table></div>
 }
 
 function SpeakingDetailDialog({ feedback, onClose }: { feedback: SpeakingFeedback | null; onClose: () => void }) {
   const errors = feedback ? parseWritingErrors(feedback.topErrors) : []
   const content = feedback ? parseSpeakingContentScores(feedback.contentScores) : null
-  return <Dialog open={Boolean(feedback)} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">{feedback && <><DialogHeader><DialogTitle className="pr-6">{feedback.question}</DialogTitle></DialogHeader><div className="flex flex-col gap-4"><p className="text-xs text-muted-foreground">Unofficial practice · {feedback.deliveryProvider} {feedback.providerRevision} · content by {feedback.graderModel}</p><ScoreGroup title="Measured delivery · 0–100" scores={[["Pronunciation", feedback.pronunciation], ["Fluency", feedback.fluency], ["Prosody", feedback.prosody]]} /><ScoreGroup title="AI content · 0–100 · unofficial" scores={[["Vocabulary", content?.vocabulary], ["Grammar", content?.grammar], ["Topic", content?.topic]]} /><p className="text-sm leading-relaxed">{feedback.summary}</p><Transcript text={feedback.transcript} errors={errors} />{errors.length > 0 && <div className="space-y-2">{errors.map((error, index) => <div key={index} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs"><p className="font-medium">{error.label}</p><p className="text-muted-foreground"><span className="line-through">{error.quote}</span> {' → '} <span className="text-foreground">{error.fix}</span></p></div>)}</div>}</div></>}</DialogContent></Dialog>
+  const estimate = feedback ? parseSpeakingIeltsEstimate(feedback.ieltsEstimate) : null
+  return <Dialog open={Boolean(feedback)} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">{feedback && <><DialogHeader><DialogTitle className="pr-6">{feedback.question}</DialogTitle></DialogHeader><div className="flex flex-col gap-4"><p className="text-xs text-muted-foreground">Unofficial practice · {feedback.deliveryProvider} {feedback.providerRevision} · content by {feedback.graderModel}</p>{estimate && <IeltsEstimateCard estimate={estimate} version={feedback.estimateVersion} />}<ScoreGroup title="Measured delivery · 0–100" scores={[["Pronunciation", feedback.pronunciation], ["Fluency", feedback.fluency], ["Prosody", feedback.prosody]]} /><ScoreGroup title="AI content · 0–100 · unofficial" scores={[["Vocabulary", content?.vocabulary], ["Grammar", content?.grammar], ["Topic", content?.topic]]} /><p className="text-sm leading-relaxed">{feedback.summary}</p><Transcript text={feedback.transcript} errors={errors} />{errors.length > 0 && <div className="space-y-2">{errors.map((error, index) => <div key={index} className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs"><p className="font-medium">{error.label}</p><p className="text-muted-foreground"><span className="line-through">{error.quote}</span> {' → '} <span className="text-foreground">{error.fix}</span></p></div>)}</div>}</div></>}</DialogContent></Dialog>
 }
 
 function DeleteSpeakingDialog({ feedback, onClose }: { feedback: SpeakingFeedback | null; onClose: () => void }) {
