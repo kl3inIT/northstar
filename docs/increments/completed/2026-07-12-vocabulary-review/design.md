@@ -123,4 +123,3 @@ Unknown keys are preserved and clients ignore fields they do not understand.
    a rating advances the queue, and default reading/part-of-speech render.
 7. Consolidate study spec/test matrix, this decision, roadmap, completed
    increment location, and Northstar App Behavior.
-

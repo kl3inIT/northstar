@@ -42,4 +42,3 @@ memory behavior stays stable. The API gains thin review and coaching endpoints.
 AI cost is visible and controllable because loading, revealing, and rating a
 card never trigger enrichment. Future FSRS adoption remains a separate
 decision rather than an accidental UI side effect.
-

@@ -2,8 +2,8 @@
 
 ## Current Behavior
 
-Study combines a capture-first practice log, a vocabulary memory reviewed
-through chat, an LLM writing tutor, and measured speech practice with one
+Study combines a capture-first practice log, a focused vocabulary memory,
+an LLM writing tutor, and measured speech practice with one
 shared grammar-error history. There is no due-date queue, streak system,
 lesson content, or conversational voice agent: entries arrive through
 Capture/chat or the focused speech workflows, and `/study` answers "how much,
@@ -42,15 +42,25 @@ via predicted recall, so missed days never build a backlog. New cards start
 balanced (α=β=2) at a one-day half-life; ~10 new cards a day is guidance in
 the tool description, not a hard wall.
 
-- `front` is the word, `back` the meaning. Language specifics (tone-marked
-  pinyin/IPA reading, an AI-generated example sentence with translation)
-  travel in a `metadata` JSON string — never as columns.
+- `front` is the word and `back` its meaning. Tone-marked pinyin/IPA
+  `reading` and `partOfSpeech` are the base language fields. They travel in a
+  `metadata` JSON string — never as columns — and remain empty when the model
+  is unsure. Existing cards without either field remain valid.
+- Examples, collocations, synonyms, antonyms, easily-confused-word contrast,
+  and mnemonics are optional enrichment. Creating, loading, or revealing a
+  card never generates them. The learner selects fields and explicitly asks
+  for a validated preview, then applies or discards it; unknown metadata keys
+  and existing user-authored values are preserved.
 - Re-capturing an existing front (accent- and case-insensitive) returns the
   existing card instead of duplicating it.
-- Reviews happen in chat: the assistant quizzes at-risk cards one at a time
-  (never revealing the back first), grades free-text answers by meaning
-  equivalence, and records each review. Ratings map to Ebisu success values:
-  AGAIN=0, HARD=0.6, GOOD=0.9, EASY=1.0 (binary update at ≥0.5).
+- Focused reviews happen on the Vocabulary page; chat may still conduct a
+  quiz. A browser-owned 10/20/30-card snapshot takes the lowest-recall active
+  cards and never reveals the back first. Optional free-text answer checking
+  returns `CORRECT`, `CLOSE`, or `MISSED` with a short explanation but does
+  not select a rating or update memory. Only the learner's subsequent
+  Again/Hard/Good/Easy action records a `MANUAL` review. Ratings map to Ebisu
+  success values: AGAIN=0, HARD=0.6, GOOD=0.9, EASY=1.0 (binary update at
+  ≥0.5).
 - Every review appends to an immutable log carrying rating, elapsed hours,
   and the model triple before/after — enough for a future FSRS-style
   optimizer to retrain from history.
@@ -152,8 +162,8 @@ skipped, never fatal.
 
 - Capture classifies `STUDY` (practice already done — multi-item, echo-back,
   undo, same contract as expenses) and `VOCAB` (words to memorize; the model
-  enriches with reading and an example sentence only when confident). An
-  intention to study later stays a task.
+  supplies reading and part of speech when known, but generates no optional
+  enrichment). An intention to study later stays a task.
 - Assistant and MCP tools: `log_study_sessions`, `find_study_sessions`,
   `update_study_session`, `delete_study_session`, `study_summary`,
   `list_mock_results`, `save_vocab_cards`, `find_vocab_cards`, `quiz_vocab`,
@@ -172,19 +182,26 @@ skipped, never fatal.
   (score percentage per mock, one line per skill, hidden until two scored
   mocks exist), skill/kind filters, sessions table with edit/delete.
   Vocabulary: tracked/at-risk/new-this-week stats, search across word,
-  meaning, and reading, table sorted most-at-risk first with suspended cards
-  last, pause/resume/edit/delete plus live pronunciation assessment. Writing: essays graded, latest estimate,
+  meaning, reading, and part of speech; the table is sorted most-at-risk first
+  with suspended cards last. It provides pause/resume/edit/delete, live
+  pronunciation assessment, and a keyboard-first weak-card reviewer. The
+  reviewer supports typed or dictated answers, explicit semantic checking,
+  Space to reveal, 1-4 to rate, R to listen, Escape to exit, a completion
+  tally, and an opt-in enrichment Sheet with preview/apply/discard. Writing:
+  essays graded, latest estimate,
   trend vs previous essay, recurring-error strip, feedback table with a
   detail dialog (per-criterion justifications, quote-to-fix errors, the
   essay) and delete. Speaking: attempt count and recent delivery trend,
   question generation, 60-second recorder, separately-labelled delivery,
   content, and unofficial IELTS-style ranges, grounded expandable evidence,
   highlighted transcript errors, history detail, and delete.
-- Vocab reviews and writing grading remain in chat; speech assessment runs on
-  the focused page because chat has no audio attachment/output workflow.
+- Vocab review and speech assessment have focused page workflows; chat remains
+  an optional entry path for vocab quizzes. Writing grading remains in chat.
 - REST surface: `/api/study/sessions` (GET/POST/PUT/DELETE), `/summary`,
   `/mocks`, `/skills`, `/vocab` (GET/POST/PUT/DELETE),
-  `/vocab/{id}/pronunciation`, `/writing` (GET/DELETE), and `/speaking`
+  `/vocab/review`, `/vocab/{id}/reviews`, `/vocab/{id}/answer-check`,
+  `/vocab/{id}/enrichment`, `/vocab/{id}/pronunciation`, `/writing`
+  (GET/DELETE), and `/speaking`
   history plus `/speaking/question` and `/speaking/attempts`. Week boundaries
   respect the `X-Timezone` header.
 

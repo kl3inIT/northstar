@@ -41,4 +41,3 @@
 - Update the Study spec, test matrix, roadmap, and Northstar App Behavior.
 - Move this increment to `completed/`.
 - Commit: `docs(study): consolidate vocabulary review workflow`.
-
