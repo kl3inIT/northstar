@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { BookOpenCheck, ChevronDown, Ellipsis, Flame, Mic, Pencil, PauseCircle, PlayCircle, Search, Sparkles, Trash2 } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import { VocabularyReviewer } from './vocabulary-reviewer'
+import { cardMatchesDeck, deckQuery } from './vocabulary-review-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -14,8 +15,10 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import {
   parseVocabMetadata,
@@ -25,6 +28,7 @@ import {
   useUpdateVocabCard,
   useVocabCards,
   type VocabCard,
+  type VocabLanguage,
   type PronunciationAssessment,
 } from '@/lib/study-api'
 import { useWavRecorder } from '@/lib/use-wav-recorder'
@@ -39,7 +43,9 @@ function recallTone(probability: number): string {
 }
 
 export function VocabularyPanel() {
-  const cardsQuery = useVocabCards()
+  const [language, setLanguage] = useState<VocabLanguage>('ENGLISH')
+  const [deck, setDeck] = useState('ALL')
+  const cardsQuery = useVocabCards(language)
   const cards = cardsQuery.data ?? EMPTY_CARDS
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<VocabCard | null>(null)
@@ -48,30 +54,36 @@ export function VocabularyPanel() {
   const [reviewLimit, setReviewLimit] = useState<number | null>(null)
   const update = useUpdateVocabCard()
 
-  const active = useMemo(() => cards.filter((c) => !c.suspended), [cards])
+  const deckOptions = useMemo(() => [
+    'General',
+    ...[...new Set(cards.map((card) => card.deck).filter((value): value is string => Boolean(value)))]
+      .sort((a, b) => a.localeCompare(b)),
+  ], [cards])
+  const scopedCards = useMemo(() => cards.filter((card) => cardMatchesDeck(card.deck, deck)), [cards, deck])
+  const active = useMemo(() => scopedCards.filter((c) => !c.suspended), [scopedCards])
   const atRiskCount = useMemo(
     () => active.filter((c) => c.recallProbability < 0.7).length,
     [active],
   )
   const newThisWeek = useMemo(() => {
     const cutoff = Date.now() - WEEK_MS
-    return cards.filter((c) => new Date(c.createdAt).getTime() >= cutoff).length
-  }, [cards])
+    return scopedCards.filter((c) => new Date(c.createdAt).getTime() >= cutoff).length
+  }, [scopedCards])
 
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
     const filtered = query
-      ? cards.filter((c) =>
+      ? scopedCards.filter((c) =>
           c.front.toLocaleLowerCase().includes(query)
           || c.back.toLocaleLowerCase().includes(query)
           || (parseVocabMetadata(c.metadata).reading ?? '').toLocaleLowerCase().includes(query))
-      : cards
+      : scopedCards
     // At-risk first, suspended last — the table doubles as the priority list.
     return [...filtered].sort((a, b) => {
       if (a.suspended !== b.suspended) return a.suspended ? 1 : -1
       return a.recallProbability - b.recallProbability
     })
-  }, [cards, search])
+  }, [scopedCards, search])
 
   function toggleSuspended(card: VocabCard) {
     update.mutate(
@@ -80,6 +92,8 @@ export function VocabularyPanel() {
         front: card.front,
         back: card.back,
         metadata: card.metadata ?? undefined,
+        language: card.language,
+        deck: card.deck,
         disciplineId: card.disciplineId ?? undefined,
         suspended: !card.suspended,
       },
@@ -93,7 +107,8 @@ export function VocabularyPanel() {
   if (reviewLimit !== null) {
     return (
       <>
-        <VocabularyReviewer limit={reviewLimit} onExit={() => setReviewLimit(null)}
+        <VocabularyReviewer limit={reviewLimit} language={language}
+          deck={deckQuery(deck)} onExit={() => setReviewLimit(null)}
           onEdit={setEditing} onPronounce={setPronouncing} />
         <EditCardDialog key={editing?.id ?? 'none'} card={editing} onClose={() => setEditing(null)} />
         <PronunciationDialog key={pronouncing?.id ?? 'no-pronunciation'} card={pronouncing} onClose={() => setPronouncing(null)} />
@@ -103,6 +118,28 @@ export function VocabularyPanel() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={language} onValueChange={(value) => {
+          setLanguage(value as VocabLanguage)
+          setDeck('ALL')
+          setSearch('')
+        }}>
+          <TabsList>
+            <TabsTrigger value="ENGLISH">English</TabsTrigger>
+            <TabsTrigger value="CHINESE">Chinese</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="vocab-deck" className="text-xs text-muted-foreground">Review deck</Label>
+          <Select value={deck} onValueChange={setDeck}>
+            <SelectTrigger id="vocab-deck" className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All decks</SelectItem>
+              {deckOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
       <VocabStats tracked={active.length} atRisk={atRiskCount} newThisWeek={newThisWeek} />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -112,13 +149,13 @@ export function VocabularyPanel() {
             aria-label="Search vocabulary"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search word, meaning, IPA, or pinyin"
+            placeholder={`Search ${language === 'ENGLISH' ? 'English' : 'Chinese'} · ${deck === 'ALL' ? 'all decks' : deck}`}
             className="pl-8"
           />
         </div>
         <div className="flex shrink-0 items-center">
           <Button className="rounded-r-none" disabled={active.length === 0} onClick={() => setReviewLimit(20)}>
-            <PlayCircle /> Review {Math.min(20, active.length)} weak cards
+            <PlayCircle /> Review {language === 'ENGLISH' ? 'English' : 'Chinese'} · {deck === 'ALL' ? 'All decks' : deck}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -236,6 +273,7 @@ function CardsTable({ rows, isLoading, onEdit, onDelete, onPronounce, onToggleSu
                   <div className="min-w-28">
                     <p className="text-sm font-medium">{card.front}</p>
                     {(meta.reading || meta.partOfSpeech) && <p className="text-xs text-muted-foreground">{[meta.reading, meta.partOfSpeech].filter(Boolean).join(' · ')}</p>}
+                    <Badge variant="outline" className="mt-1 h-5 rounded px-1.5 text-[10px] font-normal">{card.deck ?? 'General'}</Badge>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -304,6 +342,8 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
   const [reading, setReading] = useState(meta.reading ?? '')
   const [partOfSpeech, setPartOfSpeech] = useState(meta.partOfSpeech ?? '')
   const [example, setExample] = useState(meta.example ?? '')
+  const [language, setLanguage] = useState<VocabLanguage>(card.language)
+  const [deck, setDeck] = useState(card.deck ?? '')
   const update = useUpdateVocabCard()
 
   function save() {
@@ -317,6 +357,8 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
         front: front.trim(),
         back: back.trim(),
         metadata: mergeVocabMetadata(card.metadata, { reading, partOfSpeech, example }),
+        language,
+        deck: deck.trim() || undefined,
         disciplineId: card.disciplineId ?? undefined,
         suspended: card.suspended,
       },
@@ -331,6 +373,19 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
     <>
       <DialogHeader><DialogTitle>Edit vocab card</DialogTitle></DialogHeader>
       <div className="grid gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1.5">
+            <Label htmlFor="card-language">Language</Label>
+            <Select value={language} onValueChange={(value) => setLanguage(value as VocabLanguage)}>
+              <SelectTrigger id="card-language" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="ENGLISH">English</SelectItem><SelectItem value="CHINESE">Chinese</SelectItem></SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="card-deck">Deck</Label>
+            <Input id="card-deck" placeholder="General" value={deck} onChange={(event) => setDeck(event.target.value)} />
+          </div>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
             <Label htmlFor="card-front">Word</Label>

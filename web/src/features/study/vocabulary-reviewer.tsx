@@ -40,6 +40,7 @@ import {
   useVocabReviewCards,
   type VocabCard,
   type VocabEnrichmentField,
+  type VocabLanguage,
   type VocabRating,
 } from '@/lib/study-api'
 import { cn } from '@/lib/utils'
@@ -70,16 +71,20 @@ const ENRICHMENT_OPTIONS: Array<{ field: VocabEnrichmentField; label: string; de
 
 export function VocabularyReviewer({
   limit,
+  language,
+  deck,
   onExit,
   onEdit,
   onPronounce,
 }: {
   limit: number
+  language: VocabLanguage
+  deck?: string
   onExit: () => void
   onEdit: (card: VocabCard) => void
   onPronounce: (card: VocabCard) => void
 }) {
-  const queueQuery = useVocabReviewCards(limit, true)
+  const queueQuery = useVocabReviewCards(limit, language, deck, true)
   const review = useRecordVocabReview()
   const checkAnswer = useCheckVocabAnswer()
   const [cards, setCards] = useState<VocabCard[] | null>(null)
@@ -198,7 +203,7 @@ export function VocabularyReviewer({
         <Button variant="ghost" size="sm" onClick={onExit}><X /> Exit</Button>
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-            <span>Review session</span><span className="tabular-nums">{index + 1} / {cards.length}</span>
+            <span>{language === 'ENGLISH' ? 'English' : 'Chinese'} · {deck ?? 'All decks'}</span><span className="tabular-nums">{index + 1} / {cards.length}</span>
           </div>
           <div role="progressbar" aria-valuemin={0} aria-valuemax={cards.length} aria-valuenow={index}
             className="h-1.5 overflow-hidden rounded-full bg-muted">
@@ -380,6 +385,7 @@ function EnrichmentSheet({ open, onOpenChange, card, onApplied }: {
     if (!preview.data) return
     update.mutate({ id: card.id, front: card.front, back: card.back,
       metadata: preview.data.metadata, disciplineId: card.disciplineId ?? undefined,
+      language: card.language, deck: card.deck,
       suspended: card.suspended }, {
       onSuccess: (updated) => { onApplied(updated); toast.success('Enrichment applied'); close() },
       onError: (error) => toast.error(error.message),

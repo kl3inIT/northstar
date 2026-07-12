@@ -168,6 +168,8 @@ async function saveVocab(items: VocabItem[]): Promise<CaptureResult> {
           front: i.front || '(word)',
           back: i.back || '(meaning)',
           metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+          language: i.language ?? (/\p{Script=Han}/u.test(i.front ?? '') ? 'CHINESE' : 'ENGLISH'),
+          deck: i.deck?.trim() || undefined,
           disciplineId: disciplineIds[index],
         }
       }),

@@ -35,6 +35,16 @@ export function reviewIsComplete(index: number, cardCount: number): boolean {
   return index >= cardCount
 }
 
+export function cardMatchesDeck(storedDeck: string | undefined, scope: string): boolean {
+  if (scope === 'ALL') return true
+  if (scope === 'General') return !storedDeck
+  return storedDeck?.toLocaleLowerCase() === scope.toLocaleLowerCase()
+}
+
+export function deckQuery(scope: string): string | undefined {
+  return scope === 'ALL' ? undefined : scope
+}
+
 /** Selection alone is inert; only an explicit Generate action returns request fields. */
 export function enrichmentFieldsForRequest(
   selected: ReadonlySet<VocabEnrichmentField>,

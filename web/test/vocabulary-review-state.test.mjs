@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
   EMPTY_TALLY,
+  cardMatchesDeck,
+  deckQuery,
   enrichmentFieldsForRequest,
   incrementRating,
   reviewIsComplete,
@@ -29,4 +31,14 @@ test('selecting enrichment is inert until Generate is explicit', () => {
   assert.equal(enrichmentFieldsForRequest(selected, false), null)
   assert.deepEqual(enrichmentFieldsForRequest(selected, true), ['EXAMPLE', 'COLLOCATIONS'])
   assert.equal(enrichmentFieldsForRequest(new Set(), true), null)
+})
+
+test('deck scopes never leak cards and All decks omits the deck query', () => {
+  assert.equal(cardMatchesDeck('IELTS', 'IELTS'), true)
+  assert.equal(cardMatchesDeck('Daily', 'IELTS'), false)
+  assert.equal(cardMatchesDeck(undefined, 'General'), true)
+  assert.equal(cardMatchesDeck('IELTS', 'General'), false)
+  assert.equal(cardMatchesDeck('HSK4', 'ALL'), true)
+  assert.equal(deckQuery('ALL'), undefined)
+  assert.equal(deckQuery('HSK4'), 'HSK4')
 })

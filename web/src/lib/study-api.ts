@@ -43,6 +43,7 @@ export type StudySession = StudySessionSummary
 export type StudyKind = StudySessionSummary['kind']
 export type StudySessionInput = StudyItemRequest
 export type VocabCard = VocabCardSummary
+export type VocabLanguage = VocabCardSummary['language']
 export type WritingFeedback = WritingFeedbackSummary
 export type SpeakingFeedback = SpeakingFeedbackSummary
 export type SpeakingAttempt = SpeakingAttemptResult
@@ -274,18 +275,23 @@ export function useStudySkills() {
 }
 
 /** Every card, newest first, with recall probability computed server-side for now. */
-export function useVocabCards() {
+export function useVocabCards(language?: VocabLanguage) {
   return useQuery({
-    queryKey: ['study-vocab'],
-    queryFn: async () => dataOrThrow(await listVocabCards()),
+    queryKey: ['study-vocab', language ?? 'ALL'],
+    queryFn: async () => dataOrThrow(await listVocabCards({ query: { language } })),
   })
 }
 
-export function useVocabReviewCards(limit: number, enabled: boolean) {
+export function useVocabReviewCards(
+  limit: number,
+  language: VocabLanguage,
+  deck: string | undefined,
+  enabled: boolean,
+) {
   return useQuery({
-    queryKey: ['study-vocab-review', limit],
+    queryKey: ['study-vocab-review', language, deck ?? 'ALL', limit],
     enabled,
-    queryFn: async () => dataOrThrow(await listVocabReviewCards({ query: { limit } })),
+    queryFn: async () => dataOrThrow(await listVocabReviewCards({ query: { language, deck, limit } })),
   })
 }
 
