@@ -1,0 +1,26 @@
+spring:
+  datasource:
+    hikari:
+      pool-name: northstar-worker
+      maximum-pool-size: ${NORTHSTAR_WORKER_DB_POOL_MAX:6}
+      minimum-idle: ${NORTHSTAR_WORKER_DB_POOL_MIN:2}
+      connection-timeout: ${NORTHSTAR_WORKER_DB_CONNECTION_TIMEOUT_MS:5000}
+      validation-timeout: ${NORTHSTAR_WORKER_DB_VALIDATION_TIMEOUT_MS:3000}
+  lifecycle:
+    # db-scheduler may wait up to two minutes for an in-flight automation.
+    timeout-per-shutdown-phase: 130s
+
+logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        environment: production
+    json:
+      stacktrace:
+        max-length: 32768
+        max-throwable-depth: 64
+  level:
+    root: INFO
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: 'OFF'

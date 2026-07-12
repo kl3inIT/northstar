@@ -1,0 +1,38 @@
+spring:
+  datasource:
+    hikari:
+      pool-name: northstar-mcp
+      maximum-pool-size: ${NORTHSTAR_MCP_DB_POOL_MAX:4}
+      minimum-idle: ${NORTHSTAR_MCP_DB_POOL_MIN:1}
+      connection-timeout: ${NORTHSTAR_MCP_DB_CONNECTION_TIMEOUT_MS:5000}
+      validation-timeout: ${NORTHSTAR_MCP_DB_VALIDATION_TIMEOUT_MS:3000}
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  # Behind NPM: resolve the real client IP from trusted private-range proxies
+  # so the per-IP MCP rate limiter cannot be bypassed with a forged header.
+  forward-headers-strategy: native
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  structured:
+    format:
+      console: ecs
+    ecs:
+      service:
+        environment: production
+    json:
+      stacktrace:
+        max-length: 32768
+        max-throwable-depth: 64
+  level:
+    root: INFO

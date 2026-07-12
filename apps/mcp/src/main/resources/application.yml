@@ -12,9 +12,6 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
-  # The api owns migrations; mcp only reads the already-migrated schema.
-  flyway:
-    enabled: false
   ai:
     mcp:
       server:
@@ -36,12 +33,6 @@ spring:
 
 server:
   port: ${NORTHSTAR_MCP_PORT:8081}
-  # Behind NPM: let Tomcat's RemoteIpValve resolve the real client IP from the
-  # proxy's forwarded headers (it trusts only private-range proxies — the NPM
-  # container — and ignores a client-supplied X-Forwarded-For), so getRemoteAddr()
-  # is the true client and the per-IP rate limit can't be spoofed. To lock it
-  # down further, pin server.tomcat.remoteip.internal-proxies to the NPM subnet.
-  forward-headers-strategy: native
 
 # Abuse guard for the PUBLIC, no-auth MCP endpoint (/mcp). Two-layer request-rate
 # limit (global + per client IP, IP taken from X-Forwarded-For behind NPM) plus a

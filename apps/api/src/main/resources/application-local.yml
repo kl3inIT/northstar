@@ -1,0 +1,28 @@
+spring:
+  config:
+    # Repo-root .env is a local convenience only. Both paths support Gradle
+    # bootRun from apps/api and IDE runs from the repository root.
+    import: optional:file:.env[.properties],optional:file:../../.env[.properties]
+  jpa:
+    properties:
+      hibernate.format_sql: true
+
+northstar:
+  auth:
+    enabled: ${NORTHSTAR_AUTH_ENABLED:false}
+
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,modulith
+
+logging:
+  level:
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: DEBUG

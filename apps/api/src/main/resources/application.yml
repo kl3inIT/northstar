@@ -1,11 +1,6 @@
 spring:
   application:
     name: northstar-api
-  config:
-    # Load repo-root .env (gitignored) as properties so OPENAI_API_KEY resolves
-    # without a shell env var. Both paths because the working dir differs between
-    # `./gradlew :apps:api:bootRun` (apps/api) and IDE run configs (repo root).
-    import: optional:file:.env[.properties],optional:file:../../.env[.properties]
   threads:
     virtual:
       # Java 25 virtual threads for request handling — blocking LLM/DB calls park
@@ -19,21 +14,13 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
-    properties:
-      hibernate.format_sql: true
   flyway:
     enabled: true
     # Migrations ship on the classpath from :core (core/src/main/resources/db/migration).
     locations: classpath:db/migration
-    # The shared zeromail-postgres is an EXTERNAL container — compose cannot
-    # depends_on it, so after a VPS reboot the api may start before the DB
-    # accepts connections. Retry the first connection (≈150s) instead of
-    # failing fast and crash-looping the site into 502s until the race is won.
-    connect-retries: 30
-    connect-retries-interval: 5s
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: ${OPENAI_API_KEY:}
       # Interactive calls (capture, alignment, transcribe) run on the request
       # thread — bound the wait and retry transient failures instead of hanging.
       timeout: 60s
@@ -42,13 +29,12 @@ spring:
       # No temperature: gpt-5.5 is a reasoning model and rejects any value but 1.
       chat:
         model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
-      # Embedding config KEPT the `.options` nesting (unlike chat above — verified
-      # in OpenAiEmbeddingProperties). 3-large shortened to 1536 dims (Matryoshka):
+      # Spring AI 2.0 binds embedding model options directly below `embedding`.
+      # 3-large is shortened to 1536 dimensions (Matryoshka):
       # best multilingual quality (Vietnamese notes) at a pgvector-indexable width.
       embedding:
-        options:
-          model: text-embedding-3-large
-          dimensions: 1536
+        model: text-embedding-3-large
+        dimensions: 1536
     vectorstore:
       pgvector:
         # Flyway owns the schema (V14) — HNSW + cosine are the defaults.
@@ -181,16 +167,17 @@ server:
       cookie:
         http-only: true
         same-site: lax
-        secure: ${NORTHSTAR_COOKIE_SECURE:false}
+        # Fail-safe default. The local profile disables Secure for local HTTP.
+        secure: ${NORTHSTAR_COOKIE_SECURE:true}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,modulith
+        include: health
 
 logging:
   level:
-    # Full LLM request/response bodies from the SimpleLoggerAdvisor in AiConfig.
-    # DEBUG in dev; drop to INFO to silence.
-    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: DEBUG
+    # Prompt and response bodies can contain private user data. Only the local
+    # profile opts into this logger.
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: 'OFF'

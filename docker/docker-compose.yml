@@ -26,6 +26,7 @@ services:
     restart: unless-stopped
     env_file: ../.env
     environment:
+      SPRING_PROFILES_ACTIVE: prod
       # The app resolves the user's "today"/"this week" from the JVM's system
       # zone (ToolSupport.zone(), the assistant's date injection, reviews). This
       # is a single-user OS, so pin that zone to the user's — otherwise a UTC
@@ -33,11 +34,12 @@ services:
       TZ: ${TZ:-Asia/Ho_Chi_Minh}
       NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
       NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
-      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     mem_limit: 1200m
     mem_reservation: 800m
     # Keep Java out of swap; host swap stays a system-level safety net only.
     memswap_limit: 1200m
+    stop_grace_period: 40s
     networks:
       - northstar-proxy
       - northstar-internal
@@ -84,12 +86,14 @@ services:
     restart: unless-stopped
     env_file: ../.env
     environment:
+      SPRING_PROFILES_ACTIVE: prod
       TZ: ${TZ:-Asia/Ho_Chi_Minh}
       NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
       NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
-      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     mem_limit: 768m
     memswap_limit: 768m
+    stop_grace_period: 40s
     networks:
       - northstar-proxy
       - northstar-internal
@@ -113,13 +117,16 @@ services:
     restart: unless-stopped
     env_file: ../.env
     environment:
+      SPRING_PROFILES_ACTIVE: prod
       TZ: ${TZ:-Asia/Ho_Chi_Minh}
       NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
       NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
-      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     mem_limit: 512m
     mem_reservation: 256m
     memswap_limit: 512m
+    # db-scheduler may drain an in-flight job for up to two minutes.
+    stop_grace_period: 140s
     networks:
       - northstar-internal
     healthcheck:

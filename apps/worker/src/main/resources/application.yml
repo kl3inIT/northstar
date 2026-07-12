@@ -1,10 +1,6 @@
 spring:
   application:
     name: northstar-worker
-  config:
-    # Optional local .env (gitignored) so OPENAI_API_KEY resolves for a local
-    # bootRun; in the container it arrives as an env var (compose env_file).
-    import: optional:file:.env[.properties],optional:file:../../.env[.properties]
   main:
     # No web server; run as a background process.
     web-application-type: none
@@ -26,23 +22,20 @@ spring:
     hibernate:
       ddl-auto: validate
     open-in-view: false
-  flyway:
-    enabled: false
   ai:
     # The worker is the indexer: it embeds notes/files and captions images. Same
     # OpenAI + pgvector config as the api (which keeps its own copy only to embed
     # search QUERIES), so both write/read vectors of identical shape.
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: ${OPENAI_API_KEY:}
       timeout: 60s
       max-retries: 2
       chat:
         # Vision captions for image attachments (reasoning model, no temperature).
         model: ${NORTHSTAR_CAPTURE_MODEL:gpt-5.5}
       embedding:
-        options:
-          model: text-embedding-3-large
-          dimensions: 1536
+        model: text-embedding-3-large
+        dimensions: 1536
     vectorstore:
       pgvector:
         # Flyway (api, V14) owns the schema — never initialize it here.
@@ -120,3 +113,7 @@ northstar:
       search-context-size: medium
       connect-timeout: 5s
       request-timeout: 60s
+
+logging:
+  level:
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: 'OFF'
