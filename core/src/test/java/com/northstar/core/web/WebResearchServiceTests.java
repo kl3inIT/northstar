@@ -67,7 +67,8 @@ class WebResearchServiceTests {
     }
 
     private static WebResearchDefaults defaults(boolean fallback, List<String> fallbackOrder) {
-        return new WebResearchDefaults(true, "first", "direct", fallback, fallbackOrder, List.of(),
+        return new WebResearchDefaults(true, "first", WebProviderRoute.none(), "direct",
+                WebProviderRoute.none(), fallback, fallbackOrder, List.of(),
                 Duration.ofMinutes(5), 20);
     }
 

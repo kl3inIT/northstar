@@ -71,16 +71,16 @@ public class SpringAiClientRouter implements AiClientRouter {
     }
 
     private void validateGateway(String gatewayId) {
-        gateways.require(gatewayId);
+        gateways.definition(gatewayId);
     }
 
     private ChatModel createModel(String gatewayId) {
-        AiGatewayDefinition gateway = gateways.require(gatewayId);
+        AiGatewayDefinition gateway = gateways.definition(gatewayId);
         String defaultModel = gateway.models().isEmpty()
                 ? properties.routes().assistant()
                 : gateway.models().getFirst();
         return switch (gateway.type()) {
-            case OPENAI_COMPATIBLE -> OpenAiChatModel.builder()
+            case OPENAI, NINE_ROUTER, OPENAI_CHAT_COMPATIBLE -> OpenAiChatModel.builder()
                     .options(OpenAiChatOptions.builder()
                             .baseUrl(gateway.baseUrl())
                             .apiKey(gateway.apiKey())

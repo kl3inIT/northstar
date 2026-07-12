@@ -92,7 +92,7 @@ northstar:
     active-gateway: ${NORTHSTAR_AI_GATEWAY:openai}
     gateways:
       openai:
-        type: OPENAI_COMPATIBLE
+        type: OPENAI
         display-name: OpenAI
         base-url: https://api.openai.com/v1
         api-key: ${OPENAI_API_KEY:}
@@ -146,6 +146,8 @@ northstar:
   web:
     enabled: ${NORTHSTAR_WEB_ENABLED:true}
     default-search-provider: ${NORTHSTAR_WEB_SEARCH_PROVIDER:openai}
+    default-search-gateway: ${NORTHSTAR_WEB_SEARCH_GATEWAY:openai}
+    default-search-target: ${NORTHSTAR_WEB_SEARCH_TARGET:gpt-5.5}
     default-page-reader: ${NORTHSTAR_WEB_PAGE_READER:direct}
     fallback-enabled: false
     search-fallback-order: []

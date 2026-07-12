@@ -21,6 +21,9 @@ public class AiGatewaySetting {
     @Column(name = "display_name", nullable = false, length = 100)
     private String displayName;
 
+    @Column(nullable = false, length = 40)
+    private String type;
+
     @Column(name = "base_url", nullable = false, length = 500)
     private String baseUrl;
 
@@ -49,16 +52,17 @@ public class AiGatewaySetting {
     protected AiGatewaySetting() {
     }
 
-    public AiGatewaySetting(String id, String displayName, String baseUrl,
+    public AiGatewaySetting(String id, String displayName, AiGatewayType type, String baseUrl,
             byte[] apiKeyCiphertext, String models, boolean discoverModels,
             int timeoutSeconds) {
         this.id = id;
-        apply(displayName, baseUrl, apiKeyCiphertext, models, discoverModels, timeoutSeconds);
+        apply(displayName, type, baseUrl, apiKeyCiphertext, models, discoverModels, timeoutSeconds);
     }
 
-    public void apply(String displayName, String baseUrl, byte[] apiKeyCiphertext,
+    public void apply(String displayName, AiGatewayType type, String baseUrl, byte[] apiKeyCiphertext,
             String models, boolean discoverModels, int timeoutSeconds) {
         this.displayName = displayName;
+        this.type = type.name();
         this.baseUrl = baseUrl;
         this.apiKeyCiphertext = Arrays.copyOf(apiKeyCiphertext, apiKeyCiphertext.length);
         this.models = models;
@@ -80,6 +84,7 @@ public class AiGatewaySetting {
 
     public String id() { return id; }
     public String displayName() { return displayName; }
+    public AiGatewayType type() { return AiGatewayType.valueOf(type); }
     public String baseUrl() { return baseUrl; }
     public byte[] apiKeyCiphertext() { return Arrays.copyOf(apiKeyCiphertext, apiKeyCiphertext.length); }
     public String models() { return models; }

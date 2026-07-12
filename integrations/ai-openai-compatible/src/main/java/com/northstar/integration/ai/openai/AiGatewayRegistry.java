@@ -2,6 +2,9 @@ package com.northstar.integration.ai.openai;
 
 import com.northstar.core.ai.AiGatewaySetting;
 import com.northstar.core.ai.AiGatewaySettingRepository;
+import com.northstar.core.ai.AiGatewayConnection;
+import com.northstar.core.ai.AiGatewayConnectionResolver;
+import com.northstar.core.ai.AiGatewayType;
 import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -13,7 +16,7 @@ import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
 
 @Component
-class AiGatewayRegistry {
+class AiGatewayRegistry implements AiGatewayConnectionResolver {
 
     private static final Pattern ID_PATTERN = Pattern.compile("[a-z0-9][a-z0-9-]{1,63}");
     private static final int MAX_MODELS = 200;
@@ -29,7 +32,7 @@ class AiGatewayRegistry {
         this.cipher = cipher;
     }
 
-    AiGatewayDefinition require(String gatewayId) {
+    AiGatewayDefinition definition(String gatewayId) {
         AiProperties.Gateway deployment = properties.gateways().get(gatewayId);
         if (deployment != null) {
             AiGatewayDefinition definition = deployment(gatewayId, deployment);
@@ -41,6 +44,13 @@ class AiGatewayRegistry {
         return settings.findById(gatewayId)
                 .map(this::runtime)
                 .orElseThrow(() -> new IllegalArgumentException("Unknown AI gateway: " + gatewayId));
+    }
+
+    @Override
+    public AiGatewayConnection require(String gatewayId) {
+        AiGatewayDefinition gateway = definition(gatewayId);
+        return new AiGatewayConnection(gateway.id(), gateway.displayName(), gateway.type(), gateway.baseUrl(),
+                gateway.apiKey(), gateway.timeout());
     }
 
     List<AiGatewayDescriptor> descriptors() {
@@ -65,7 +75,8 @@ class AiGatewayRegistry {
         if (apiKey.isBlank()) {
             throw new IllegalArgumentException("API key is required");
         }
-        return new AiGatewayDefinition(id, AiGatewayType.OPENAI_COMPATIBLE,
+        AiGatewayType type = input.type() == null ? AiGatewayType.OPENAI_CHAT_COMPATIBLE : input.type();
+        return new AiGatewayDefinition(id, type,
                 required(input.displayName(), "displayName"), baseUrl(input.baseUrl()), apiKey,
                 models(input.models()), input.discoverModels(), timeout(input.timeoutSeconds()),
                 AiGatewaySource.SETTINGS);
@@ -79,10 +90,10 @@ class AiGatewayRegistry {
         }
         byte[] encrypted = cipher.encrypt(definition.apiKey(), definition.id());
         AiGatewaySetting setting = settings.findById(definition.id())
-                .orElseGet(() -> new AiGatewaySetting(definition.id(), definition.displayName(),
+                .orElseGet(() -> new AiGatewaySetting(definition.id(), definition.displayName(), definition.type(),
                         definition.baseUrl(), encrypted, encodeModels(definition.models()),
                         definition.discoverModels(), Math.toIntExact(definition.timeout().toSeconds())));
-        setting.apply(definition.displayName(), definition.baseUrl(), encrypted,
+        setting.apply(definition.displayName(), definition.type(), definition.baseUrl(), encrypted,
                 encodeModels(definition.models()), definition.discoverModels(),
                 Math.toIntExact(definition.timeout().toSeconds()));
         settings.save(setting);
@@ -106,7 +117,7 @@ class AiGatewayRegistry {
     }
 
     private AiGatewayDefinition runtime(AiGatewaySetting setting) {
-        return new AiGatewayDefinition(setting.id(), AiGatewayType.OPENAI_COMPATIBLE,
+        return new AiGatewayDefinition(setting.id(), setting.type(),
                 setting.displayName(), setting.baseUrl(),
                 cipher.decrypt(setting.apiKeyCiphertext(), setting.id()), decodeModels(setting.models()),
                 setting.discoverModels(), Duration.ofSeconds(setting.timeoutSeconds()),
@@ -114,7 +125,8 @@ class AiGatewayRegistry {
     }
 
     private AiGatewayDescriptor runtimeDescriptor(AiGatewaySetting setting) {
-        return new AiGatewayDescriptor(setting.id(), setting.displayName(), true,
+        return new AiGatewayDescriptor(setting.id(), setting.displayName(), setting.type(),
+                setting.type().capabilities(), true,
                 AiGatewaySource.SETTINGS, true, setting.baseUrl(),
                 decodeModels(setting.models()), setting.discoverModels(), setting.timeoutSeconds());
     }

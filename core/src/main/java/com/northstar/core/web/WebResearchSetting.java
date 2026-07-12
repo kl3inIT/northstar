@@ -18,8 +18,20 @@ class WebResearchSetting extends BaseEntity {
     @Column(name = "search_provider_id", nullable = false, length = 64)
     private String searchProviderId;
 
+    @Column(name = "search_gateway_id", length = 64)
+    private String searchGatewayId;
+
+    @Column(name = "search_target_id", length = 200)
+    private String searchTargetId;
+
     @Column(name = "page_reader_id", nullable = false, length = 64)
     private String pageReaderId;
+
+    @Column(name = "page_gateway_id", length = 64)
+    private String pageGatewayId;
+
+    @Column(name = "page_target_id", length = 200)
+    private String pageTargetId;
 
     @Column(name = "fallback_enabled", nullable = false)
     private boolean fallbackEnabled;
@@ -31,14 +43,19 @@ class WebResearchSetting extends BaseEntity {
     WebResearchSetting(boolean enabled, String searchProviderId, String pageReaderId,
             boolean fallbackEnabled) {
         super(SINGLETON_ID);
-        apply(enabled, searchProviderId, pageReaderId, fallbackEnabled);
+        apply(enabled, searchProviderId, WebProviderRoute.none(), pageReaderId,
+                WebProviderRoute.none(), fallbackEnabled);
     }
 
-    void apply(boolean enabled, String searchProviderId, String pageReaderId,
-            boolean fallbackEnabled) {
+    void apply(boolean enabled, String searchProviderId, WebProviderRoute searchRoute,
+            String pageReaderId, WebProviderRoute pageReaderRoute, boolean fallbackEnabled) {
         this.enabled = enabled;
         this.searchProviderId = searchProviderId;
+        this.searchGatewayId = nullable(searchRoute.gatewayId());
+        this.searchTargetId = nullable(searchRoute.targetId());
         this.pageReaderId = pageReaderId;
+        this.pageGatewayId = nullable(pageReaderRoute.gatewayId());
+        this.pageTargetId = nullable(pageReaderRoute.targetId());
         this.fallbackEnabled = fallbackEnabled;
     }
 
@@ -54,7 +71,19 @@ class WebResearchSetting extends BaseEntity {
         return pageReaderId;
     }
 
+    WebProviderRoute searchRoute() {
+        return new WebProviderRoute(searchGatewayId, searchTargetId);
+    }
+
+    WebProviderRoute pageReaderRoute() {
+        return new WebProviderRoute(pageGatewayId, pageTargetId);
+    }
+
     boolean fallbackEnabled() {
         return fallbackEnabled;
+    }
+
+    private static String nullable(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 }

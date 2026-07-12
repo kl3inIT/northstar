@@ -57,7 +57,9 @@ Northstar is one domain with three backend deployables:
   not run Flyway in production.
 - `integrations/ai-openai-compatible` owns the reusable Spring AI adapter,
   model-catalog discovery, and runtime task router shared by API and worker.
-  Gateway ids are configuration, not provider-specific feature branches.
+  Gateway ids are configuration. Each gateway also declares a protocol type
+  and its supported capabilities so chat compatibility is never assumed to
+  imply web, speech, or realtime compatibility.
 
 The app classes are explicitly named `NorthstarApiApplication`,
 `NorthstarMcpApplication`, and `NorthstarWorkerApplication`. The package root is
@@ -125,8 +127,11 @@ verification in `:core:test` is the boundary check.
   and routing; `integrations:web-openai` supplies Responses web search,
   `apps/api` supplies a bounded direct HTML/text reader, and
   `integrations:web-firecrawl` supplies optional rendered-page Markdown.
+  `integrations:web-nine-router` supplies normalized 9Router search and fetch.
   Search and page-reader providers can be selected at runtime from Settings
-  without restarting. Credentials stay in server config.
+  without restarting. Gateway-backed providers reuse a server-only AI gateway
+  connection plus a capability target; credentials are never duplicated in
+  web-research settings or returned to clients.
 - `search_web` and `read_web_page` are in-app Assistant tools only. They are not
   published by the public MCP app, so unauthenticated MCP traffic cannot spend
   web-provider credits or use Northstar as a fetch proxy.

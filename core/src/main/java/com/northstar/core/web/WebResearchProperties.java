@@ -9,7 +9,11 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record WebResearchProperties(
         @DefaultValue("true") boolean enabled,
         @DefaultValue("openai") String defaultSearchProvider,
+        @DefaultValue("openai") String defaultSearchGateway,
+        @DefaultValue("gpt-5.5") String defaultSearchTarget,
         @DefaultValue("direct") String defaultPageReader,
+        @DefaultValue("") String defaultPageGateway,
+        @DefaultValue("") String defaultPageTarget,
         @DefaultValue("false") boolean fallbackEnabled,
         List<String> searchFallbackOrder,
         List<String> pageReaderFallbackOrder,

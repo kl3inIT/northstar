@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":core"))
     implementation(project(":integrations:web-openai"))
     implementation(project(":integrations:web-firecrawl"))
+    implementation(project(":integrations:web-nine-router"))
     implementation(project(":integrations:ai-openai-compatible"))
     implementation(project(":integrations:speech-azure"))
 

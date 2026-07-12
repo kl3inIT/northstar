@@ -32,7 +32,7 @@ class OpenAiModelCatalog {
     }
 
     List<AiModelDescriptor> models(String gatewayId) {
-        AiGatewayDefinition gateway = gateways.require(gatewayId);
+        AiGatewayDefinition gateway = gateways.definition(gatewayId);
         CachedModels current = cache.get(gatewayId);
         if (current != null && current.expiresAt().isAfter(Instant.now())) {
             return current.models();

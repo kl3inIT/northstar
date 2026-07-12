@@ -1,5 +1,6 @@
 package com.northstar.integration.ai.openai;
 
+import com.northstar.core.ai.AiGatewayType;
 import java.time.Duration;
 import java.util.List;
 
@@ -19,7 +20,7 @@ record AiGatewayDefinition(
     }
 
     AiGatewayDescriptor descriptor() {
-        return new AiGatewayDescriptor(id, displayName, configured(), source,
+        return new AiGatewayDescriptor(id, displayName, type, type.capabilities(), configured(), source,
                 source == AiGatewaySource.SETTINGS, baseUrl, models, discoverModels,
                 Math.toIntExact(timeout.toSeconds()));
     }

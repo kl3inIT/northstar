@@ -6,7 +6,9 @@ import java.util.List;
 public record WebResearchDefaults(
         boolean enabled,
         String searchProviderId,
+        WebProviderRoute searchRoute,
         String pageReaderId,
+        WebProviderRoute pageReaderRoute,
         boolean fallbackEnabled,
         List<String> searchFallbackOrder,
         List<String> pageReaderFallbackOrder,
@@ -15,7 +17,9 @@ public record WebResearchDefaults(
 
     public WebResearchDefaults {
         searchProviderId = normalized(searchProviderId);
+        searchRoute = searchRoute == null ? WebProviderRoute.none() : searchRoute;
         pageReaderId = normalized(pageReaderId);
+        pageReaderRoute = pageReaderRoute == null ? WebProviderRoute.none() : pageReaderRoute;
         searchFallbackOrder = searchFallbackOrder == null ? List.of() : List.copyOf(searchFallbackOrder);
         pageReaderFallbackOrder = pageReaderFallbackOrder == null ? List.of() : List.copyOf(pageReaderFallbackOrder);
         cacheTtl = cacheTtl == null ? Duration.ofMinutes(15) : cacheTtl;
@@ -23,7 +27,8 @@ public record WebResearchDefaults(
     }
 
     public static WebResearchDefaults disabled() {
-        return new WebResearchDefaults(false, "", "", false, List.of(), List.of(),
+        return new WebResearchDefaults(false, "", WebProviderRoute.none(), "",
+                WebProviderRoute.none(), false, List.of(), List.of(),
                 Duration.ofMinutes(15), 200);
     }
 

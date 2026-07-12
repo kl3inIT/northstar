@@ -5,6 +5,7 @@ import com.northstar.core.ai.AiRoute;
 import com.northstar.core.ai.AiRouteSettingsService;
 import com.northstar.core.ai.AiRouteSettingsService.AiRouteSelection;
 import com.northstar.core.ai.AiTask;
+import com.northstar.core.ai.AiGatewayType;
 import com.northstar.integration.ai.openai.AiCatalogService;
 import com.northstar.integration.ai.openai.AiGatewayDescriptor;
 import com.northstar.integration.ai.openai.AiGatewayInput;
@@ -106,6 +107,7 @@ class AiSettingsController {
     record AiGatewayRequest(
             @NotBlank @Size(max = 64) String id,
             @NotBlank @Size(max = 100) String displayName,
+            AiGatewayType type,
             @NotBlank @Size(max = 500) String baseUrl,
             @Size(max = 1000) String apiKey,
             @Size(max = 200) List<@NotBlank @Size(max = 255) String> models,
@@ -113,7 +115,7 @@ class AiSettingsController {
             @Min(5) @Max(300) int timeoutSeconds) {
 
         AiGatewayInput input(String resolvedId) {
-            return new AiGatewayInput(resolvedId, displayName, baseUrl, apiKey, models,
+            return new AiGatewayInput(resolvedId, displayName, type, baseUrl, apiKey, models,
                     discoverModels, timeoutSeconds);
         }
     }

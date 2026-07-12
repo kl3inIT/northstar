@@ -1,5 +1,10 @@
 package com.northstar.integration.web.openai;
 
+import com.northstar.core.ai.AiGatewayCapability;
+import com.northstar.core.ai.AiGatewayConnection;
+import com.northstar.core.ai.AiGatewayConnectionResolver;
+import com.northstar.core.ai.AiGatewayType;
+import com.northstar.core.web.WebProviderRoute;
 import com.northstar.core.web.WebResearchException;
 import com.northstar.core.web.WebResearchFailureCode;
 import com.northstar.core.web.WebSearchProvider;
@@ -8,14 +13,15 @@ import com.northstar.core.web.WebSearchRequest;
 import com.northstar.core.web.WebSource;
 import java.net.URI;
 import java.net.http.HttpClient;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.ResourceAccessException;
@@ -27,15 +33,26 @@ public class OpenAiWebSearchProvider implements WebSearchProvider {
 
     private final OpenAiWebSearchProperties properties;
     private final RestClient openai;
+    private final AiGatewayConnectionResolver gateways;
+    private final Function<AiGatewayConnection, RestClient> gatewayClients;
 
     @Autowired
-    OpenAiWebSearchProvider(OpenAiWebSearchProperties properties) {
-        this(properties, client(properties));
+    OpenAiWebSearchProvider(OpenAiWebSearchProperties properties,
+            ObjectProvider<AiGatewayConnectionResolver> gateways) {
+        this(properties, client(properties), gateways.getIfAvailable(), OpenAiWebSearchProvider::client);
     }
 
     public OpenAiWebSearchProvider(OpenAiWebSearchProperties properties, RestClient openai) {
+        this(properties, openai, null, OpenAiWebSearchProvider::client);
+    }
+
+    OpenAiWebSearchProvider(OpenAiWebSearchProperties properties, RestClient openai,
+            AiGatewayConnectionResolver gateways,
+            Function<AiGatewayConnection, RestClient> gatewayClients) {
         this.properties = properties;
         this.openai = openai;
+        this.gateways = gateways;
+        this.gatewayClients = gatewayClients;
     }
 
     private static RestClient client(OpenAiWebSearchProperties properties) {
@@ -68,11 +85,45 @@ public class OpenAiWebSearchProvider implements WebSearchProvider {
     }
 
     @Override
+    public boolean routeRequired() {
+        return true;
+    }
+
+    @Override
+    public Set<AiGatewayType> gatewayTypes() {
+        return Set.of(AiGatewayType.OPENAI);
+    }
+
+    @Override
+    public boolean configured(WebProviderRoute route) {
+        if (route == null || !route.complete()) return configured();
+        try {
+            AiGatewayConnection connection = requireConnection(route);
+            return connection.type() == AiGatewayType.OPENAI
+                    && connection.supports(AiGatewayCapability.WEB_SEARCH);
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    @Override
     public WebSearchProviderResult search(WebSearchRequest request) {
         if (!configured()) {
             throw new WebResearchException(WebResearchFailureCode.NOT_CONFIGURED,
                     "OPENAI_API_KEY is not configured");
         }
+        return search(openai, "/v1/responses", properties.model(), request);
+    }
+
+    @Override
+    public WebSearchProviderResult search(WebSearchRequest request, WebProviderRoute route) {
+        if (route == null || !route.complete()) return search(request);
+        AiGatewayConnection connection = requireConnection(route);
+        return search(gatewayClients.apply(connection), "/responses", route.targetId(), request);
+    }
+
+    private WebSearchProviderResult search(RestClient client, String path, String model,
+            WebSearchRequest request) {
         Map<String, Object> tool = new LinkedHashMap<>();
         tool.put("type", "web_search");
         tool.put("search_context_size", properties.searchContextSize());
@@ -81,14 +132,14 @@ public class OpenAiWebSearchProvider implements WebSearchProvider {
         }
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", properties.model());
+        body.put("model", model);
         body.put("input", searchPrompt(request));
         body.put("tools", List.of(tool));
         body.put("include", List.of("web_search_call.action.sources"));
         body.put("store", false);
 
         try {
-            Map<?, ?> response = openai.post().uri("/v1/responses").body(body).retrieve().body(Map.class);
+            Map<?, ?> response = client.post().uri(path).body(body).retrieve().body(Map.class);
             if (response == null) {
                 throw new WebResearchException(WebResearchFailureCode.UNAVAILABLE,
                         "OpenAI returned an empty web-search response");
@@ -105,6 +156,34 @@ public class OpenAiWebSearchProvider implements WebSearchProvider {
             throw new WebResearchException(WebResearchFailureCode.UNAVAILABLE,
                     "OpenAI web search could not be reached", exception);
         }
+    }
+
+    private AiGatewayConnection requireConnection(WebProviderRoute route) {
+        if (gateways == null) {
+            throw new WebResearchException(WebResearchFailureCode.NOT_CONFIGURED,
+                    "AI gateway routing is not available");
+        }
+        AiGatewayConnection connection = gateways.require(route.gatewayId());
+        if (connection.type() != AiGatewayType.OPENAI
+                || !connection.supports(AiGatewayCapability.WEB_SEARCH)) {
+            throw new WebResearchException(WebResearchFailureCode.UNSUPPORTED,
+                    "The selected gateway does not support OpenAI Web Search");
+        }
+        return connection;
+    }
+
+    private static RestClient client(AiGatewayConnection connection) {
+        HttpClient http = HttpClient.newBuilder()
+                .connectTimeout(connection.timeout())
+                .followRedirects(HttpClient.Redirect.NEVER)
+                .build();
+        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
+        requests.setReadTimeout(connection.timeout());
+        return RestClient.builder()
+                .baseUrl(connection.baseUrl())
+                .defaultHeader("Authorization", "Bearer " + connection.apiKey())
+                .requestFactory(requests)
+                .build();
     }
 
     private static String searchPrompt(WebSearchRequest request) {
@@ -158,7 +237,7 @@ public class OpenAiWebSearchProvider implements WebSearchProvider {
         String title = titleValue instanceof String value && !value.isBlank() ? value : url;
         WebSource existing = sources.get(url);
         if (existing == null || (existing.title().equals(url) && !title.equals(url))) {
-            sources.put(url, new WebSource(title, url, "", (Instant) null));
+            sources.put(url, new WebSource(title, url, "", null));
         }
     }
 

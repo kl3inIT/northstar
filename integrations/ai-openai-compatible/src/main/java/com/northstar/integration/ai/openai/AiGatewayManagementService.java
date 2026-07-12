@@ -42,7 +42,7 @@ public class AiGatewayManagementService {
     }
 
     public AiGatewayTestResult test(String gatewayId) {
-        return test(gateways.require(gatewayId));
+        return test(gateways.definition(gatewayId));
     }
 
     @Transactional
@@ -54,6 +54,20 @@ public class AiGatewayManagementService {
                     .update();
         } catch (DataAccessException ignored) {
             // Focused integration tests may not create the API-owned conversation table.
+        }
+        try {
+            jdbc.sql("""
+                    UPDATE web_research_setting
+                    SET search_gateway_id = CASE WHEN search_gateway_id = ? THEN NULL ELSE search_gateway_id END,
+                        search_target_id = CASE WHEN search_gateway_id = ? THEN NULL ELSE search_target_id END,
+                        page_gateway_id = CASE WHEN page_gateway_id = ? THEN NULL ELSE page_gateway_id END,
+                        page_target_id = CASE WHEN page_gateway_id = ? THEN NULL ELSE page_target_id END
+                    WHERE search_gateway_id = ? OR page_gateway_id = ?
+                    """)
+                    .params(gatewayId, gatewayId, gatewayId, gatewayId, gatewayId, gatewayId)
+                    .update();
+        } catch (DataAccessException ignored) {
+            // Focused integration tests may not create the core-owned web settings table.
         }
         gateways.delete(gatewayId);
         invalidate(gatewayId);

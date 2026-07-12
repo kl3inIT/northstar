@@ -2,6 +2,7 @@ package com.northstar.integration.ai.openai;
 
 import com.northstar.core.ai.AiRoute;
 import com.northstar.core.ai.AiTask;
+import com.northstar.core.ai.AiGatewayType;
 import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
@@ -43,7 +44,7 @@ public record AiProperties(
             Duration timeout) {
 
         public Gateway {
-            type = type == null ? AiGatewayType.OPENAI_COMPATIBLE : type;
+            type = type == null ? AiGatewayType.OPENAI_CHAT_COMPATIBLE : type;
             displayName = normalize(displayName, "OpenAI-compatible");
             baseUrl = normalize(baseUrl, "");
             apiKey = apiKey == null ? "" : apiKey.strip();

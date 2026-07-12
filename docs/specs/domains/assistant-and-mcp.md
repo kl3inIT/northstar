@@ -26,16 +26,27 @@ looking frozen.
 Model-backed workloads resolve an `AiTask` route at call time. Each route is a
 configured gateway id plus model id; application YAML supplies defaults and a
 database override from Settings wins without restarting either API or worker.
-OpenAI, 9Router, OpenRouter, and LiteLLM-style connections use the shared
-`OPENAI_COMPATIBLE` integration. Deployment gateways remain read-only defaults;
+Gateway instances declare `OPENAI`, `NINE_ROUTER`, or
+`OPENAI_CHAT_COMPATIBLE`. OpenAI and 9Router reuse the shared chat transport but
+advertise the additional capability protocols Northstar has implemented;
+generic compatible endpoints remain a conservative chat-only contract.
+Deployment gateways remain read-only defaults;
 Settings can also create, edit, test, and delete runtime gateway instances from
 OpenAI, 9Router, OpenRouter, LiteLLM, or Custom presets. Presets provide form
-defaults only and never introduce vendor-specific routing code. Runtime API keys
+defaults and select the gateway contract. Runtime API keys
 are encrypted with AES-256-GCM using a deployment key and are never returned to
 clients. The route editor and web/Flutter Chat offer models discovered from the
 selected gateway. Chat selection is persisted per conversation; a new
 conversation inherits the most recently used Assistant selection before falling
 back to the Assistant task default.
+
+Web research references those same gateway instances instead of storing another
+URL or API key. OpenAI search calls `/responses` with the `web_search` tool and a
+selected model. 9Router search and page reading call `/search` and `/web/fetch`
+with a selected provider alias or combo. Connection testing stays in AI
+Settings; Web Research only validates that the referenced gateway supports the
+capability and that a target is present. Direct page and Firecrawl adapters
+remain available as non-gateway alternatives.
 
 The web Assistant composes its transcript from AI Elements primitives. The
 composer and transcript share native attachment tiles; the native Prompt Input

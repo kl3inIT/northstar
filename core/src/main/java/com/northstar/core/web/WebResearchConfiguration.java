@@ -11,7 +11,10 @@ class WebResearchConfiguration {
     @Bean
     WebResearchDefaults webResearchDefaults(WebResearchProperties properties) {
         return new WebResearchDefaults(properties.enabled(), properties.defaultSearchProvider(),
-                properties.defaultPageReader(), properties.fallbackEnabled(),
+                new WebProviderRoute(properties.defaultSearchGateway(), properties.defaultSearchTarget()),
+                properties.defaultPageReader(),
+                new WebProviderRoute(properties.defaultPageGateway(), properties.defaultPageTarget()),
+                properties.fallbackEnabled(),
                 properties.searchFallbackOrder(), properties.pageReaderFallbackOrder(),
                 properties.cacheTtl(), properties.cacheMaxSize());
     }

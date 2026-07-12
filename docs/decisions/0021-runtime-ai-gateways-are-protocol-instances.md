@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted on 2026-07-12. Supersedes the deployment-only credential portion of
+Partially superseded on 2026-07-12 by
+[0022](./0022-ai-gateways-declare-supported-capabilities.md). The encrypted
+runtime-instance decision remains accepted; the single `OPENAI_COMPATIBLE` type
+does not. This decision superseded the deployment-only credential portion of
 [0020](./0020-ai-tasks-route-through-configured-gateways.md).
 
 ## Decision

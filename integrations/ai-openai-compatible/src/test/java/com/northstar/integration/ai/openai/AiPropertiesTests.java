@@ -29,7 +29,7 @@ class AiPropertiesTests {
 
     private static AiProperties properties() {
         var gateway = new AiProperties.Gateway(
-                AiGatewayType.OPENAI_COMPATIBLE,
+                com.northstar.core.ai.AiGatewayType.OPENAI_CHAT_COMPATIBLE,
                 "Custom Router",
                 "https://router.example/v1",
                 "secret-key",

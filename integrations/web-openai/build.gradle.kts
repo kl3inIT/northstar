@@ -8,6 +8,8 @@ dependencies {
     implementation("org.springframework:spring-web")
 
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.assertj:assertj-core")
+    testImplementation("org.hamcrest:hamcrest")
     testImplementation("org.springframework:spring-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }

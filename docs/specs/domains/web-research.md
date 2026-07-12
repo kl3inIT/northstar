@@ -9,9 +9,14 @@ authenticated pages, and interactive browser actions are not supported in V1.
 Search and page reading are separate capabilities behind `core.web` contracts.
 The current adapters are:
 
-- `openai`: OpenAI Responses with the hosted `web_search` tool. Results carry a
-  concise answer, deduplicated source URLs/titles, the actual provider, fetch
-  time, and any fallback origin.
+- `openai`: OpenAI Responses with the hosted `web_search` tool. Its runtime
+  route selects an `OPENAI` gateway and model. Results carry a concise answer,
+  deduplicated source URLs/titles, the actual provider, fetch time, and any
+  fallback origin.
+- `nine-router`: 9Router's normalized `/search` and `/web/fetch` capability
+  endpoints. Search and fetch each select an existing `NINE_ROUTER` gateway
+  plus a provider or combo target; the gateway credential is configured once
+  under AI models and never duplicated in Web research.
 - `direct`: Java HTTP plus Jsoup for HTML/text. It follows redirects manually,
   revalidates every target, and returns title, normalized main text, final URL,
   content type, truncation state, reader, and fetch time.
@@ -33,6 +38,7 @@ The general `/settings` page currently has a `Web research` section. It can:
 
 - enable or disable Assistant web access;
 - select one configured search provider and page reader independently;
+- select a compatible gateway and target when the provider is gateway-routed;
 - enable the server-configured fallback order;
 - show provider capability/configured status;
 - save a runtime override or restore application defaults.
@@ -42,13 +48,13 @@ REST endpoints are `GET/PUT /api/settings/web-research`,
 `GET /api/settings/web-research/providers`. Responses expose ids,
 capabilities, display names, and configured state, never API keys.
 
-Defaults and credentials are under `northstar.web`; environment overrides use
-`NORTHSTAR_WEB_*`, `OPENAI_API_KEY`, and `FIRECRAWL_API_KEY`. Direct remains the
-default reader; `firecrawl` is present in the configured page-reader fallback
-order and becomes selectable when its key is configured. Adding a provider
-means registering a new `WebSearchProvider` and/or `WebPageReader` bean and
-adding its id to configuration. Assistant tool schemas and Settings REST
-contracts remain unchanged.
+Provider defaults are under `northstar.web`. Direct provider credentials use
+`NORTHSTAR_WEB_*` and `FIRECRAWL_API_KEY`; gateway-routed providers resolve the
+server-only connection from the AI gateway registry. Direct remains the default
+reader; `firecrawl` is present in the configured page-reader fallback order and
+becomes selectable when its key is configured. Adding a provider means
+registering a new `WebSearchProvider` and/or `WebPageReader` bean and adding its
+id to configuration. Assistant tool schemas remain provider-neutral.
 
 ## Safety
 
@@ -71,6 +77,7 @@ contracts remain unchanged.
 
 - `core.web`
 - `integrations.web-openai`
+- `integrations.web-nine-router`
 - `integrations.web-firecrawl`
 - `apps/api.webresearch`
 - `apps/api.assistant.WebResearchTools`

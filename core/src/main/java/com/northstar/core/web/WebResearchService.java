@@ -42,7 +42,7 @@ public class WebResearchService {
 
     public WebSearchResult search(WebSearchRequest request) {
         WebResearchSettings current = requireEnabled();
-        SearchKey key = new SearchKey(current.searchProviderId(), current.fallbackEnabled(),
+        SearchKey key = new SearchKey(current.searchProviderId(), current.searchRoute(), current.fallbackEnabled(),
                 settings.defaults().searchFallbackOrder(), request);
         WebSearchResult cached = searchCache.getIfPresent(key);
         if (cached != null) return cached;
@@ -51,8 +51,10 @@ public class WebResearchService {
                 current.fallbackEnabled(), settings.defaults().searchFallbackOrder());
         WebSearchResult result = route(candidates, id -> {
             WebSearchProvider provider = providers.searchProvider(id);
-            requireConfigured(provider.configured(), "search provider", id);
-            WebSearchProviderResult found = provider.search(request);
+            WebProviderRoute route = id.equals(current.searchProviderId())
+                    ? current.searchRoute() : WebProviderRoute.none();
+            requireConfigured(provider.configured(route), "search provider", id);
+            WebSearchProviderResult found = provider.search(request, route);
             return new WebSearchResult(request.query(), id, found.answer(), found.sources(),
                     Instant.now(clock), id.equals(current.searchProviderId()) ? null : current.searchProviderId());
         });
@@ -62,7 +64,7 @@ public class WebResearchService {
 
     public WebPageResult read(WebPageRequest request) {
         WebResearchSettings current = requireEnabled();
-        PageKey key = new PageKey(current.pageReaderId(), current.fallbackEnabled(),
+        PageKey key = new PageKey(current.pageReaderId(), current.pageReaderRoute(), current.fallbackEnabled(),
                 settings.defaults().pageReaderFallbackOrder(), request.url());
         WebPageResult cached = pageCache.getIfPresent(key);
         if (cached != null) return cached;
@@ -71,12 +73,14 @@ public class WebResearchService {
                 current.fallbackEnabled(), settings.defaults().pageReaderFallbackOrder());
         WebPageResult result = route(candidates, id -> {
             WebPageReader reader = providers.pageReader(id);
-            requireConfigured(reader.configured(), "page reader", id);
+            WebProviderRoute route = id.equals(current.pageReaderId())
+                    ? current.pageReaderRoute() : WebProviderRoute.none();
+            requireConfigured(reader.configured(route), "page reader", id);
             if (!reader.supports(request.url())) {
                 throw new WebResearchException(WebResearchFailureCode.UNSUPPORTED,
                         "Reader " + id + " does not support this URL");
             }
-            WebPageProviderResult page = reader.read(request);
+            WebPageProviderResult page = reader.read(request, route);
             return new WebPageResult(request.url(), page.finalUrl(), id, page.title(), page.content(),
                     page.contentType(), page.truncated(), Instant.now(clock),
                     id.equals(current.pageReaderId()) ? null : current.pageReaderId());
@@ -121,11 +125,11 @@ public class WebResearchService {
         throw failures.getLast();
     }
 
-    private record SearchKey(String providerId, boolean fallbackEnabled,
+    private record SearchKey(String providerId, WebProviderRoute route, boolean fallbackEnabled,
             List<String> fallbackOrder, WebSearchRequest request) {
     }
 
-    private record PageKey(String readerId, boolean fallbackEnabled,
+    private record PageKey(String readerId, WebProviderRoute route, boolean fallbackEnabled,
             List<String> fallbackOrder, java.net.URI url) {
     }
 }

@@ -46,15 +46,26 @@ public class WebProviderRegistry {
             WebSearchProvider search = searchProviders.get(id);
             WebPageReader reader = pageReaders.get(id);
             Set<WebResearchCapability> capabilities = new LinkedHashSet<>();
+            Set<com.northstar.core.ai.AiGatewayType> gatewayTypes = new LinkedHashSet<>();
             if (search != null) capabilities.add(WebResearchCapability.SEARCH);
             if (reader != null) capabilities.add(WebResearchCapability.READ_PAGE);
+            if (search != null) gatewayTypes.addAll(search.gatewayTypes());
+            if (reader != null) gatewayTypes.addAll(reader.gatewayTypes());
             result.add(new WebProviderDescriptor(
                     id,
-                    search != null ? search.displayName() : reader.displayName(),
+                    displayName(search, reader),
                     capabilities,
-                    (search == null || search.configured()) && (reader == null || reader.configured())));
+                    (search == null || search.configured()) && (reader == null || reader.configured()),
+                    (search != null && search.routeRequired()) || (reader != null && reader.routeRequired()),
+                    gatewayTypes));
         }
         return result.stream().sorted(Comparator.comparing(WebProviderDescriptor::displayName)).toList();
+    }
+
+    private static String displayName(WebSearchProvider search, WebPageReader reader) {
+        if (search != null) return search.displayName();
+        if (reader != null) return reader.displayName();
+        throw new IllegalStateException("Provider id has no registered capability");
     }
 
     private static <T> Map<String, T> indexed(List<T> values, IdReader<T> ids, String kind) {
