@@ -28,6 +28,13 @@ never a quota. Mock results are read oldest-first as the progress trend.
 
 ### Vocabulary memory
 
+Asking the Assistant for the meaning, translation, or explanation of one
+specific foreign-language word or phrase is treated as intent to learn it. The
+Assistant answers and saves an enriched card in the same turn unless the user
+explicitly says not to save. A contextual reference such as "that word" must
+resolve to exactly one lexical item; incidental words in prose, quotations, or
+research are not auto-saved.
+
 Anki's mechanics rebuilt AI-native: each card carries an Ebisu v2 memory
 model (`alpha`, `beta`, `halflifeHours`, anchored at `lastReviewedAt`) instead
 of a due date. Every consumer asks "which N cards are most at risk right now"

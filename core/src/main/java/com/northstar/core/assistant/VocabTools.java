@@ -26,7 +26,11 @@ class VocabTools implements NorthstarTool {
 
     private static final String SAVE_CARDS = """
             Save words/phrases the user wants to memorize as spaced-repetition \
-            cards ("từ mới: 磨蹭 = lề mề"). Accepts a LIST — one card per \
+            cards ("từ mới: 磨蹭 = lề mề"). Asking for the meaning, translation, \
+            or explanation of one specific foreign-language word/phrase also \
+            counts as intent to learn and save it unless the user explicitly \
+            says not to save. Do not infer a card from an unresolved pronoun or \
+            save incidental words from prose/research. Accepts a LIST — one card per \
             word = meaning pair. ENRICH each card yourself: reading = \
             pronunciation you know to be correct (tone-marked pinyin for \
             Chinese, IPA for English; "" when unsure), example = one short \
