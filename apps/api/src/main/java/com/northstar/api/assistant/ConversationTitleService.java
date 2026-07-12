@@ -117,8 +117,7 @@ class ConversationTitleService {
         String source = firstMessage.length() > MAX_SOURCE_CHARS
                 ? firstMessage.substring(0, MAX_SOURCE_CHARS)
                 : firstMessage;
-        // Override only the model (cheaper tier is fine for titling); gpt-5.5 is a
-        // reasoning model that rejects any temperature but 1, so none is set.
+        // Override only the model; title generation intentionally uses a cheap tier.
         AiRoute route = ai.route(AiTask.TITLE);
         return ai.client(route).prompt()
                 .options(ChatOptions.builder().model(route.modelId()))

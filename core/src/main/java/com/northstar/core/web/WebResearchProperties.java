@@ -10,7 +10,7 @@ public record WebResearchProperties(
         @DefaultValue("true") boolean enabled,
         @DefaultValue("openai") String defaultSearchProvider,
         @DefaultValue("openai") String defaultSearchGateway,
-        @DefaultValue("gpt-5.5") String defaultSearchTarget,
+        @DefaultValue("gpt-5.6-luna") String defaultSearchTarget,
         @DefaultValue("direct") String defaultPageReader,
         @DefaultValue("") String defaultPageGateway,
         @DefaultValue("") String defaultPageTarget,
