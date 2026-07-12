@@ -7,13 +7,21 @@ import {
 } from './hey-api'
 import { zListWebResearchProvidersResponse, zSettingsResponse } from './hey-api/zod.gen'
 import { dataOrThrow } from './hey-api-result'
+import type { AiGatewayType } from './ai-settings-api'
 
 export interface WebResearchSettings {
   enabled: boolean
   searchProviderId: string
+  searchRoute: WebProviderRoute
   pageReaderId: string
+  pageReaderRoute: WebProviderRoute
   fallbackEnabled: boolean
   overridden: boolean
+}
+
+export interface WebProviderRoute {
+  gatewayId: string
+  targetId: string
 }
 
 export interface WebResearchProvider {
@@ -21,6 +29,8 @@ export interface WebResearchProvider {
   displayName: string
   capabilities: Array<'SEARCH' | 'READ_PAGE'>
   configured: boolean
+  routeRequired: boolean
+  gatewayTypes: AiGatewayType[]
 }
 
 export type WebResearchSettingsInput = Omit<WebResearchSettings, 'overridden'>
@@ -33,7 +43,9 @@ function settings(value: unknown): WebResearchSettings {
   return {
     enabled: parsed.enabled ?? false,
     searchProviderId: parsed.searchProviderId,
+    searchRoute: route(parsed.searchRoute),
     pageReaderId: parsed.pageReaderId,
+    pageReaderRoute: route(parsed.pageReaderRoute),
     fallbackEnabled: parsed.fallbackEnabled ?? false,
     overridden: parsed.overridden ?? false,
   }
@@ -47,8 +59,14 @@ function providers(value: unknown): WebResearchProvider[] {
       displayName: provider.displayName,
       capabilities: provider.capabilities ?? [],
       configured: provider.configured ?? false,
+      routeRequired: provider.routeRequired ?? false,
+      gatewayTypes: provider.gatewayTypes ?? [],
     }
   })
+}
+
+function route(value?: { gatewayId?: string; targetId?: string }): WebProviderRoute {
+  return { gatewayId: value?.gatewayId ?? '', targetId: value?.targetId ?? '' }
 }
 
 export function useWebResearchSettings() {

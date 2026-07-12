@@ -29,6 +29,7 @@ import {
   useUpdateWebResearchSettings,
   useWebResearchProviders,
   useWebResearchSettings,
+  type WebProviderRoute,
   type WebResearchSettingsInput,
 } from '@/lib/web-research-api'
 import { cn } from '@/lib/utils'
@@ -43,8 +44,10 @@ import {
   useTestAiGatewayDraft,
   useUpdateAiRoute,
   type AiGateway,
+  type AiGatewayCapability,
   type AiGatewayConnectionTest,
   type AiGatewayInput,
+  type AiGatewayType,
   type AiRouteSelection,
   type AiTask,
 } from '@/lib/ai-settings-api'
@@ -91,7 +94,7 @@ export function SettingsPage() {
             {section === 'ai'
               ? <AiSettingsSection />
               : section === 'web-research'
-                ? <WebResearchLoader />
+                ? <WebResearchLoader onManageGateways={() => setSection('ai')} />
                 : <AutomationsSection />}
           </section>
         </div>
@@ -124,7 +127,7 @@ function AiSettingsSection() {
       <div className="pb-5">
         <h2 id="ai-heading" className="text-xl font-semibold">AI models</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Route each workload through a configured OpenAI-compatible gateway.
+          Route each workload through a configured AI gateway.
         </p>
       </div>
       <Separator />
@@ -198,6 +201,9 @@ function GatewayRow({ gateway, onEdit }: { gateway: AiGateway; onEdit: () => voi
           </Badge>
         </div>
         <p className="mt-0.5 truncate text-xs text-muted-foreground">{gateway.baseUrl}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {gatewayTypeLabel(gateway.type)} · {gateway.capabilities.map(gatewayCapabilityLabel).join(' · ')}
+        </p>
       </div>
       <Badge variant="outline" className={cn('hidden shrink-0 sm:inline-flex', gateway.configured && 'text-emerald-600 dark:text-emerald-400')}>
         {gateway.configured ? 'Ready' : 'Not configured'}
@@ -239,11 +245,11 @@ function GatewayRow({ gateway, onEdit }: { gateway: AiGateway; onEdit: () => voi
 }
 
 const GATEWAY_PRESETS = {
-  openai: { label: 'OpenAI', id: 'openai-direct', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
-  nineRouter: { label: '9Router', id: 'nine-router', name: '9Router', baseUrl: '' },
-  openRouter: { label: 'OpenRouter', id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
-  liteLlm: { label: 'LiteLLM', id: 'litellm', name: 'LiteLLM', baseUrl: '' },
-  custom: { label: 'Custom', id: 'custom-gateway', name: 'Custom gateway', baseUrl: '' },
+  openai: { label: 'OpenAI', type: 'OPENAI', id: 'openai-direct', name: 'OpenAI', baseUrl: 'https://api.openai.com/v1' },
+  nineRouter: { label: '9Router', type: 'NINE_ROUTER', id: 'nine-router', name: '9Router', baseUrl: '' },
+  openRouter: { label: 'OpenRouter', type: 'OPENAI_CHAT_COMPATIBLE', id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1' },
+  liteLlm: { label: 'LiteLLM', type: 'OPENAI_CHAT_COMPATIBLE', id: 'litellm', name: 'LiteLLM', baseUrl: '' },
+  custom: { label: 'Generic OpenAI chat', type: 'OPENAI_CHAT_COMPATIBLE', id: 'custom-gateway', name: 'Custom gateway', baseUrl: '' },
 } as const
 
 type GatewayPreset = keyof typeof GATEWAY_PRESETS
@@ -258,6 +264,7 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
   const [form, setForm] = useState<AiGatewayInput>(() => gateway ? {
     id: gateway.id,
     displayName: gateway.displayName,
+    type: gateway.type,
     baseUrl: gateway.baseUrl,
     apiKey: '',
     models: gateway.configuredModels,
@@ -298,21 +305,33 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
+      <DialogContent className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden sm:max-w-2xl">
+        <DialogHeader className="shrink-0">
           <DialogTitle>{editing ? `Edit ${gateway.displayName}` : 'Add AI gateway'}</DialogTitle>
           <DialogDescription>
-            Connect any OpenAI-compatible endpoint. The API key is encrypted and never returned to this screen.
+            Add one connection, then reuse it for every capability that gateway supports. API keys are encrypted and never returned.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-5 py-2">
+        <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto py-2 pr-2">
           {!editing && (
-            <Field label="Preset" htmlFor="gateway-preset">
+            <Field label="Gateway type" htmlFor="gateway-preset" hint={gatewayTypeHint(form.type)}>
               <Select value={preset} onValueChange={(value) => applyPreset(value as GatewayPreset)}>
                 <SelectTrigger id="gateway-preset"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(GATEWAY_PRESETS).map(([id, item]) => <SelectItem key={id} value={id}>{item.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
+          {editing && (
+            <Field label="Gateway type" htmlFor="gateway-type" hint={gatewayTypeHint(form.type)}>
+              <Select value={form.type} onValueChange={(type) => update('type', type as AiGatewayType)}>
+                <SelectTrigger id="gateway-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="OPENAI">OpenAI</SelectItem>
+                  <SelectItem value="NINE_ROUTER">9Router</SelectItem>
+                  <SelectItem value="OPENAI_CHAT_COMPATIBLE">OpenAI chat-compatible</SelectItem>
                 </SelectContent>
               </Select>
             </Field>
@@ -365,7 +384,7 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0">
           <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
           <Button type="button" variant="secondary" disabled={!valid || testGateway.isPending} onClick={test}>
             {testGateway.isPending ? <Loader2 className="size-4 animate-spin" /> : <PlugZap className="size-4" />}
@@ -383,7 +402,7 @@ function GatewayDialog({ gateway, onClose }: { gateway: AiGateway | null; onClos
 
 function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: string; hint?: string; children: ReactNode }) {
   return (
-    <div className="grid gap-2">
+    <div className="grid self-start gap-2">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
       {hint && <p className="text-xs leading-relaxed text-muted-foreground">{hint}</p>}
@@ -393,7 +412,31 @@ function Field({ label, htmlFor, hint, children }: { label: string; htmlFor: str
 
 function presetForm(preset: GatewayPreset): AiGatewayInput {
   const item = GATEWAY_PRESETS[preset]
-  return { id: item.id, displayName: item.name, baseUrl: item.baseUrl, apiKey: '', models: [], discoverModels: true, timeoutSeconds: 60 }
+  return { id: item.id, displayName: item.name, type: item.type, baseUrl: item.baseUrl, apiKey: '', models: [], discoverModels: true, timeoutSeconds: 60 }
+}
+
+function gatewayTypeLabel(type: AiGatewayType) {
+  if (type === 'OPENAI') return 'OpenAI'
+  if (type === 'NINE_ROUTER') return '9Router'
+  return 'OpenAI chat-compatible'
+}
+
+function gatewayTypeHint(type: AiGatewayType) {
+  if (type === 'OPENAI') return 'Chat, web search, speech, and Realtime use OpenAI protocols.'
+  if (type === 'NINE_ROUTER') return 'Chat, search, fetch, and speech use 9Router capability endpoints.'
+  return 'Conservative contract: model listing and chat only.'
+}
+
+function gatewayCapabilityLabel(capability: AiGatewayCapability) {
+  const labels: Record<AiGatewayCapability, string> = {
+    CHAT: 'Chat',
+    WEB_SEARCH: 'Search',
+    WEB_FETCH: 'Fetch',
+    SPEECH_TO_TEXT: 'STT',
+    TEXT_TO_SPEECH: 'TTS',
+    REALTIME: 'Realtime',
+  }
+  return labels[capability]
 }
 
 function slug(value: string) {
@@ -488,21 +531,26 @@ function AiRouteRow({
   )
 }
 
-function WebResearchLoader() {
+function WebResearchLoader({ onManageGateways }: { onManageGateways: () => void }) {
   const settings = useWebResearchSettings()
   const providers = useWebResearchProviders()
-  if (settings.isLoading || providers.isLoading) {
+  const ai = useAiSettings()
+  if (settings.isLoading || providers.isLoading || ai.isLoading) {
     return <div className="flex h-52 items-center justify-center border-y"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>
   }
-  if (settings.isError || providers.isError) {
-    return <div className="border-y py-8 text-sm text-destructive">{settings.error?.message ?? providers.error?.message ?? 'Could not load settings.'}</div>
+  if (settings.isError || providers.isError || ai.isError) {
+    return <div className="border-y py-8 text-sm text-destructive">{settings.error?.message ?? providers.error?.message ?? ai.error?.message ?? 'Could not load settings.'}</div>
   }
-  return settings.data && providers.data ? <WebResearchSection initial={settings.data} providers={providers.data} /> : null
+  return settings.data && providers.data && ai.data
+    ? <WebResearchSection initial={settings.data} providers={providers.data} gateways={ai.data.gateways} onManageGateways={onManageGateways} />
+    : null
 }
 
 function WebResearchSection({
   initial,
   providers,
+  gateways,
+  onManageGateways,
 }: {
   initial: WebResearchSettingsInput & { overridden: boolean }
   providers: Array<{
@@ -510,14 +558,20 @@ function WebResearchSection({
     displayName: string
     capabilities: Array<'SEARCH' | 'READ_PAGE'>
     configured: boolean
+    routeRequired: boolean
+    gatewayTypes: AiGatewayType[]
   }>
+  gateways: AiGateway[]
+  onManageGateways: () => void
 }) {
   const update = useUpdateWebResearchSettings()
   const reset = useResetWebResearchSettings()
   const [form, setForm] = useState<WebResearchSettingsInput>({
     enabled: initial.enabled,
     searchProviderId: initial.searchProviderId,
+    searchRoute: initial.searchRoute,
     pageReaderId: initial.pageReaderId,
+    pageReaderRoute: initial.pageReaderRoute,
     fallbackEnabled: initial.fallbackEnabled,
   })
 
@@ -525,7 +579,9 @@ function WebResearchSection({
     setForm({
       enabled: initial.enabled,
       searchProviderId: initial.searchProviderId,
+      searchRoute: initial.searchRoute,
       pageReaderId: initial.pageReaderId,
+      pageReaderRoute: initial.pageReaderRoute,
       fallbackEnabled: initial.fallbackEnabled,
     })
   }, [initial])
@@ -540,10 +596,16 @@ function WebResearchSection({
   )
   const dirty = form.enabled !== initial.enabled
     || form.searchProviderId !== initial.searchProviderId
+    || form.searchRoute.gatewayId !== initial.searchRoute.gatewayId
+    || form.searchRoute.targetId !== initial.searchRoute.targetId
     || form.pageReaderId !== initial.pageReaderId
+    || form.pageReaderRoute.gatewayId !== initial.pageReaderRoute.gatewayId
+    || form.pageReaderRoute.targetId !== initial.pageReaderRoute.targetId
     || form.fallbackEnabled !== initial.fallbackEnabled
-  const selectedReady = searchProviders.find((item) => item.id === form.searchProviderId)?.configured
-    && pageReaders.find((item) => item.id === form.pageReaderId)?.configured
+  const selectedSearch = searchProviders.find((item) => item.id === form.searchProviderId)
+  const selectedReader = pageReaders.find((item) => item.id === form.pageReaderId)
+  const selectedReady = providerReady(selectedSearch, form.searchRoute, gateways, 'WEB_SEARCH')
+    && providerReady(selectedReader, form.pageReaderRoute, gateways, 'WEB_FETCH')
 
   function save() {
     update.mutate(form, {
@@ -558,7 +620,9 @@ function WebResearchSection({
         setForm({
           enabled: value.enabled,
           searchProviderId: value.searchProviderId,
+          searchRoute: value.searchRoute,
           pageReaderId: value.pageReaderId,
+          pageReaderRoute: value.pageReaderRoute,
           fallbackEnabled: value.fallbackEnabled,
         })
         toast.success('Application defaults restored')
@@ -607,7 +671,11 @@ function WebResearchSection({
         control={(
           <Select
             value={form.searchProviderId}
-            onValueChange={(searchProviderId) => setForm((value) => ({ ...value, searchProviderId }))}
+            onValueChange={(searchProviderId) => setForm((value) => ({
+              ...value,
+              searchProviderId,
+              searchRoute: routeForProvider(searchProviders, searchProviderId, value.searchRoute, gateways, 'WEB_SEARCH'),
+            }))}
           >
             <SelectTrigger className="w-full sm:w-64" aria-label="Search provider">
               <Search className="size-4" />
@@ -615,14 +683,31 @@ function WebResearchSection({
             </SelectTrigger>
             <SelectContent>
               {searchProviders.map((provider) => (
-                <SelectItem key={provider.id} value={provider.id} disabled={!provider.configured}>
-                  {provider.displayName}{provider.configured ? '' : ' · not configured'}
+                <SelectItem key={provider.id} value={provider.id} disabled={!provider.configured && !provider.routeRequired}>
+                  {provider.displayName}{provider.configured || provider.routeRequired ? '' : ' · not configured'}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
       />
+      {selectedSearch?.routeRequired && (
+        <>
+          <Separator />
+          <SettingRow
+            title="Search route"
+            description="Use an existing gateway and a provider or combo target."
+            control={<GatewayRouteControl
+              capability="WEB_SEARCH"
+              gateways={gateways}
+              gatewayTypes={selectedSearch.gatewayTypes}
+              route={form.searchRoute}
+              targetPlaceholder={form.searchRoute.gatewayId && gateways.find((item) => item.id === form.searchRoute.gatewayId)?.type === 'OPENAI' ? 'gpt-5.5' : 'search-combo'}
+              onChange={(searchRoute) => setForm((value) => ({ ...value, searchRoute }))}
+            />}
+          />
+        </>
+      )}
       <Separator />
       <SettingRow
         title="Page reader"
@@ -630,7 +715,11 @@ function WebResearchSection({
         control={(
           <Select
             value={form.pageReaderId}
-            onValueChange={(pageReaderId) => setForm((value) => ({ ...value, pageReaderId }))}
+            onValueChange={(pageReaderId) => setForm((value) => ({
+              ...value,
+              pageReaderId,
+              pageReaderRoute: routeForProvider(pageReaders, pageReaderId, value.pageReaderRoute, gateways, 'WEB_FETCH'),
+            }))}
           >
             <SelectTrigger className="w-full sm:w-64" aria-label="Page reader">
               <Globe2 className="size-4" />
@@ -638,14 +727,31 @@ function WebResearchSection({
             </SelectTrigger>
             <SelectContent>
               {pageReaders.map((provider) => (
-                <SelectItem key={provider.id} value={provider.id} disabled={!provider.configured}>
-                  {provider.displayName}{provider.configured ? '' : ' · not configured'}
+                <SelectItem key={provider.id} value={provider.id} disabled={!provider.configured && !provider.routeRequired}>
+                  {provider.displayName}{provider.configured || provider.routeRequired ? '' : ' · not configured'}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         )}
       />
+      {selectedReader?.routeRequired && (
+        <>
+          <Separator />
+          <SettingRow
+            title="Fetch route"
+            description="Use an existing gateway and a fetch provider or combo target."
+            control={<GatewayRouteControl
+              capability="WEB_FETCH"
+              gateways={gateways}
+              gatewayTypes={selectedReader.gatewayTypes}
+              route={form.pageReaderRoute}
+              targetPlaceholder="fetch-combo"
+              onChange={(pageReaderRoute) => setForm((value) => ({ ...value, pageReaderRoute }))}
+            />}
+          />
+        </>
+      )}
       <Separator />
       <SettingRow
         title="Provider fallback"
@@ -676,11 +782,18 @@ function WebResearchSection({
               </div>
               <Badge variant="outline" className={cn('shrink-0 gap-1', provider.configured && 'text-emerald-600 dark:text-emerald-400')}>
                 <CheckCircle2 className="size-3" />
-                {provider.configured ? 'Configured' : 'Not configured'}
+                 {provider.routeRequired ? 'Uses gateway' : provider.configured ? 'Configured' : 'Not configured'}
               </Badge>
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="flex justify-end border-t py-4">
+        <Button type="button" variant="ghost" size="sm" onClick={onManageGateways}>
+          <Waypoints className="size-4" />
+          Manage gateways
+        </Button>
       </div>
 
       <div className="flex flex-col-reverse gap-2 border-t pt-5 sm:flex-row sm:items-center sm:justify-between">
@@ -699,6 +812,103 @@ function WebResearchSection({
           Save changes
         </Button>
       </div>
+    </div>
+  )
+}
+
+type WebProviderOption = {
+  id: string
+  configured: boolean
+  routeRequired: boolean
+  gatewayTypes: AiGatewayType[]
+}
+
+function providerReady(
+  provider: WebProviderOption | undefined,
+  route: WebProviderRoute,
+  gateways: AiGateway[],
+  capability: AiGatewayCapability,
+) {
+  if (!provider) return false
+  if (!provider.routeRequired) return provider.configured
+  const gateway = gateways.find((item) => item.id === route.gatewayId)
+  return Boolean(gateway?.configured
+    && provider.gatewayTypes.includes(gateway.type)
+    && gateway.capabilities.includes(capability)
+    && route.targetId.trim())
+}
+
+function routeForProvider(
+  providers: WebProviderOption[],
+  providerId: string,
+  current: WebProviderRoute,
+  gateways: AiGateway[],
+  capability: AiGatewayCapability,
+): WebProviderRoute {
+  const provider = providers.find((item) => item.id === providerId)
+  if (!provider?.routeRequired) return { gatewayId: '', targetId: '' }
+  const compatible = gateways.filter((gateway) => gateway.configured
+    && provider.gatewayTypes.includes(gateway.type)
+    && gateway.capabilities.includes(capability))
+  const gateway = compatible.find((item) => item.id === current.gatewayId) ?? compatible[0]
+  if (!gateway) return { gatewayId: '', targetId: '' }
+  return {
+    gatewayId: gateway.id,
+    targetId: current.gatewayId === gateway.id && current.targetId
+      ? current.targetId
+      : defaultTarget(gateway, capability),
+  }
+}
+
+function defaultTarget(gateway: AiGateway, capability: AiGatewayCapability) {
+  if (capability === 'WEB_FETCH') return 'fetch-combo'
+  if (gateway.type === 'OPENAI') return gateway.configuredModels[0] ?? 'gpt-5.5'
+  return 'search-combo'
+}
+
+function GatewayRouteControl({
+  capability,
+  gateways,
+  gatewayTypes,
+  route,
+  targetPlaceholder,
+  onChange,
+}: {
+  capability: AiGatewayCapability
+  gateways: AiGateway[]
+  gatewayTypes: AiGatewayType[]
+  route: WebProviderRoute
+  targetPlaceholder: string
+  onChange: (route: WebProviderRoute) => void
+}) {
+  const compatible = gateways.filter((gateway) => gateway.configured
+    && gatewayTypes.includes(gateway.type)
+    && gateway.capabilities.includes(capability))
+  return (
+    <div className="grid w-full gap-2 sm:w-64">
+      <Select
+        value={route.gatewayId}
+        onValueChange={(gatewayId) => {
+          const gateway = gateways.find((item) => item.id === gatewayId)
+          onChange({ gatewayId, targetId: gateway ? defaultTarget(gateway, capability) : '' })
+        }}
+      >
+        <SelectTrigger aria-label={`${gatewayCapabilityLabel(capability)} gateway`}>
+          <Waypoints className="size-4" />
+          <SelectValue placeholder="Select gateway" />
+        </SelectTrigger>
+        <SelectContent>
+          {compatible.map((gateway) => (
+            <SelectItem key={gateway.id} value={gateway.id}>{gateway.displayName}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Input
+        value={route.targetId}
+        placeholder={targetPlaceholder}
+        aria-label={`${gatewayCapabilityLabel(capability)} target`}
+        onChange={(event) => onChange({ ...route, targetId: event.target.value })}
+      />
     </div>
   )
 }

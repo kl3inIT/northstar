@@ -42,6 +42,8 @@ export interface AiRouteSelection {
 export interface AiGateway {
   id: string
   displayName: string
+  type: AiGatewayType
+  capabilities: AiGatewayCapability[]
   configured: boolean
   source: 'DEPLOYMENT' | 'SETTINGS'
   editable: boolean
@@ -51,9 +53,13 @@ export interface AiGateway {
   timeoutSeconds: number
 }
 
+export type AiGatewayType = 'OPENAI' | 'NINE_ROUTER' | 'OPENAI_CHAT_COMPATIBLE'
+export type AiGatewayCapability = 'CHAT' | 'WEB_SEARCH' | 'WEB_FETCH' | 'SPEECH_TO_TEXT' | 'TEXT_TO_SPEECH' | 'REALTIME'
+
 export interface AiGatewayInput {
   id: string
   displayName: string
+  type: AiGatewayType
   baseUrl: string
   apiKey?: string
   models: string[]
@@ -102,6 +108,8 @@ function settings(value: AiSettingsResponse): AiSettings {
       return {
         id: gateway.id,
         displayName: gateway.displayName,
+        type: gateway.type ?? 'OPENAI_CHAT_COMPATIBLE',
+        capabilities: gateway.capabilities ?? ['CHAT'],
         configured: gateway.configured ?? false,
         source: gateway.source ?? 'DEPLOYMENT',
         editable: gateway.editable ?? false,
@@ -119,6 +127,8 @@ function gateway(value: import('./hey-api').AiGatewayDescriptor): AiGateway {
   return {
     id: value.id,
     displayName: value.displayName,
+    type: value.type ?? 'OPENAI_CHAT_COMPATIBLE',
+    capabilities: value.capabilities ?? ['CHAT'],
     configured: value.configured ?? false,
     source: value.source ?? 'DEPLOYMENT',
     editable: value.editable ?? false,
