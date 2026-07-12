@@ -7,10 +7,10 @@ import { WritingPanel } from '@/features/study/writing-panel'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 /**
- * Study — read-mostly view over the study log. Entries are captured on the
- * Capture page or in chat; this page answers "how much, what, and is it
- * moving". Vocab reviews and essay grading both happen in chat — the
- * Vocabulary and Writing tabs show the resulting state, never a workflow.
+ * Study combines history with focused practice. Entries are captured on the
+ * Capture page or in chat; Vocabulary owns the card review workflow, while
+ * Writing shows feedback produced through the Assistant and Speaking owns its
+ * audio practice flow.
  */
 export function StudyPage() {
   const [tab, setTab] = useState<'log' | 'vocabulary' | 'writing' | 'speaking'>('log')

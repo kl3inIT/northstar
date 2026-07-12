@@ -173,18 +173,68 @@ export function parseWritingErrors(topErrors: string | undefined | null): Writin
   }
 }
 
-/** The card's metadata JSON parsed leniently — unknown keys are ignored. */
-export function parseVocabMetadata(metadata: string | undefined | null): { reading?: string; example?: string } {
+export interface VocabMetadata {
+  reading?: string
+  partOfSpeech?: string
+  example?: string
+  collocations?: string[]
+  synonyms?: string[]
+  antonyms?: string[]
+  contrast?: string
+  mnemonic?: string
+}
+
+function stringList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const values = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+  return values.length > 0 ? values : undefined
+}
+
+/** The card's metadata JSON parsed leniently — unknown keys are ignored by the reader. */
+export function parseVocabMetadata(metadata: string | undefined | null): VocabMetadata {
   if (!metadata) return {}
   try {
     const parsed = JSON.parse(metadata) as Record<string, unknown>
     return {
       reading: typeof parsed.reading === 'string' ? parsed.reading : undefined,
+      partOfSpeech: typeof parsed.partOfSpeech === 'string' ? parsed.partOfSpeech : undefined,
       example: typeof parsed.example === 'string' ? parsed.example : undefined,
+      collocations: stringList(parsed.collocations),
+      synonyms: stringList(parsed.synonyms),
+      antonyms: stringList(parsed.antonyms),
+      contrast: typeof parsed.contrast === 'string' ? parsed.contrast : undefined,
+      mnemonic: typeof parsed.mnemonic === 'string' ? parsed.mnemonic : undefined,
     }
   } catch {
     return {}
   }
+}
+
+/** Merge edited fields while preserving enrichment and future metadata keys. */
+export function mergeVocabMetadata(
+  metadata: string | undefined | null,
+  updates: Record<string, string | string[] | undefined>,
+): string | undefined {
+  let merged: Record<string, unknown> = {}
+  if (metadata) {
+    try {
+      const parsed = JSON.parse(metadata) as unknown
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        merged = { ...(parsed as Record<string, unknown>) }
+      }
+    } catch {
+      // An edit repairs malformed legacy metadata.
+    }
+  }
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value == null || (typeof value === 'string' && value.trim().length === 0)
+      || (Array.isArray(value) && value.length === 0)) {
+      delete merged[key]
+    } else {
+      merged[key] = typeof value === 'string' ? value.trim() : value
+    }
+  })
+  return Object.keys(merged).length > 0 ? JSON.stringify(merged) : undefined
 }
 
 const tzHeaders = { 'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone }

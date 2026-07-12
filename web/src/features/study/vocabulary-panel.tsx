@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { BookOpenCheck, Ellipsis, Flame, MessageSquareText, Mic, Pencil, PauseCircle, PlayCircle, Search, Sparkles, Trash2 } from 'lucide-react'
+import { BookOpenCheck, ChevronDown, Ellipsis, Flame, Mic, Pencil, PauseCircle, PlayCircle, Search, Sparkles, Trash2 } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
+import { VocabularyReviewer } from './vocabulary-reviewer'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -18,6 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import {
   parseVocabMetadata,
+  mergeVocabMetadata,
   useAssessVocabPronunciation,
   useDeleteVocabCard,
   useUpdateVocabCard,
@@ -43,6 +45,7 @@ export function VocabularyPanel() {
   const [editing, setEditing] = useState<VocabCard | null>(null)
   const [deleting, setDeleting] = useState<VocabCard | null>(null)
   const [pronouncing, setPronouncing] = useState<VocabCard | null>(null)
+  const [reviewLimit, setReviewLimit] = useState<number | null>(null)
   const update = useUpdateVocabCard()
 
   const active = useMemo(() => cards.filter((c) => !c.suspended), [cards])
@@ -87,6 +90,17 @@ export function VocabularyPanel() {
     )
   }
 
+  if (reviewLimit !== null) {
+    return (
+      <>
+        <VocabularyReviewer limit={reviewLimit} onExit={() => setReviewLimit(null)}
+          onEdit={setEditing} onPronounce={setPronouncing} />
+        <EditCardDialog key={editing?.id ?? 'none'} card={editing} onClose={() => setEditing(null)} />
+        <PronunciationDialog key={pronouncing?.id ?? 'no-pronunciation'} card={pronouncing} onClose={() => setPronouncing(null)} />
+      </>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <VocabStats tracked={active.length} atRisk={atRiskCount} newThisWeek={newThisWeek} />
@@ -98,14 +112,25 @@ export function VocabularyPanel() {
             aria-label="Search vocabulary"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search word, meaning, or pinyin"
+            placeholder="Search word, meaning, IPA, or pinyin"
             className="pl-8"
           />
         </div>
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <MessageSquareText className="size-3.5" />
-          Review happens in chat — tell the Assistant "ôn từ đi"
-        </p>
+        <div className="flex shrink-0 items-center">
+          <Button className="rounded-r-none" disabled={active.length === 0} onClick={() => setReviewLimit(20)}>
+            <PlayCircle /> Review {Math.min(20, active.length)} weak cards
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="default" size="icon" className="rounded-l-none border-l border-primary-foreground/20" disabled={active.length === 0} aria-label="Choose review size">
+                <ChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {[10, 20, 30].map((limit) => <DropdownMenuItem key={limit} onClick={() => setReviewLimit(limit)}>Review up to {limit} cards</DropdownMenuItem>)}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {cardsQuery.error ? (
@@ -210,7 +235,7 @@ function CardsTable({ rows, isLoading, onEdit, onDelete, onPronounce, onToggleSu
                 <TableCell>
                   <div className="min-w-28">
                     <p className="text-sm font-medium">{card.front}</p>
-                    {meta.reading && <p className="text-xs text-muted-foreground">{meta.reading}</p>}
+                    {(meta.reading || meta.partOfSpeech) && <p className="text-xs text-muted-foreground">{[meta.reading, meta.partOfSpeech].filter(Boolean).join(' · ')}</p>}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -277,6 +302,7 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
   const [front, setFront] = useState(card.front)
   const [back, setBack] = useState(card.back)
   const [reading, setReading] = useState(meta.reading ?? '')
+  const [partOfSpeech, setPartOfSpeech] = useState(meta.partOfSpeech ?? '')
   const [example, setExample] = useState(meta.example ?? '')
   const update = useUpdateVocabCard()
 
@@ -285,15 +311,12 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
       toast.error('Enter both the word and its meaning')
       return
     }
-    const metadata: Record<string, string> = {}
-    if (reading.trim()) metadata.reading = reading.trim()
-    if (example.trim()) metadata.example = example.trim()
     update.mutate(
       {
         id: card.id,
         front: front.trim(),
         back: back.trim(),
-        metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+        metadata: mergeVocabMetadata(card.metadata, { reading, partOfSpeech, example }),
         disciplineId: card.disciplineId ?? undefined,
         suspended: card.suspended,
       },
@@ -317,6 +340,10 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
             <Label htmlFor="card-reading">Reading</Label>
             <Input id="card-reading" placeholder="pinyin / IPA" value={reading} onChange={(event) => setReading(event.target.value)} />
           </div>
+        </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="card-part-of-speech">Part of speech</Label>
+          <Input id="card-part-of-speech" placeholder="noun / verb / adjective / phrase" value={partOfSpeech} onChange={(event) => setPartOfSpeech(event.target.value)} />
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="card-back">Meaning</Label>
