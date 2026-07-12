@@ -4,15 +4,20 @@ import {
   ArrowDownLeft,
   ArrowUpDown,
   ArrowUpRight,
+  Banknote,
   Download,
   Ellipsis,
+  Landmark,
   LockKeyhole,
   Pencil,
   Scale,
   Search,
+  Smartphone,
   Sparkles,
   Trash2,
   TrendingUp,
+  Undo2,
+  WalletCards,
 } from 'lucide-react'
 import {
   createColumnHelper,
@@ -46,6 +51,7 @@ import {
   useCreateBalanceCheckIn,
   useDeleteTransaction,
   useMonthSummary,
+  useUndoBalanceCheckIn,
   useTransactions,
   useUpdateTransaction,
   type Transaction,
@@ -393,47 +399,115 @@ function TransactionActions({ transaction, onEdit, onDelete }: {
 function BalanceCheckInDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const history = useBalanceCheckIns()
   const create = useCreateBalanceCheckIn()
+  const undo = useUndoBalanceCheckIn()
   const latest = history.data?.[0]
-  const [actualBalance, setActualBalance] = useState('')
+  const [balances, setBalances] = useState({ bankBalance: '', cashBalance: '', eWalletBalance: '', otherBalance: '' })
   const [checkedOn, setCheckedOn] = useState(todayIso())
+  const [confirmingUndo, setConfirmingUndo] = useState(false)
+
+  const parsedBalances = Object.fromEntries(
+    Object.entries(balances).map(([key, value]) => [key, value.trim() === '' ? 0 : Number(value)]),
+  ) as Record<keyof typeof balances, number>
+  const totalBalance = Object.values(parsedBalances).reduce((sum, value) => sum + (Number.isSafeInteger(value) ? value : 0), 0)
 
   function submit() {
-    const actual = Number(actualBalance)
-    if (!Number.isSafeInteger(actual) || actual < 0 || !checkedOn) {
-      toast.error('Enter a non-negative whole-VND balance and date')
+    if (Object.values(parsedBalances).some((value) => !Number.isSafeInteger(value) || value < 0) || !checkedOn) {
+      toast.error('Enter non-negative whole-VND balances and a date')
       return
     }
-    create.mutate({ actualBalance: actual, checkedOn }, {
+    create.mutate({ ...parsedBalances, checkedOn }, {
       onSuccess: (result) => {
         if (!result.adjustment) toast.success(latest ? 'Ledger already matches your balance' : 'Balance baseline saved')
         else if (result.discrepancy < 0) toast.success(`${vnd(Math.abs(result.discrepancy))} added as unrecorded spending`)
         else toast.success(`${vnd(result.discrepancy)} added as unrecorded income`)
-        setActualBalance('')
+        setBalances({ bankBalance: '', cashBalance: '', eWalletBalance: '', otherBalance: '' })
         onClose()
       },
       onError: (error) => toast.error(error.message),
     })
   }
 
+  function undoLatest() {
+    if (!latest) return
+    undo.mutate(latest.id, {
+      onSuccess: () => {
+        toast.success('Latest balance check-in undone')
+        setConfirmingUndo(false)
+      },
+      onError: (error) => toast.error(error.message),
+    })
+  }
+
+  function closeDialog() {
+    setConfirmingUndo(false)
+    onClose()
+  }
+
+  const balanceFields = [
+    { key: 'bankBalance', label: 'Bank accounts', icon: Landmark },
+    { key: 'cashBalance', label: 'Cash on hand', icon: Banknote },
+    { key: 'eWalletBalance', label: 'E-wallets', icon: Smartphone },
+    { key: 'otherBalance', label: 'Other balances', icon: WalletCards },
+  ] as const
+
   return (
-    <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={(value) => !value && closeDialog()}>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Balance check-in</DialogTitle>
-          <DialogDescription>Enter the combined end-of-day balance across your wallets and accounts.</DialogDescription>
+          <DialogDescription>Enter every place you currently hold money. Northstar reconciles the combined total, not one account.</DialogDescription>
         </DialogHeader>
         {latest && (
-          <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3 text-sm">
-            <div><p className="font-medium">Last check-in</p><p className="text-xs text-muted-foreground">{formatFullDate(latest.checkedOn)}</p></div>
-            <p className="font-semibold tabular-nums">{vnd(latest.actualBalance)}</p>
+          <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div><p className="font-medium">Last check-in</p><p className="text-xs text-muted-foreground">{formatFullDate(latest.checkedOn)}</p></div>
+              <div className="flex items-center gap-1">
+                <p className="font-semibold tabular-nums">{vnd(latest.totalBalance)}</p>
+                <Button type="button" variant="ghost" size="icon-sm" title="Undo latest check-in" aria-label="Undo latest check-in" onClick={() => setConfirmingUndo(true)}>
+                  <Undo2 className="size-3.5" />
+                </Button>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-4">
+              <span>Bank {vnd(latest.breakdown.bankBalance)}</span>
+              <span>Cash {vnd(latest.breakdown.cashBalance)}</span>
+              <span>E-wallet {vnd(latest.breakdown.eWalletBalance)}</span>
+              <span>Other {vnd(latest.breakdown.otherBalance)}</span>
+            </div>
+          </div>
+        )}
+        {confirmingUndo && latest && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+            <p className="font-medium">Undo {formatFullDate(latest.checkedOn)}?</p>
+            <p className="mt-1 text-xs text-muted-foreground">The generated reconciliation transaction will also be removed. Your recorded income and expenses stay unchanged.</p>
+            <div className="mt-3 flex justify-end gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmingUndo(false)}>Keep it</Button>
+              <Button type="button" variant="destructive" size="sm" onClick={undoLatest} disabled={undo.isPending}>Undo check-in</Button>
+            </div>
           </div>
         )}
         <div className="grid gap-3 sm:grid-cols-2">
-          <div className="grid gap-1.5"><Label htmlFor="check-in-balance">Actual balance (VND)</Label><Input id="check-in-balance" autoFocus inputMode="numeric" placeholder="0" value={actualBalance} onChange={(event) => setActualBalance(event.target.value)} /></div>
-          <div className="grid gap-1.5"><Label htmlFor="check-in-date">End-of-day date</Label><Input id="check-in-date" type="date" max={todayIso()} value={checkedOn} onChange={(event) => setCheckedOn(event.target.value)} /></div>
+          {balanceFields.map((field, index) => (
+            <div key={field.key} className="grid gap-1.5">
+              <Label htmlFor={`check-in-${field.key}`} className="flex items-center gap-1.5"><field.icon className="size-3.5 text-muted-foreground" />{field.label}</Label>
+              <Input
+                id={`check-in-${field.key}`}
+                autoFocus={index === 0}
+                inputMode="numeric"
+                placeholder="0 VND"
+                value={balances[field.key]}
+                onChange={(event) => setBalances((current) => ({ ...current, [field.key]: event.target.value }))}
+              />
+            </div>
+          ))}
+          <div className="grid gap-1.5 sm:col-span-2"><Label htmlFor="check-in-date">End-of-day date</Label><Input id="check-in-date" type="date" max={todayIso()} value={checkedOn} onChange={(event) => setCheckedOn(event.target.value)} /></div>
         </div>
-        <p className="text-xs leading-relaxed text-muted-foreground">Northstar compares this with the prior check-in plus recorded income and spending. Any difference becomes a locked adjustment transaction in category Khác.</p>
-        <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button onClick={submit} disabled={create.isPending}>Reconcile balance</Button></DialogFooter>
+        <div className="flex items-center justify-between border-y py-3 text-sm">
+          <span className="text-muted-foreground">Combined balance</span>
+          <strong className="tabular-nums">{vnd(totalBalance)}</strong>
+        </div>
+        <p className="text-xs leading-relaxed text-muted-foreground">Northstar compares this total with the prior check-in plus every recorded income and expense. Any difference becomes a locked adjustment transaction in category Khác.</p>
+        <DialogFooter><Button variant="outline" onClick={closeDialog}>Cancel</Button><Button onClick={submit} disabled={create.isPending}>Reconcile balance</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   )

@@ -17,8 +17,20 @@ public class BalanceCheckIn extends BaseEntity {
     private LocalDate checkedOn;
 
     @PositiveOrZero
-    @Column(name = "actual_balance", nullable = false)
-    private long actualBalance;
+    @Column(name = "bank_balance", nullable = false)
+    private long bankBalance;
+
+    @PositiveOrZero
+    @Column(name = "cash_balance", nullable = false)
+    private long cashBalance;
+
+    @PositiveOrZero
+    @Column(name = "e_wallet_balance", nullable = false)
+    private long eWalletBalance;
+
+    @PositiveOrZero
+    @Column(name = "other_balance", nullable = false)
+    private long otherBalance;
 
     @Column(name = "expected_balance", nullable = false)
     private long expectedBalance;
@@ -33,11 +45,14 @@ public class BalanceCheckIn extends BaseEntity {
         // for JPA
     }
 
-    BalanceCheckIn(UUID id, LocalDate checkedOn, long actualBalance, long expectedBalance,
-            long discrepancy, UUID adjustmentTransactionId) {
+    BalanceCheckIn(UUID id, LocalDate checkedOn, BalanceBreakdown breakdown,
+            long expectedBalance, long discrepancy, UUID adjustmentTransactionId) {
         super(id);
         this.checkedOn = checkedOn;
-        this.actualBalance = actualBalance;
+        this.bankBalance = breakdown.bankBalance();
+        this.cashBalance = breakdown.cashBalance();
+        this.eWalletBalance = breakdown.eWalletBalance();
+        this.otherBalance = breakdown.otherBalance();
         this.expectedBalance = expectedBalance;
         this.discrepancy = discrepancy;
         this.adjustmentTransactionId = adjustmentTransactionId;
@@ -47,8 +62,12 @@ public class BalanceCheckIn extends BaseEntity {
         return checkedOn;
     }
 
-    public long getActualBalance() {
-        return actualBalance;
+    public BalanceBreakdown getBreakdown() {
+        return new BalanceBreakdown(bankBalance, cashBalance, eWalletBalance, otherBalance);
+    }
+
+    public long getTotalBalance() {
+        return getBreakdown().totalBalance();
     }
 
     public long getExpectedBalance() {

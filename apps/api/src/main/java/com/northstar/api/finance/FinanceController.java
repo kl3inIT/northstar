@@ -1,6 +1,7 @@
 package com.northstar.api.finance;
 
 import com.northstar.core.finance.BalanceCheckInSummary;
+import com.northstar.core.finance.BalanceBreakdown;
 import com.northstar.core.finance.FinanceInsights;
 import com.northstar.core.finance.FinanceService;
 import com.northstar.core.finance.BudgetSummary;
@@ -112,8 +113,17 @@ class FinanceController {
     BalanceCheckInSummary createBalanceCheckIn(
             @Valid @RequestBody FinanceRequest.BalanceCheckInRequest request,
             @RequestHeader(name = "X-Timezone", required = false) String tz) {
-        return finance.checkInBalance(request.actualBalance(), request.checkedOn(),
+        return finance.checkInBalance(new BalanceBreakdown(request.bankBalance(),
+                request.cashBalance(), request.eWalletBalance(), request.otherBalance()),
+                request.checkedOn(),
                 LocalDate.now(zone(tz)));
+    }
+
+    @DeleteMapping("/balance-check-ins/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "undoBalanceCheckIn")
+    void undoBalanceCheckIn(@PathVariable("id") UUID id) {
+        finance.undoBalanceCheckIn(id);
     }
 
     @GetMapping("/insights")

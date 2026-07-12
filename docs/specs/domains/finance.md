@@ -53,12 +53,18 @@ of creating spelling variants.
   remains user-overridable. A real category change stores a compact mapping from
   normalized description and type to the chosen category; recent mappings are
   fed back to Capture as user-specific few-shot examples.
-- A balance check-in records the aggregate real balance at the end of a day.
-  The first check-in establishes a baseline. Each later check-in compares the
-  actual balance with the prior actual plus intervening income minus expense,
-  then writes the signed discrepancy as one immutable reconciliation entry in
-  category `Khac`. This re-anchors the ledger without pretending to identify
-  which account or forgotten purchase caused the difference.
+- A balance check-in records an explicit end-of-day breakdown for bank
+  accounts, cash, e-wallets, and other balances. The server derives the aggregate
+  total; callers cannot submit a detached total that accidentally reconciles one
+  account against the whole ledger. The first check-in establishes a baseline.
+  Each later check-in compares the new total with the prior total plus
+  intervening income minus expense, then writes the signed discrepancy as one
+  immutable reconciliation entry in category `Khac`.
+- Only the latest balance check-in can be undone. Undo removes both its anchor
+  and generated reconciliation row while preserving user-recorded transactions.
+  Earlier anchors stay immutable so a later check-in can never be left based on
+  a deleted predecessor. This remains aggregate reconciliation: transaction rows
+  still do not claim an account or explain which balance component moved.
 - The transaction toolbar exports the loaded month as CSV for statement review
   or spreadsheet analysis.
 - The weekly alignment review reports ordinary category totals separately from
@@ -156,7 +162,8 @@ of creating spelling variants.
   `/api/finance/savings-goals`
 - Subscription list/create/update/delete and explicit payment under
   `/api/finance/subscriptions`
-- Balance check-in list/create under `/api/finance/balance-check-ins`
+- Balance check-in list/create and latest-only undo under
+  `/api/finance/balance-check-ins`
 - `GET /api/finance/insights?through=yyyy-MM-dd`
 - `GET /api/finance/recurring-suggestions`
 
@@ -177,3 +184,4 @@ of creating spelling variants.
 - [0008 - Finance Uses A Capture-First Ledger And Lightweight Planning](../../decisions/0008-finance-is-a-capture-first-ledger.md)
 - [0009 - Subscriptions Are Visible And Explicitly Paid](../../decisions/0009-subscriptions-are-visible-and-explicitly-paid.md)
 - [0010 - Finance Reanchors The Ledger And Learns Locally](../../decisions/0010-finance-reanchors-the-ledger-and-learns-locally.md)
+- [0030 - Finance Check-ins Require A Balance Breakdown](../../decisions/0030-finance-check-ins-require-a-balance-breakdown.md)

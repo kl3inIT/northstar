@@ -74,7 +74,10 @@ final class FinanceRequest {
     }
 
     record BalanceCheckInRequest(
-            @PositiveOrZero @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long actualBalance,
+            @PositiveOrZero @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long bankBalance,
+            @PositiveOrZero @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long cashBalance,
+            @PositiveOrZero @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long eWalletBalance,
+            @PositiveOrZero @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long otherBalance,
             @NotNull LocalDate checkedOn) {
     }
 

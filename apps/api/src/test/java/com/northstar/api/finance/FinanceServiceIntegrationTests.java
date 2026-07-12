@@ -3,12 +3,14 @@ package com.northstar.api.finance;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.hasItems;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.northstar.core.finance.BalanceBreakdown;
 import com.northstar.core.finance.FinanceService;
 import com.northstar.core.finance.NewTransaction;
 import com.northstar.core.finance.SubscriptionCycle;
@@ -61,6 +63,8 @@ class FinanceServiceIntegrationTests {
                         + ".post.operationId").value("contributeSavingsGoal"))
                 .andExpect(jsonPath("$.paths['/api/finance/balance-check-ins'].post.operationId")
                         .value("createBalanceCheckIn"))
+                .andExpect(jsonPath("$.paths['/api/finance/balance-check-ins/{id}'].delete.operationId")
+                        .value("undoBalanceCheckIn"))
                 .andExpect(jsonPath("$.paths['/api/finance/insights'].get.operationId")
                         .value("getFinanceInsights"))
                 .andExpect(jsonPath("$.paths['/api/finance/recurring-suggestions'].get.operationId")
@@ -82,9 +86,10 @@ class FinanceServiceIntegrationTests {
                 .andExpect(jsonPath("$.components.schemas.SubscriptionPaymentRequest.required",
                         hasItems("occurredOn", "expectedDueOn", "version")))
                 .andExpect(jsonPath("$.components.schemas.BalanceCheckInRequest.required",
-                        hasItems("actualBalance", "checkedOn")))
+                        hasItems("bankBalance", "cashBalance", "eWalletBalance", "otherBalance",
+                                "checkedOn")))
                 .andExpect(jsonPath("$.components.schemas.BalanceCheckInSummary.required",
-                        hasItems("actualBalance", "expectedBalance", "discrepancy")));
+                        hasItems("breakdown", "totalBalance", "expectedBalance", "discrepancy")));
     }
 
     @Test
@@ -167,31 +172,42 @@ class FinanceServiceIntegrationTests {
     }
 
     @Test
-    void balanceCheckInAnchorsTheLedgerAndCreatesImmutableAdjustments() {
+    void balanceCheckInAnchorsTheLedgerAndCreatesImmutableAdjustments() throws Exception {
         LocalDate baseline = LocalDate.of(2040, 1, 1);
-        var first = finance.checkInBalance(10_000_000, baseline, baseline);
+        var first = finance.checkInBalance(balance(10_000_000, 0), baseline, baseline);
 
         assertThat(first.expectedBalance()).isEqualTo(10_000_000);
+        assertThat(first.totalBalance()).isEqualTo(10_000_000);
         assertThat(first.discrepancy()).isZero();
         assertThat(first.adjustment()).isNull();
 
-        finance.record(item(TransactionType.EXPENSE, 1_000_000, baseline.plusDays(1),
+        finance.record(item(TransactionType.INCOME, 500_000, baseline.plusDays(1),
+                "Cash received", "Khác", false), TransactionSource.CAPTURE);
+        var cashCheckIn = finance.checkInBalance(balance(10_000_000, 500_000),
+                baseline.plusDays(1), baseline.plusDays(1));
+
+        assertThat(cashCheckIn.expectedBalance()).isEqualTo(10_500_000);
+        assertThat(cashCheckIn.totalBalance()).isEqualTo(10_500_000);
+        assertThat(cashCheckIn.breakdown().cashBalance()).isEqualTo(500_000);
+        assertThat(cashCheckIn.discrepancy()).isZero();
+
+        finance.record(item(TransactionType.EXPENSE, 1_000_000, baseline.plusDays(2),
                 "Rent after baseline", "Nhà cửa", false), TransactionSource.CAPTURE);
         finance.record(item(TransactionType.INCOME, 200_000, baseline.plusDays(2),
                 "Refund after baseline", "Khác", false), TransactionSource.CAPTURE);
 
-        var missingExpense = finance.checkInBalance(9_000_000, baseline.plusDays(2),
+        var missingExpense = finance.checkInBalance(balance(9_000_000, 500_000), baseline.plusDays(2),
                 baseline.plusDays(2));
-        assertThat(missingExpense.expectedBalance()).isEqualTo(9_200_000);
+        assertThat(missingExpense.expectedBalance()).isEqualTo(9_700_000);
         assertThat(missingExpense.discrepancy()).isEqualTo(-200_000);
         assertThat(missingExpense.adjustment().type()).isEqualTo(TransactionType.EXPENSE);
         assertThat(missingExpense.adjustment().source())
                 .isEqualTo(TransactionSource.RECONCILIATION);
         assertThat(missingExpense.adjustment().category()).isEqualTo("Khác");
 
-        var missingIncome = finance.checkInBalance(9_100_000, baseline.plusDays(3),
+        var missingIncome = finance.checkInBalance(balance(9_100_000, 500_000), baseline.plusDays(3),
                 baseline.plusDays(3));
-        assertThat(missingIncome.expectedBalance()).isEqualTo(9_000_000);
+        assertThat(missingIncome.expectedBalance()).isEqualTo(9_500_000);
         assertThat(missingIncome.discrepancy()).isEqualTo(100_000);
         assertThat(missingIncome.adjustment().type()).isEqualTo(TransactionType.INCOME);
 
@@ -201,8 +217,16 @@ class FinanceServiceIntegrationTests {
                 .hasMessageContaining("managed by their balance check-in");
         assertThatThrownBy(() -> finance.delete(missingExpense.adjustment().id()))
                 .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> finance.undoBalanceCheckIn(first.id()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("only the latest");
+
+        mvc.perform(delete("/api/finance/balance-check-ins/{id}", missingIncome.id()))
+                .andExpect(status().isNoContent());
+        assertThatThrownBy(() -> finance.find(missingIncome.adjustment().id()))
+                .isInstanceOf(TransactionNotFoundException.class);
         assertThat(finance.balanceCheckIns()).extracting(item -> item.checkedOn())
-                .containsExactly(baseline.plusDays(3), baseline.plusDays(2), baseline);
+                .containsExactly(baseline.plusDays(2), baseline.plusDays(1), baseline);
     }
 
     @Test
@@ -475,5 +499,9 @@ class FinanceServiceIntegrationTests {
     private static NewTransaction item(TransactionType type, long amount, LocalDate occurredOn,
             String description, String category, boolean exceptional) {
         return new NewTransaction(type, amount, occurredOn, description, category, exceptional);
+    }
+
+    private static BalanceBreakdown balance(long bank, long cash) {
+        return new BalanceBreakdown(bank, cash, 0, 0);
     }
 }

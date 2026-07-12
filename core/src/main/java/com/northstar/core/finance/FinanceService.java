@@ -199,9 +199,10 @@ public class FinanceService {
      * establishes the baseline; later differences become immutable ledger rows.
      */
     @Transactional
-    public BalanceCheckInSummary checkInBalance(long actualBalance, LocalDate checkedOn,
+    public BalanceCheckInSummary checkInBalance(BalanceBreakdown breakdown, LocalDate checkedOn,
             LocalDate today) {
-        long actual = requireNonNegative(actualBalance, "actualBalance");
+        BalanceBreakdown validBreakdown = requireBalanceBreakdown(breakdown);
+        long actual = validBreakdown.totalBalance();
         LocalDate date = requireDate(checkedOn, "checkedOn");
         if (date.isAfter(requireDate(today, "today"))) {
             throw new IllegalArgumentException("checkedOn must not be in the future");
@@ -223,7 +224,7 @@ public class FinanceService {
             long expense = flow.stream().filter(row -> row.type() == TransactionType.EXPENSE)
                     .mapToLong(TransactionSummary::amount).sum();
             try {
-                expected = Math.subtractExact(Math.addExact(previous.getActualBalance(), income),
+                expected = Math.subtractExact(Math.addExact(previous.getTotalBalance(), income),
                         expense);
                 discrepancy = Math.subtractExact(actual, expected);
             } catch (ArithmeticException e) {
@@ -239,10 +240,27 @@ public class FinanceService {
             }
         }
 
-        BalanceCheckIn checkIn = new BalanceCheckIn(UUID.randomUUID(), date, actual, expected,
-                discrepancy, adjustment == null ? null : adjustment.id());
+        BalanceCheckIn checkIn = new BalanceCheckIn(UUID.randomUUID(), date, validBreakdown,
+                expected, discrepancy, adjustment == null ? null : adjustment.id());
         balanceCheckInRepository.saveAndFlush(checkIn);
         return balanceCheckInSummary(checkIn, adjustment);
+    }
+
+    /** Remove only the latest anchor and its generated adjustment, then expose its predecessor. */
+    @Transactional
+    public void undoBalanceCheckIn(UUID id) {
+        BalanceCheckIn latest = balanceCheckInRepository
+                .findTopByOrderByCheckedOnDescCreatedAtDesc()
+                .orElseThrow(() -> new IllegalArgumentException("balance check-in not found"));
+        if (!latest.getId().equals(Objects.requireNonNull(id, "id is required"))) {
+            throw new IllegalArgumentException("only the latest balance check-in can be undone");
+        }
+        UUID adjustmentId = latest.getAdjustmentTransactionId();
+        balanceCheckInRepository.delete(latest);
+        balanceCheckInRepository.flush();
+        if (adjustmentId != null) {
+            transactions.deleteById(adjustmentId);
+        }
     }
 
     /** Twelve monthly points plus current-month categories and 365 daily expense buckets. */
@@ -626,8 +644,18 @@ public class FinanceService {
     private static BalanceCheckInSummary balanceCheckInSummary(BalanceCheckIn checkIn,
             TransactionSummary adjustment) {
         return new BalanceCheckInSummary(checkIn.getId(), checkIn.getCheckedOn(),
-                checkIn.getActualBalance(), checkIn.getExpectedBalance(), checkIn.getDiscrepancy(),
-                adjustment, checkIn.getCreatedAt());
+                checkIn.getBreakdown(), checkIn.getTotalBalance(), checkIn.getExpectedBalance(),
+                checkIn.getDiscrepancy(), adjustment, checkIn.getCreatedAt());
+    }
+
+    private static BalanceBreakdown requireBalanceBreakdown(BalanceBreakdown breakdown) {
+        BalanceBreakdown value = Objects.requireNonNull(breakdown, "breakdown is required");
+        requireNonNegative(value.bankBalance(), "bankBalance");
+        requireNonNegative(value.cashBalance(), "cashBalance");
+        requireNonNegative(value.eWalletBalance(), "eWalletBalance");
+        requireNonNegative(value.otherBalance(), "otherBalance");
+        value.totalBalance();
+        return value;
     }
 
     private static void rejectReconciliationMutation(Transaction transaction) {
