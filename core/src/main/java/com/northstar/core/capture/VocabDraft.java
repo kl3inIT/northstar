@@ -1,5 +1,6 @@
 package com.northstar.core.capture;
 
+import com.northstar.core.study.VocabLanguage;
 import java.util.List;
 
 /**
@@ -18,6 +19,8 @@ public record VocabDraft(List<VocabItem> items) {
             String reading,
             String partOfSpeech,
             String example,
+            VocabLanguage language,
+            String deck,
             String disciplineName) {
     }
 }

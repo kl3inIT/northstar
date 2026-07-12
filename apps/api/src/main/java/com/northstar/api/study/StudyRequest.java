@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import com.northstar.core.study.VocabEnrichmentField;
+import com.northstar.core.study.VocabLanguage;
 import com.northstar.core.study.VocabReviewLog;
 
 /**
@@ -48,6 +49,8 @@ final class StudyRequest {
             @NotBlank @Size(max = 255) String front,
             @NotBlank @Size(max = 1000) String back,
             @Size(max = 4000) String metadata,
+            @NotNull VocabLanguage language,
+            @Size(max = 80) String deck,
             UUID disciplineId) {
     }
 
@@ -60,6 +63,8 @@ final class StudyRequest {
             @NotBlank @Size(max = 255) String front,
             @NotBlank @Size(max = 1000) String back,
             @Size(max = 4000) String metadata,
+            @NotNull VocabLanguage language,
+            @Size(max = 80) String deck,
             UUID disciplineId,
             @NotNull Boolean suspended) {
     }

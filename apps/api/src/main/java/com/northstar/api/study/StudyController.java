@@ -18,6 +18,7 @@ import com.northstar.core.study.VocabCardSummary;
 import com.northstar.core.study.VocabAnswerAssessment;
 import com.northstar.core.study.VocabCoach;
 import com.northstar.core.study.VocabEnrichmentPreview;
+import com.northstar.core.study.VocabLanguage;
 import com.northstar.core.study.VocabReviewLog;
 import com.northstar.core.study.VocabService;
 import com.northstar.core.study.WritingFeedbackSummary;
@@ -145,16 +146,19 @@ class StudyController {
     /** Every card, newest first, with recall probability computed for now. */
     @GetMapping("/vocab")
     @Operation(operationId = "listVocabCards")
-    List<VocabCardSummary> vocabCards() {
-        return vocab.cards();
+    List<VocabCardSummary> vocabCards(
+            @RequestParam(name = "language", required = false) VocabLanguage language) {
+        return vocab.cards(language);
     }
 
     /** Active cards with the lowest predicted recall right now; there are no due dates. */
     @GetMapping("/vocab/review")
     @Operation(operationId = "listVocabReviewCards")
     List<VocabCardSummary> vocabReviewCards(
+            @RequestParam(name = "language") VocabLanguage language,
+            @RequestParam(name = "deck", required = false) String deck,
             @RequestParam(name = "limit", defaultValue = "20") int limit) {
-        return vocab.atRisk(limit, null);
+        return vocab.atRisk(language, deck, limit, null);
     }
 
     /** A learner-chosen rating is the only page action that updates the memory model. */
@@ -189,7 +193,8 @@ class StudyController {
     List<VocabCardSummary> recordVocabCards(
             @Valid @RequestBody StudyRequest.RecordVocabCardsRequest request) {
         List<NewVocabCard> items = request.items().stream()
-                .map(i -> new NewVocabCard(i.front(), i.back(), i.metadata(), i.disciplineId()))
+                .map(i -> new NewVocabCard(i.front(), i.back(), i.metadata(),
+                        i.language(), i.deck(), i.disciplineId()))
                 .toList();
         return vocab.createAll(items);
     }
@@ -199,7 +204,7 @@ class StudyController {
     VocabCardSummary updateVocabCard(@PathVariable("id") UUID id,
             @Valid @RequestBody StudyRequest.UpdateVocabCardRequest request) {
         return vocab.update(id, request.front(), request.back(), request.metadata(),
-                request.disciplineId(), request.suspended());
+                request.language(), request.deck(), request.disciplineId(), request.suspended());
     }
 
     @DeleteMapping("/vocab/{id}")

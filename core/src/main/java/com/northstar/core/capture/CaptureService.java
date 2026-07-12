@@ -255,6 +255,10 @@ public class CaptureService {
               Chinese (with tone marks), IPA for English. "" when unsure.
             - partOfSpeech: the word's lexical category in concise English
               (noun, verb, adjective, adverb, phrase, etc.). "" when unsure.
+            - language: ENGLISH or CHINESE. Chinese means the front contains a
+              Chinese lexical item; supported non-Han vocabulary is ENGLISH.
+            - deck: the user's explicitly named deck (IELTS, HSK4, Daily,
+              etc.), otherwise "" for General. Never invent a deck.
             - example: preserve ONE example with translation after " — " only
               when the user supplied or explicitly requested it. Otherwise "".
               Never generate extra card enrichment during capture.

@@ -56,25 +56,30 @@ public class VocabService {
             throw new IllegalArgumentException("items must contain at least one card");
         }
         Instant now = Instant.now();
-        List<VocabCard> existing = cards.findByOrderByCreatedAtDesc();
+        List<VocabCard> existing = new ArrayList<>(cards.findByOrderByCreatedAtDesc());
         Map<String, VocabCard> byFront = new HashMap<>();
         for (VocabCard card : existing) {
-            byFront.putIfAbsent(key(card.getFront()), card);
+            byFront.putIfAbsent(key(card.getLanguage(), card.getFront()), card);
         }
         List<VocabCard> result = new ArrayList<>();
         for (NewVocabCard item : items) {
             String front = requireText(item.front(), "front", 255);
-            VocabCard already = byFront.get(key(front));
+            VocabLanguage language = Objects.requireNonNullElseGet(item.language(),
+                    () -> VocabLanguage.detect(front));
+            String identity = key(language, front);
+            VocabCard already = byFront.get(identity);
             if (already != null) {
                 result.add(already);
                 continue;
             }
             VocabCard card = new VocabCard(UUID.randomUUID(), front,
                     requireText(item.back(), "back", 1000),
-                    trimToNull(item.metadata(), 4000), item.disciplineId(),
+                    trimToNull(item.metadata(), 4000), language,
+                    canonicalDeck(item.deck(), language, existing), item.disciplineId(),
                     INITIAL_ALPHA_BETA, INITIAL_ALPHA_BETA, INITIAL_HALFLIFE_HOURS, now);
             cards.save(card);
-            byFront.put(key(front), card);
+            existing.add(card);
+            byFront.put(identity, card);
             result.add(card);
         }
         return summarize(result, now);
@@ -91,10 +96,32 @@ public class VocabService {
                 .toList();
     }
 
+    /** The independent review queue for one language and optional deck scope. */
+    @Transactional(readOnly = true)
+    public List<VocabCardSummary> atRisk(VocabLanguage language, String deck,
+            int limit, Instant now) {
+        VocabLanguage requiredLanguage = Objects.requireNonNull(language, "language is required");
+        String requestedDeck = normalizeDeckFilter(deck);
+        Instant at = Objects.requireNonNullElseGet(now, Instant::now);
+        return summarize(cards.findBySuspendedFalse(), at).stream()
+                .filter(card -> card.language() == requiredLanguage)
+                .filter(card -> deckMatches(card.deck(), requestedDeck))
+                .sorted(Comparator.comparingDouble(VocabCardSummary::recallProbability))
+                .limit(Math.clamp(limit, 1, 50))
+                .toList();
+    }
+
     /** Every card, most recently added first, with recall computed for now. */
     @Transactional(readOnly = true)
     public List<VocabCardSummary> cards() {
         return summarize(cards.findByOrderByCreatedAtDesc(), Instant.now());
+    }
+
+    /** One language library; null retains the all-card internal/tool view. */
+    @Transactional(readOnly = true)
+    public List<VocabCardSummary> cards(VocabLanguage language) {
+        return cards().stream().filter(card -> language == null || card.language() == language)
+                .toList();
     }
 
     /**
@@ -126,10 +153,15 @@ public class VocabService {
     /** Edit the content sides; the memory model only moves through reviews. */
     @Transactional
     public VocabCardSummary update(UUID id, String front, String back, String metadata,
-            UUID disciplineId, boolean suspended) {
+            VocabLanguage language, String deck, UUID disciplineId, boolean suspended) {
         VocabCard card = get(id);
+        String requiredFront = requireText(front, "front", 255);
+        VocabLanguage requiredLanguage = Objects.requireNonNullElseGet(language,
+                () -> VocabLanguage.detect(requiredFront));
         card.edit(requireText(front, "front", 255), requireText(back, "back", 1000),
-                trimToNull(metadata, 4000), disciplineId, suspended);
+                trimToNull(metadata, 4000), requiredLanguage,
+                canonicalDeck(deck, requiredLanguage, cards.findByOrderByCreatedAtDesc()),
+                disciplineId, suspended);
         return summarize(List.of(card), Instant.now()).getFirst();
     }
 
@@ -186,7 +218,8 @@ public class VocabService {
                     Duration.between(card.getLastReviewedAt(), now).toMillis() / 3_600_000.0);
             double recall = Ebisu.predictRecall(model(card), elapsedHours);
             return new VocabCardSummary(card.getId(), card.getFront(), card.getBack(),
-                    card.getMetadata(), card.getDisciplineId(), recall, card.getHalflifeHours(),
+                    card.getMetadata(), card.getLanguage(), card.getDeck(),
+                    card.getDisciplineId(), recall, card.getHalflifeHours(),
                     card.getLastReviewedAt(), counts.getOrDefault(card.getId(), 0L).intValue(),
                     card.isSuspended(), card.getCreatedAt(), card.getVersion());
         }).toList();
@@ -220,10 +253,39 @@ public class VocabService {
         return stripped;
     }
 
-    private static String key(String value) {
+    static String canonicalDeck(String value, VocabLanguage language, List<VocabCard> existing) {
+        String normalized = normalizeStoredDeck(value);
+        if (normalized == null) return null;
+        return existing.stream()
+                .filter(card -> card.getLanguage() == language && card.getDeck() != null)
+                .map(VocabCard::getDeck)
+                .filter(deck -> deck.equalsIgnoreCase(normalized))
+                .findFirst()
+                .orElse(normalized);
+    }
+
+    static boolean deckMatches(String stored, String requested) {
+        if (requested == null) return true;
+        if (requested.equalsIgnoreCase("General")) return stored == null;
+        return stored != null && stored.equalsIgnoreCase(requested);
+    }
+
+    private static String normalizeStoredDeck(String value) {
+        if (value == null || value.isBlank()) return null;
+        String deck = requireText(value, "deck", 80);
+        return deck.equalsIgnoreCase("General") ? null : deck;
+    }
+
+    private static String normalizeDeckFilter(String value) {
+        if (value == null || value.isBlank()) return null;
+        return requireText(value, "deck", 80);
+    }
+
+    private static String key(VocabLanguage language, String value) {
         String decomposed = Normalizer.normalize(value, Normalizer.Form.NFD)
                 .replace('đ', 'd')
                 .replace('Đ', 'D');
-        return COMBINING_MARKS.matcher(decomposed).replaceAll("").toLowerCase(Locale.ROOT);
+        return language.name() + ':'
+                + COMBINING_MARKS.matcher(decomposed).replaceAll("").toLowerCase(Locale.ROOT);
     }
 }

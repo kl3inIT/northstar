@@ -14,6 +14,7 @@ import com.northstar.core.study.VocabCardSummary;
 import com.northstar.core.study.VocabCoach;
 import com.northstar.core.study.VocabEnrichmentField;
 import com.northstar.core.study.VocabEnrichmentPreview;
+import com.northstar.core.study.VocabLanguage;
 import com.northstar.core.study.VocabReviewLog;
 import com.northstar.core.study.VocabService;
 import com.northstar.core.study.WritingService;
@@ -58,6 +59,13 @@ class StudyControllerTests {
     }
 
     @Test
+    void reviewQueueIsScopedByLanguageAndDeck() {
+        controller.vocabReviewCards(VocabLanguage.ENGLISH, "IELTS", 10);
+
+        verify(vocab).atRisk(VocabLanguage.ENGLISH, "IELTS", 10, null);
+    }
+
+    @Test
     void enrichmentReturnsPreviewWithoutUpdatingTheCard() {
         UUID id = UUID.randomUUID();
         VocabCardSummary card = card(id);
@@ -72,13 +80,13 @@ class StudyControllerTests {
 
         assertThat(actual).isSameAs(expected);
         verify(vocab, never()).update(id, card.front(), card.back(), expected.metadata(),
-                card.disciplineId(), card.suspended());
+                card.language(), card.deck(), card.disciplineId(), card.suspended());
     }
 
     private static VocabCardSummary card(UUID id) {
         Instant now = Instant.parse("2026-07-12T00:00:00Z");
         return new VocabCardSummary(id, "meticulous", "tỉ mỉ",
                 "{\"reading\":\"/məˈtɪkjələs/\",\"partOfSpeech\":\"adjective\"}",
-                null, 0.4, 24, now, 2, false, now, 1);
+                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24, now, 2, false, now, 1);
     }
 }

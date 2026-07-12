@@ -5,6 +5,7 @@ import static com.northstar.core.assistant.ToolSupport.disciplineIdByName;
 import com.northstar.core.discipline.DisciplineService;
 import com.northstar.core.study.NewVocabCard;
 import com.northstar.core.study.VocabCardSummary;
+import com.northstar.core.study.VocabLanguage;
 import com.northstar.core.study.VocabReviewLog;
 import com.northstar.core.study.VocabService;
 import java.util.List;
@@ -38,7 +39,9 @@ class VocabTools implements NorthstarTool {
             "" when unsure). example is ONLY a sentence the user supplied or \
             explicitly requested; otherwise pass "". Never generate extra \
             enrichment merely because a card is saved. \
-            A front that already exists is returned as-is, never duplicated. \
+            language is ENGLISH or CHINESE; deck is an explicitly named flat \
+            deck such as IELTS or HSK4, otherwise "" for General. Never invent \
+            a deck. A front already saved in that language is returned as-is. \
             Pace introductions: more than ~10 new cards in one day dilutes \
             retention, and semantically similar words (near-synonyms) learned \
             together interfere — suggest spreading them across days instead of \
@@ -47,7 +50,8 @@ class VocabTools implements NorthstarTool {
             back in one line each.""";
 
     private static final String QUIZ = """
-            The N cards most likely forgotten RIGHT NOW (lowest predicted \
+            The N cards in ONE required language and optional deck most likely \
+            forgotten RIGHT NOW (lowest predicted \
             recall first) — there are no due dates, so this is always callable \
             and never backlogged. Each entry carries front, back, reading, \
             example, and recallProbability. QUIZ PROTOCOL when the user wants \
@@ -89,8 +93,8 @@ class VocabTools implements NorthstarTool {
             này dễ quá khỏi ôn" prefer update_vocab_card with suspended=true.""";
 
     /** One entry of a save_vocab_cards call; "" fields mean "none". */
-    record VocabItem(String front, String back, String reading, String partOfSpeech, String example,
-            String disciplineName) {
+    record VocabItem(String front, String back, String reading, String partOfSpeech,
+            String example, String language, String deck, String disciplineName) {
     }
 
     private final VocabService vocab;
@@ -114,6 +118,7 @@ class VocabTools implements NorthstarTool {
         List<NewVocabCard> resolved = items.stream()
                 .map(item -> new NewVocabCard(item.front(), item.back(),
                         ToolSupport.vocabMetadata(item.reading(), item.partOfSpeech(), item.example()),
+                        parseLanguage(item.language(), item.front()), item.deck(),
                         disciplineIdByName(disciplines, item.disciplineName())))
                 .toList();
         return vocab.createAll(resolved);
@@ -126,8 +131,15 @@ class VocabTools implements NorthstarTool {
     List<VocabCardSummary> quizVocab(
             @ToolParam(description = "How many cards, 1-50; defaults to 5", required = false)
             @McpToolParam(description = "How many cards, 1-50; defaults to 5",
-                    required = false) Integer count) {
-        return vocab.atRisk(count == null ? 5 : count, null);
+                    required = false) Integer count,
+            @ToolParam(description = "Required review library: ENGLISH or CHINESE")
+            @McpToolParam(description = "Required review library: ENGLISH or CHINESE",
+                    required = true) String language,
+            @ToolParam(description = "Deck name, General, or blank for all decks", required = false)
+            @McpToolParam(description = "Deck name, General, or blank for all decks",
+                    required = false) String deck) {
+        return vocab.atRisk(parseRequiredLanguage(language), deck,
+                count == null ? 5 : count, null);
     }
 
     @Tool(name = "record_vocab_review", description = RECORD_REVIEW)
@@ -175,13 +187,17 @@ class VocabTools implements NorthstarTool {
             @ToolParam(description = "User-supplied example with translation; pass '' for none", required = false)
             @McpToolParam(description = "User-supplied example with translation; pass '' for none",
                     required = false) String example,
+            @ToolParam(description = "ENGLISH or CHINESE")
+            @McpToolParam(description = "ENGLISH or CHINESE", required = true) String language,
+            @ToolParam(description = "Deck name; pass '' for General", required = false)
+            @McpToolParam(description = "Deck name; pass '' for General", required = false) String deck,
             @ToolParam(description = "true pauses the card out of quizzes; false resumes it")
             @McpToolParam(description = "true pauses the card out of quizzes; false resumes it",
                     required = true) boolean suspended) {
         UUID id = UUID.fromString(cardId);
         VocabCardSummary current = vocab.find(id);
         return vocab.update(id, front, back, ToolSupport.vocabMetadata(reading, partOfSpeech, example),
-                current.disciplineId(), suspended);
+                parseLanguage(language, front), deck, current.disciplineId(), suspended);
     }
 
     @Tool(name = "delete_vocab_card", description = DELETE_CARD)
@@ -206,5 +222,21 @@ class VocabTools implements NorthstarTool {
             throw new IllegalArgumentException(
                     "rating must be AGAIN, HARD, GOOD, or EASY — got '" + rating + "'");
         }
+    }
+
+    private static VocabLanguage parseLanguage(String language, String front) {
+        if (language == null || language.isBlank()) return VocabLanguage.detect(front);
+        try {
+            return VocabLanguage.valueOf(language.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("language must be ENGLISH or CHINESE");
+        }
+    }
+
+    private static VocabLanguage parseRequiredLanguage(String language) {
+        if (language == null || language.isBlank()) {
+            throw new IllegalArgumentException("language must be ENGLISH or CHINESE");
+        }
+        return parseLanguage(language, null);
     }
 }

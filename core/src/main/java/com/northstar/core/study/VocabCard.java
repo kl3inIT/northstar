@@ -3,6 +3,8 @@ package com.northstar.core.study;
 import com.northstar.core.shared.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import java.time.Instant;
@@ -32,6 +34,13 @@ public class VocabCard extends BaseEntity {
     @Column(length = 4000)
     private String metadata;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private VocabLanguage language;
+
+    @Column(length = 80)
+    private String deck;
+
     @Column(name = "discipline_id")
     private UUID disciplineId;
 
@@ -54,12 +63,15 @@ public class VocabCard extends BaseEntity {
         // for JPA
     }
 
-    public VocabCard(UUID id, String front, String back, String metadata, UUID disciplineId,
+    public VocabCard(UUID id, String front, String back, String metadata,
+            VocabLanguage language, String deck, UUID disciplineId,
             double alpha, double beta, double halflifeHours, Instant lastReviewedAt) {
         super(id);
         this.front = front;
         this.back = back;
         this.metadata = metadata;
+        this.language = language;
+        this.deck = deck;
         this.disciplineId = disciplineId;
         this.alpha = alpha;
         this.beta = beta;
@@ -78,6 +90,14 @@ public class VocabCard extends BaseEntity {
 
     public String getMetadata() {
         return metadata;
+    }
+
+    public VocabLanguage getLanguage() {
+        return language;
+    }
+
+    public String getDeck() {
+        return deck;
     }
 
     public UUID getDisciplineId() {
@@ -105,11 +125,13 @@ public class VocabCard extends BaseEntity {
     }
 
     /** Edit the content sides; the memory model is only ever moved by a review. */
-    public void edit(String front, String back, String metadata, UUID disciplineId,
-            boolean suspended) {
+    public void edit(String front, String back, String metadata, VocabLanguage language,
+            String deck, UUID disciplineId, boolean suspended) {
         this.front = front;
         this.back = back;
         this.metadata = metadata;
+        this.language = language;
+        this.deck = deck;
         this.disciplineId = disciplineId;
         this.suspended = suspended;
     }

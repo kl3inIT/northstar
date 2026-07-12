@@ -18,6 +18,8 @@ public record VocabCardSummary(
         @NotNull String front,
         @NotNull String back,
         String metadata,
+        @NotNull VocabLanguage language,
+        String deck,
         UUID disciplineId,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) double recallProbability,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) double halflifeHours,
