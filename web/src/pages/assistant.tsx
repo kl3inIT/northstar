@@ -10,6 +10,7 @@ import {
   type UIMessage,
 } from 'ai'
 import {
+  Bot,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -66,6 +67,7 @@ import {
   ModelSelectorInput,
   ModelSelectorItem,
   ModelSelectorList,
+  ModelSelectorLogo,
   ModelSelectorName,
   ModelSelectorTrigger,
 } from '@/components/ai-elements/model-selector'
@@ -110,7 +112,7 @@ import type {
 import { fileUrl, uploadFile } from '@/lib/files-api'
 import { apiFetch } from '@/lib/http'
 import {
-  useAiModels,
+  useChatAiModels,
   useAssistantConversationModel,
   useUpdateAssistantConversationModel,
 } from '@/lib/ai-settings-api'
@@ -506,7 +508,7 @@ function AssistantChat({
   const suggestions = useSuggestions()
   const queryClient = useQueryClient()
   const modelSelection = useAssistantConversationModel(conversationId)
-  const availableModels = useAiModels(modelSelection.data?.gatewayId)
+  const availableModels = useChatAiModels()
   const updateModel = useUpdateAssistantConversationModel(conversationId)
   const { messages, sendMessage, status, stop } = useChat({
     messages: initialMessages,
@@ -607,19 +609,6 @@ function AssistantChat({
       </PromptInputBody>
       <PromptInputFooter>
         <PromptInputTools>
-          <ModelPicker
-            gatewayName={modelSelection.data?.gatewayId}
-            modelId={modelSelection.data?.modelId}
-            models={availableModels.data ?? []}
-            disabled={busy || modelSelection.isLoading || availableModels.isLoading || updateModel.isPending}
-            onChange={(modelId) => {
-              const gatewayId = modelSelection.data?.gatewayId
-              if (!gatewayId) return
-              updateModel.mutate({ gatewayId, modelId }, {
-                onError: (error) => toast.error(error.message),
-              })
-            }}
-          />
           <PromptInputActionMenu>
             <PromptInputActionMenuTrigger aria-label="Add attachment" tooltip="Add attachment" />
             <PromptInputActionMenuContent>
@@ -627,6 +616,18 @@ function AssistantChat({
               <PromptInputActionAddScreenshot />
             </PromptInputActionMenuContent>
           </PromptInputActionMenu>
+          <ModelPicker
+            gatewayId={modelSelection.data?.gatewayId}
+            modelId={modelSelection.data?.modelId}
+            gateways={availableModels.gateways}
+            models={availableModels.models}
+            disabled={busy || modelSelection.isLoading || availableModels.isLoading || updateModel.isPending}
+            onChange={(route) => {
+              updateModel.mutate(route, {
+                onError: (error) => toast.error(error.message),
+              })
+            }}
+          />
         </PromptInputTools>
         <div className="flex items-center gap-1">
           <MicButton value={text} onChange={setText} compact />
@@ -756,23 +757,26 @@ function AssistantChat({
 }
 
 function ModelPicker({
-  gatewayName,
+  gatewayId,
   modelId,
+  gateways,
   models,
   disabled,
   onChange,
 }: {
-  gatewayName?: string
+  gatewayId?: string
   modelId?: string
-  models: Array<{ id: string; displayName: string }>
+  gateways: Array<{ id: string; displayName: string }>
+  models: Array<{ gatewayId: string; id: string; displayName: string }>
   disabled: boolean
-  onChange: (modelId: string) => void
+  onChange: (route: { gatewayId: string; modelId: string }) => void
 }) {
   const [open, setOpen] = useState(false)
-  if (!modelId) {
+  if (!gatewayId || !modelId) {
     return <Loader2 className="mx-2 size-3.5 animate-spin text-muted-foreground" />
   }
-  const current = models.find((model) => model.id === modelId)
+  const current = models.find((model) => model.gatewayId === gatewayId && model.id === modelId)
+  const currentGateway = gateways.find((gateway) => gateway.id === gatewayId)
   return (
     <ModelSelector open={open} onOpenChange={setOpen}>
       <ModelSelectorTrigger asChild>
@@ -782,9 +786,10 @@ function ModelPicker({
           size="sm"
           className="h-8 max-w-52 gap-1.5 px-2 text-xs font-normal"
           aria-label="Assistant model"
-          title={gatewayName ? `Model via ${gatewayName}` : 'Assistant model'}
+          title={`Model via ${currentGateway?.displayName ?? gatewayId}`}
           disabled={disabled}
         >
+          <ModelProviderMark modelId={modelId} gatewayName={gatewayId} />
           <span className="truncate">{current?.displayName ?? modelId}</span>
           <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
         </Button>
@@ -793,31 +798,75 @@ function ModelPicker({
         <ModelSelectorInput placeholder="Search models..." />
         <ModelSelectorList>
           <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-          <ModelSelectorGroup heading={gatewayName ?? 'Available models'}>
-            {models.map((model) => (
-              <ModelSelectorItem
-                key={model.id}
-                value={`${model.displayName} ${model.id}`}
-                onSelect={() => {
-                  onChange(model.id)
-                  setOpen(false)
-                }}
-              >
-                <ModelSelectorName>{model.displayName}</ModelSelectorName>
-                {model.id === modelId && <Check className="size-4" />}
-              </ModelSelectorItem>
-            ))}
-            {!models.some((model) => model.id === modelId) && (
-              <ModelSelectorItem value={modelId} onSelect={() => setOpen(false)}>
-                <ModelSelectorName>{modelId}</ModelSelectorName>
-                <Check className="size-4" />
-              </ModelSelectorItem>
-            )}
-          </ModelSelectorGroup>
+          {gateways.map((gateway) => {
+            const gatewayModels = models.filter((model) => model.gatewayId === gateway.id)
+            if (gatewayModels.length === 0 && gateway.id !== gatewayId) return null
+            const items = gatewayModels.length > 0
+              ? gatewayModels
+              : [{ gatewayId, id: modelId, displayName: modelId }]
+            return (
+              <ModelSelectorGroup key={gateway.id} heading={gateway.displayName}>
+                {items.map((model) => (
+                  <ModelSelectorItem
+                    key={`${model.gatewayId}:${model.id}`}
+                    value={`${gateway.displayName} ${model.displayName} ${model.id}`}
+                    onSelect={() => {
+                      onChange({ gatewayId: model.gatewayId, modelId: model.id })
+                      setOpen(false)
+                    }}
+                  >
+                    <ModelProviderMark modelId={model.id} gatewayName={model.gatewayId} />
+                    <ModelSelectorName>{model.displayName}</ModelSelectorName>
+                    {model.gatewayId === gatewayId && model.id === modelId && <Check className="size-4" />}
+                  </ModelSelectorItem>
+                ))}
+              </ModelSelectorGroup>
+            )
+          })}
         </ModelSelectorList>
       </ModelSelectorContent>
     </ModelSelector>
   )
+}
+
+function ModelProviderMark({ modelId, gatewayName }: { modelId: string; gatewayName?: string }) {
+  const provider = modelLogoProvider(modelId, gatewayName)
+  if (!provider) {
+    return (
+      <span className="flex size-4 shrink-0 items-center justify-center text-muted-foreground" aria-hidden="true">
+        <Bot className="size-3.5" />
+      </span>
+    )
+  }
+  return <ModelSelectorLogo provider={provider} className="size-4 shrink-0" aria-hidden="true" />
+}
+
+function modelLogoProvider(modelId: string, gatewayName?: string): string | undefined {
+  const id = modelId.toLowerCase()
+  const providers: Array<[RegExp, string]> = [
+    [/claude|anthropic/, 'anthropic'],
+    [/(^|[/:_-])gpt|(^|[/:_-])o[134](?:$|[/:_-])|openai|codex/, 'openai'],
+    [/gemini|google/, 'google'],
+    [/deepseek/, 'deepseek'],
+    [/grok|(^|[/:_-])xai(?:$|[/:_-])/, 'xai'],
+    [/mistral|mixtral/, 'mistral'],
+    [/llama|(^|[/:_-])meta(?:$|[/:_-])/, 'llama'],
+    [/qwen|alibaba/, 'alibaba'],
+    [/kimi|moonshot/, 'moonshotai'],
+    [/perplexity/, 'perplexity'],
+    [/openrouter/, 'openrouter'],
+    [/groq/, 'groq'],
+    [/azure/, 'azure'],
+    [/hugging[ -]?face/, 'huggingface'],
+    [/nvidia/, 'nvidia'],
+    [/cerebras/, 'cerebras'],
+    [/bedrock|amazon/, 'amazon-bedrock'],
+    [/together/, 'togetherai'],
+    [/fireworks/, 'fireworks-ai'],
+  ]
+  const matched = providers.find(([pattern]) => pattern.test(id))
+  if (matched) return matched[1]
+  return gatewayName?.toLowerCase() === 'openai' ? 'openai' : undefined
 }
 
 function isToolPart(part: UIMessage['parts'][number]): part is ToolUIPart {

@@ -52,7 +52,11 @@ The web Assistant composes its transcript from AI Elements primitives. The
 composer and transcript share native attachment tiles; the native Prompt Input
 provides drag/drop, paste, file-picker, screenshot, submit, and stop behavior;
 message text exposes a native copy action; Chat uses the searchable Model
-Selector; and external Markdown citations use Inline Citation hover cards.
+Selector with model/provider marks in both its trigger and results. The compact
+composer keeps attachment actions first under `+`, followed by the current
+model selector. The dialog groups models from every configured chat-capable
+gateway, and selecting a model persists both its gateway and model id for that
+conversation; external Markdown citations use Inline Citation hover cards.
 Web-tool results emit Vercel `source-url` parts, while knowledge-search note and
 file hits emit `source-document` parts. Both render in the native Sources
 disclosure and survive transcript rehydration. Tool workflow and Northstar's

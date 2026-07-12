@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createAiGateway,
   deleteAiGateway,
@@ -163,10 +163,33 @@ export function useAiModels(gatewayId?: string) {
     queryKey: ['settings', 'ai', 'models', gatewayId],
     enabled: Boolean(gatewayId),
     staleTime: 5 * 60_000,
-    queryFn: async () => dataOrThrow(await listAiModels({ path: { gatewayId: gatewayId! } })).map((model) => {
-      if (!model.gatewayId || !model.id || !model.displayName) throw new Error('AI model identity is incomplete')
-      return { gatewayId: model.gatewayId, id: model.id, displayName: model.displayName }
-    }),
+    queryFn: () => fetchAiModels(gatewayId!),
+  })
+}
+
+export function useChatAiModels() {
+  const settingsQuery = useAiSettings()
+  const gateways = (settingsQuery.data?.gateways ?? []).filter(
+    (gateway) => gateway.configured && gateway.capabilities.includes('CHAT'),
+  )
+  const modelQueries = useQueries({
+    queries: gateways.map((gateway) => ({
+      queryKey: ['settings', 'ai', 'models', gateway.id],
+      queryFn: () => fetchAiModels(gateway.id),
+      staleTime: 5 * 60_000,
+    })),
+  })
+  return {
+    gateways,
+    models: modelQueries.flatMap((query) => query.data ?? []),
+    isLoading: settingsQuery.isLoading || modelQueries.some((query) => query.isLoading),
+  }
+}
+
+async function fetchAiModels(gatewayId: string): Promise<AiModel[]> {
+  return dataOrThrow(await listAiModels({ path: { gatewayId } })).map((model) => {
+    if (!model.gatewayId || !model.id || !model.displayName) throw new Error('AI model identity is incomplete')
+    return { gatewayId: model.gatewayId, id: model.id, displayName: model.displayName }
   })
 }
 
