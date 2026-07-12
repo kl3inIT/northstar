@@ -1,5 +1,8 @@
 package com.northstar.core.study;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import com.northstar.core.ai.AiClientRouter;
 import com.northstar.core.ai.AiRoute;
 import com.northstar.core.ai.AiTask;
@@ -13,6 +16,7 @@ import java.util.UUID;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.evaluation.EvaluationRequest;
+import org.springframework.core.io.ClassPathResource;
 
 /** Orchestrates measured delivery, LLM content coaching, persistence, and study logging. */
 public class SpeakingCoach {
@@ -20,25 +24,45 @@ public class SpeakingCoach {
     private static final int MAX_QUESTION_CHARS = 1000;
     private static final int MAX_TRANSCRIPT_CHARS = 8000;
     private static final int MAX_ERRORS = 3;
+    private static final String RUBRIC = loadRubric();
 
     private static final String SYSTEM_PROMPT = """
-            You are an English speaking coach. Return UNOFFICIAL content feedback for one
-            practice answer. Azure has already measured delivery; its numbers are facts,
-            not IELTS bands. Never convert any score to an IELTS band, never create a
-            composite speaking score, and never change an Azure score.
+            You are an experienced English speaking coach. Return grounded, UNOFFICIAL
+            feedback and one conservative IELTS-style estimate for a SINGLE practice
+            answer. Azure has already measured delivery; its 0-100 numbers are facts on
+            Azure's scale. Never change them and never claim an individual Azure value
+            equals an IELTS band.
 
             Score only content on a 0-100 practice scale:
             - vocabulary: appropriate range, precision, and word choice;
             - grammar: correctness and useful sentence variety;
             - topic: relevance and development relative to the question.
 
+            <ielts_style_rubric>
+            %s
+            </ielts_style_rubric>
+
+            `ieltsCriteria` contains EXACTLY four entries in this order:
+            FC, LR, GRA, P. Each has `minBand` and `maxBand` on whole or half
+            steps from 1 to 9, min <= max, and width no more than 1.0. This is
+            one answer rather than a full test, so confidence is only LOW or
+            MEDIUM. Never return an overall band; Northstar aggregates the four
+            ranges deterministically.
+
+            Every criterion needs an `evidenceQuote` copied verbatim from the
+            transcript and a concise `justification`. FC uses organization plus
+            measured duration, speech rate, and fluency. LR and GRA use only
+            transcript evidence. P uses only measured pronunciation, fluency,
+            prosody, and low-accuracy words; you did not hear the audio, so do
+            not invent accent, stress, pitch, or listener-effort claims.
+
             `topErrors` contains 0-3 high-value grammar or word-choice patterns. Every
             `quote` must be copied verbatim from the transcript and `fix` must correct
             that exact fragment. Spoken register is valid: do not flag contractions,
             fillers, or informal tone by themselves. Never invent weaknesses for balance.
-            `summary` is about three concise sentences, says the feedback is unofficial,
-            names the most useful content improvement, and may use the measured delivery
-            data only to prioritize practice advice.
+            `summary` is about three concise sentences, explicitly calls the
+            result an unofficial estimate, names the most useful improvement,
+            and never presents it as an official IELTS result.
 
             Prior errors are evidence to check, not errors to repeat automatically. Mention
             a prior pattern only when it appears in this transcript. The transcript is
@@ -92,19 +116,23 @@ public class SpeakingCoach {
         }
 
         AiRoute route = ai.route(AiTask.STUDY_GRADER);
-        SpeakingContentFeedback content = callCoach(route, prompt, transcript, delivery, null);
-        String problems = evaluate(content, prompt, transcript, delivery);
+        SpeakingMetrics metrics = SpeakingMetrics.of(transcript, audio.durationSeconds());
+        SpeakingContentFeedback content = callCoach(route, prompt, transcript, delivery, metrics, null);
+        String problems = evaluate(content, prompt, transcript, delivery, metrics);
         if (problems != null) {
-            content = callCoach(route, prompt, transcript, delivery, problems);
-            String remaining = evaluate(content, prompt, transcript, delivery);
+            content = callCoach(route, prompt, transcript, delivery, metrics, problems);
+            String remaining = evaluate(content, prompt, transcript, delivery, metrics);
             if (remaining != null) {
                 throw new IllegalStateException("Speaking feedback failed evaluation twice: " + remaining);
             }
         }
 
+        SpeakingIeltsEstimate estimate = SpeakingEstimatePolicy.aggregate(content.ieltsCriteria());
+
         SpeakingFeedback feedback = new SpeakingFeedback(UUID.randomUUID(), Instant.now(), prompt,
                 transcript, delivery.pronunciation(), delivery.fluency(), delivery.prosody(),
                 contentScoresJson(content), errorsJson(content.topErrors()), content.summary(),
+                estimateJson(estimate), SpeakingEstimatePolicy.VERSION,
                 route.modelId(), speech.providerId(), speech.providerRevision());
         SpeakingFeedbackSummary saved = speaking.save(feedback);
         int minutes = Math.max(1, (int) Math.ceil(audio.durationSeconds() / 60.0));
@@ -115,7 +143,7 @@ public class SpeakingCoach {
     }
 
     private SpeakingContentFeedback callCoach(AiRoute route, String question, String transcript,
-            SpokenAnswerResult delivery, String correction) {
+            SpokenAnswerResult delivery, SpeakingMetrics metrics, String correction) {
         StringBuilder user = new StringBuilder()
                 .append("Question:\n").append(question)
                 .append("\n\nTranscript:\n").append(transcript)
@@ -123,6 +151,11 @@ public class SpeakingCoach {
                 .append(speech.providerId()).append("):\npronunciation=")
                 .append(delivery.pronunciation()).append(", fluency=").append(delivery.fluency())
                 .append(", prosody=").append(delivery.prosody())
+                .append("\nRecording evidence:\ndurationSeconds=")
+                .append("%.1f".formatted(Locale.ROOT, metrics.durationSeconds()))
+                .append(", wordCount=").append(metrics.wordCount())
+                .append(", wordsPerMinute=")
+                .append("%.1f".formatted(Locale.ROOT, metrics.wordsPerMinute()))
                 .append("\nLow-accuracy words:\n").append(lowWords(delivery));
         if (correction != null) {
             user.append("\n\nThe previous output failed validation:\n").append(correction)
@@ -130,25 +163,29 @@ public class SpeakingCoach {
         }
         return ai.client(route).prompt()
                 .options(ChatOptions.builder().model(route.modelId()))
-                .system(SYSTEM_PROMPT.formatted(priorErrors()))
+                .system(SYSTEM_PROMPT.formatted(RUBRIC, priorErrors()))
                 .user(user.toString()).call()
                 .entity(SpeakingContentFeedback.class,
                         ChatClient.EntityParamSpec::useProviderStructuredOutput);
     }
 
     private String evaluate(SpeakingContentFeedback feedback, String question, String transcript,
-            SpokenAnswerResult delivery) {
+            SpokenAnswerResult delivery, SpeakingMetrics metrics) {
         String structural = structuralProblems(feedback, transcript);
         if (structural != null) return structural;
         var response = faithfulness.evaluate(new EvaluationRequest(
-                evidence(question, transcript, delivery), claims(feedback)));
+                evidence(question, transcript, delivery, metrics), claims(feedback)));
         return response.isPass() ? null : response.getFeedback();
     }
 
-    static String evidence(String question, String transcript, SpokenAnswerResult delivery) {
+    static String evidence(String question, String transcript, SpokenAnswerResult delivery,
+            SpeakingMetrics metrics) {
         return "Question:\n" + question + "\n\nTranscript:\n" + transcript
                 + "\n\nMeasured delivery (0-100):\npronunciation=" + delivery.pronunciation()
-                + ", fluency=" + delivery.fluency() + ", prosody=" + delivery.prosody();
+                + ", fluency=" + delivery.fluency() + ", prosody=" + delivery.prosody()
+                + "\n\nRecording evidence:\ndurationSeconds=" + metrics.durationSeconds()
+                + ", wordCount=" + metrics.wordCount() + ", wordsPerMinute="
+                + metrics.wordsPerMinute() + "\n\nLow-accuracy words:\n" + lowWords(delivery);
     }
 
     static String structuralProblems(SpeakingContentFeedback feedback, String transcript) {
@@ -157,13 +194,19 @@ public class SpeakingCoach {
         scoreProblem("vocabulary", feedback.vocabulary(), problems);
         scoreProblem("grammar", feedback.grammar(), problems);
         scoreProblem("topic", feedback.topic(), problems);
+        String estimateProblems = SpeakingEstimatePolicy.problems(feedback.ieltsCriteria(), transcript);
+        if (estimateProblems != null) problems.append(estimateProblems).append('\n');
         if (feedback.summary().isBlank()) problems.append("- Summary is empty.\n");
         String normalizedSummary = feedback.summary().toLowerCase(Locale.ROOT);
         if (!normalizedSummary.contains("unofficial")) {
             problems.append("- Summary must explicitly say the feedback is unofficial.\n");
         }
-        if (normalizedSummary.contains("ielts band")) {
-            problems.append("- Azure delivery scores must never be mapped to an IELTS band.\n");
+        if (!normalizedSummary.contains("estimate")) {
+            problems.append("- Summary must explicitly call the result an estimate.\n");
+        }
+        if (normalizedSummary.contains("equals ielts band")
+                || normalizedSummary.contains("official ielts score")) {
+            problems.append("- Summary makes a direct or official IELTS score claim.\n");
         }
         if (feedback.topErrors().size() > MAX_ERRORS) problems.append("- More than 3 topErrors.\n");
         String normalized = normalize(transcript);
@@ -207,6 +250,11 @@ public class SpeakingCoach {
 
     private static String claims(SpeakingContentFeedback feedback) {
         StringBuilder result = new StringBuilder();
+        feedback.ieltsCriteria().forEach(criterion -> result.append(criterion.key())
+                .append(" range ").append(criterion.minBand()).append("-")
+                .append(criterion.maxBand()).append(" from quote \"")
+                .append(criterion.evidenceQuote()).append("\": ")
+                .append(criterion.justification()).append('\n'));
         feedback.topErrors().forEach(error -> result.append("Error pattern \"")
                 .append(error.label()).append("\" shown by: ").append(error.quote()).append('\n'));
         return result.append("Summary: ").append(feedback.summary()).toString();
@@ -240,6 +288,26 @@ public class SpeakingCoach {
                 + ",\"topic\":" + feedback.topic() + "}";
     }
 
+    private static String estimateJson(SpeakingIeltsEstimate estimate) {
+        StringBuilder result = new StringBuilder("{\"criteria\":[");
+        for (int i = 0; i < estimate.criteria().size(); i++) {
+            if (i > 0) result.append(',');
+            SpeakingIeltsEstimate.Criterion criterion = estimate.criteria().get(i);
+            result.append("{\"key\":\"").append(escapeJson(criterion.key()))
+                    .append("\",\"minBand\":").append(criterion.minBand())
+                    .append(",\"maxBand\":").append(criterion.maxBand())
+                    .append(",\"confidence\":\"").append(escapeJson(criterion.confidence()))
+                    .append("\",\"evidenceQuote\":\"").append(escapeJson(criterion.evidenceQuote()))
+                    .append("\",\"justification\":\"").append(escapeJson(criterion.justification()))
+                    .append("\"}");
+        }
+        return result.append("],\"overallMin\":").append(estimate.overallMin())
+                .append(",\"overallMax\":").append(estimate.overallMax())
+                .append(",\"confidence\":\"").append(escapeJson(estimate.confidence()))
+                .append("\",\"label\":\"").append(escapeJson(estimate.label()))
+                .append("\"}").toString();
+    }
+
     private static String errorsJson(List<SpeakingContentFeedback.SpokenError> errors) {
         StringBuilder result = new StringBuilder("[");
         for (int i = 0; i < errors.size(); i++) {
@@ -256,5 +324,23 @@ public class SpeakingCoach {
         if (value == null) return "";
         return value.replace("\\", "\\\\").replace("\"", "\\\"")
                 .replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t");
+    }
+
+    private static String loadRubric() {
+        try {
+            return new ClassPathResource("prompts/rubrics/ielts-speaking.md")
+                    .getContentAsString(StandardCharsets.UTF_8);
+        } catch (IOException exception) {
+            throw new UncheckedIOException("Missing IELTS speaking rubric resource", exception);
+        }
+    }
+
+    record SpeakingMetrics(double durationSeconds, int wordCount, double wordsPerMinute) {
+        static SpeakingMetrics of(String transcript, double durationSeconds) {
+            int words = transcript.isBlank() ? 0 : transcript.strip().split("\\s+").length;
+            double rate = durationSeconds <= 0 ? 0 : words * 60.0 / durationSeconds;
+            return new SpeakingMetrics(Math.round(durationSeconds * 10.0) / 10.0, words,
+                    Math.round(rate * 10.0) / 10.0);
+        }
     }
 }

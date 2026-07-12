@@ -16,6 +16,8 @@ public record SpeakingFeedbackSummary(
         @NotNull String contentScores,
         @NotNull String topErrors,
         @NotNull String summary,
+        @NotNull String ieltsEstimate,
+        @NotNull String estimateVersion,
         @NotNull String graderModel,
         @NotNull String deliveryProvider,
         @NotNull String providerRevision,
@@ -25,7 +27,8 @@ public record SpeakingFeedbackSummary(
         return new SpeakingFeedbackSummary(feedback.getId(), feedback.getSubmittedAt(),
                 feedback.getQuestion(), feedback.getTranscript(), feedback.getPronunciation(),
                 feedback.getFluency(), feedback.getProsody(), feedback.getContentScores(),
-                feedback.getTopErrors(), feedback.getSummary(), feedback.getGraderModel(),
+                feedback.getTopErrors(), feedback.getSummary(), feedback.getIeltsEstimate(),
+                feedback.getEstimateVersion(), feedback.getGraderModel(),
                 feedback.getDeliveryProvider(), feedback.getProviderRevision(), feedback.getVersion());
     }
 }

@@ -71,6 +71,10 @@ final class SpeakingEstimatePolicy {
             throw new IllegalArgumentException("Exactly FC, LR, GRA, and P are required");
         }
         List<SpeakingIeltsEstimate.Criterion> ordered = REQUIRED_KEYS.stream().map(byKey::get).toList();
+        ordered = ordered.stream().map(criterion -> new SpeakingIeltsEstimate.Criterion(
+                criterion.key().strip().toUpperCase(Locale.ROOT), criterion.minBand(),
+                criterion.maxBand(), criterion.confidence().strip().toUpperCase(Locale.ROOT),
+                criterion.evidenceQuote(), criterion.justification())).toList();
         double overallMin = halfBand(ordered.stream().mapToDouble(SpeakingIeltsEstimate.Criterion::minBand)
                 .average().orElseThrow());
         double overallMax = halfBand(ordered.stream().mapToDouble(SpeakingIeltsEstimate.Criterion::maxBand)

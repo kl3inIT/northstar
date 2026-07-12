@@ -45,6 +45,14 @@ public class SpeakingFeedback extends BaseEntity {
     private String summary;
 
     @NotBlank
+    @Column(name = "ielts_estimate", nullable = false, length = 12000)
+    private String ieltsEstimate;
+
+    @NotBlank
+    @Column(name = "estimate_version", nullable = false, length = 64)
+    private String estimateVersion;
+
+    @NotBlank
     @Column(name = "grader_model", nullable = false, length = 128)
     private String graderModel;
 
@@ -64,6 +72,17 @@ public class SpeakingFeedback extends BaseEntity {
             Double pronunciation, Double fluency, Double prosody, String contentScores,
             String topErrors, String summary, String graderModel, String deliveryProvider,
             String providerRevision) {
+        this(id, submittedAt, question, transcript, pronunciation, fluency, prosody, contentScores,
+                topErrors, summary,
+                "{\"criteria\":[],\"overallMin\":null,\"overallMax\":null,"
+                        + "\"confidence\":\"LOW\",\"label\":\"Legacy attempt — estimate unavailable\"}",
+                "legacy-unavailable", graderModel, deliveryProvider, providerRevision);
+    }
+
+    public SpeakingFeedback(UUID id, Instant submittedAt, String question, String transcript,
+            Double pronunciation, Double fluency, Double prosody, String contentScores,
+            String topErrors, String summary, String ieltsEstimate, String estimateVersion,
+            String graderModel, String deliveryProvider, String providerRevision) {
         super(id);
         this.submittedAt = submittedAt;
         this.question = question;
@@ -74,6 +93,8 @@ public class SpeakingFeedback extends BaseEntity {
         this.contentScores = contentScores;
         this.topErrors = topErrors;
         this.summary = summary;
+        this.ieltsEstimate = ieltsEstimate;
+        this.estimateVersion = estimateVersion;
         this.graderModel = graderModel;
         this.deliveryProvider = deliveryProvider;
         this.providerRevision = providerRevision;
@@ -88,6 +109,8 @@ public class SpeakingFeedback extends BaseEntity {
     public String getContentScores() { return contentScores; }
     public String getTopErrors() { return topErrors; }
     public String getSummary() { return summary; }
+    public String getIeltsEstimate() { return ieltsEstimate; }
+    public String getEstimateVersion() { return estimateVersion; }
     public String getGraderModel() { return graderModel; }
     public String getDeliveryProvider() { return deliveryProvider; }
     public String getProviderRevision() { return providerRevision; }
