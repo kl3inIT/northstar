@@ -20,8 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Vocabulary memory — Anki's mechanics (per-card memory model, graded
  * reviews, an append-only revlog) rebuilt AI-native: cards arrive from
- * natural-language capture, reviews happen inside chat where the assistant
- * asks and grades free-text answers, and scheduling is Ebisu recall
+ * natural-language capture, reviews happen in the Study UI with optional
+ * assistant grading for free-text answers, and scheduling is Ebisu recall
  * probability instead of due dates, so {@link #atRisk} answers "what should
  * we quiz right now" at any moment and a lapse never builds a backlog.
  */
@@ -39,10 +39,13 @@ public class VocabService {
 
     private final VocabCardRepository cards;
     private final VocabReviewLogRepository reviews;
+    private final VocabDeckService decks;
 
-    VocabService(VocabCardRepository cards, VocabReviewLogRepository reviews) {
+    VocabService(VocabCardRepository cards, VocabReviewLogRepository reviews,
+            VocabDeckService decks) {
         this.cards = cards;
         this.reviews = reviews;
+        this.decks = decks;
     }
 
     /**
@@ -56,25 +59,34 @@ public class VocabService {
             throw new IllegalArgumentException("items must contain at least one card");
         }
         Instant now = Instant.now();
-        List<VocabCard> existing = cards.findByOrderByCreatedAtDesc();
+        List<VocabCard> existing = new ArrayList<>(cards.findByOrderByCreatedAtDesc());
         Map<String, VocabCard> byFront = new HashMap<>();
         for (VocabCard card : existing) {
-            byFront.putIfAbsent(key(card.getFront()), card);
+            byFront.putIfAbsent(key(card.getLanguage(), card.getFront()), card);
         }
         List<VocabCard> result = new ArrayList<>();
         for (NewVocabCard item : items) {
             String front = requireText(item.front(), "front", 255);
-            VocabCard already = byFront.get(key(front));
+            VocabLanguage language = Objects.requireNonNullElseGet(item.language(),
+                    () -> VocabLanguage.detect(front));
+            String identity = key(language, front);
+            VocabCard already = byFront.get(identity);
             if (already != null) {
                 result.add(already);
                 continue;
             }
             VocabCard card = new VocabCard(UUID.randomUUID(), front,
                     requireText(item.back(), "back", 1000),
-                    trimToNull(item.metadata(), 4000), item.disciplineId(),
+                    trimToNull(item.metadata(), 4000), language,
+                    canonicalDeck(item.deck(), language, existing), item.disciplineId(),
                     INITIAL_ALPHA_BETA, INITIAL_ALPHA_BETA, INITIAL_HALFLIFE_HOURS, now);
+            boolean productionEnabled = item.productionEnabled() != null
+                    ? item.productionEnabled()
+                    : decks.productionDefault(language, card.getDeck());
+            card.setProductionEnabled(productionEnabled, now);
             cards.save(card);
-            byFront.put(key(front), card);
+            existing.add(card);
+            byFront.put(identity, card);
             result.add(card);
         }
         return summarize(result, now);
@@ -91,10 +103,50 @@ public class VocabService {
                 .toList();
     }
 
+    /** The independent review queue for one language and optional deck scope. */
+    @Transactional(readOnly = true)
+    public List<VocabCardSummary> atRisk(VocabLanguage language, String deck,
+            int limit, Instant now) {
+        VocabLanguage requiredLanguage = Objects.requireNonNull(language, "language is required");
+        String requestedDeck = normalizeDeckFilter(deck);
+        Instant at = Objects.requireNonNullElseGet(now, Instant::now);
+        return summarize(cards.findBySuspendedFalse(), at).stream()
+                .filter(card -> card.language() == requiredLanguage)
+                .filter(card -> deckMatches(card.deck(), requestedDeck))
+                .sorted(Comparator.comparingDouble(VocabCardSummary::recallProbability))
+                .limit(Math.clamp(limit, 1, 50))
+                .toList();
+    }
+
+    /** Weakest enabled direction per item; siblings never share one queue snapshot. */
+    @Transactional(readOnly = true)
+    public List<VocabReviewCardSummary> reviewQueue(VocabLanguage language, String deck,
+            int limit, Instant now) {
+        VocabLanguage requiredLanguage = Objects.requireNonNull(language, "language is required");
+        String requestedDeck = normalizeDeckFilter(deck);
+        Instant at = Objects.requireNonNullElseGet(now, Instant::now);
+        List<VocabCard> active = cards.findBySuspendedFalse();
+        Map<ReviewKey, Integer> counts = reviewCounts(active);
+        return active.stream()
+                .filter(card -> card.getLanguage() == requiredLanguage)
+                .filter(card -> deckMatches(card.getDeck(), requestedDeck))
+                .map(card -> weakestDirection(card, at, counts))
+                .sorted(Comparator.comparingDouble(VocabReviewCardSummary::recallProbability))
+                .limit(Math.clamp(limit, 1, 50))
+                .toList();
+    }
+
     /** Every card, most recently added first, with recall computed for now. */
     @Transactional(readOnly = true)
     public List<VocabCardSummary> cards() {
         return summarize(cards.findByOrderByCreatedAtDesc(), Instant.now());
+    }
+
+    /** One language library; null retains the all-card internal/tool view. */
+    @Transactional(readOnly = true)
+    public List<VocabCardSummary> cards(VocabLanguage language) {
+        return cards().stream().filter(card -> language == null || card.language() == language)
+                .toList();
     }
 
     /**
@@ -105,31 +157,57 @@ public class VocabService {
     @Transactional
     public VocabCardSummary recordReview(UUID cardId, double success,
             VocabReviewLog.Rating rating, VocabReviewLog.ReviewSource source) {
+        return recordReview(cardId, VocabReviewDirection.RECOGNITION, success, rating, source);
+    }
+
+    @Transactional
+    public VocabCardSummary recordReview(UUID cardId, VocabReviewDirection direction, double success,
+            VocabReviewLog.Rating rating, VocabReviewLog.ReviewSource source) {
         if (success < 0 || success > 1) {
             throw new IllegalArgumentException("success must be between 0 and 1");
         }
         VocabCard card = get(cardId);
+        VocabReviewDirection requiredDirection = Objects.requireNonNull(direction, "direction is required");
+        requireEnabled(card, requiredDirection);
         Instant now = Instant.now();
         double elapsedHours = Math.max(MIN_ELAPSED_HOURS,
-                Duration.between(card.getLastReviewedAt(), now).toMillis() / 3_600_000.0);
-        Ebisu.Model before = model(card);
+                Duration.between(lastReviewedAt(card, requiredDirection), now).toMillis() / 3_600_000.0);
+        Ebisu.Model before = model(card, requiredDirection);
         Ebisu.Model after = Ebisu.updateRecall(before, success >= 0.5 ? 1 : 0, 1, elapsedHours);
         double halflifeAfter = Ebisu.modelToPercentileDecay(after);
         reviews.save(new VocabReviewLog(UUID.randomUUID(), card.getId(), now, success, rating,
                 elapsedHours, Objects.requireNonNull(source, "source is required"),
-                before.alpha(), before.beta(), card.getHalflifeHours(),
+                requiredDirection, before.alpha(), before.beta(), halflife(card, requiredDirection),
                 after.alpha(), after.beta(), halflifeAfter));
-        card.reviewed(after.alpha(), after.beta(), halflifeAfter, now);
+        if (requiredDirection == VocabReviewDirection.PRODUCTION) {
+            card.productionReviewed(after.alpha(), after.beta(), halflifeAfter, now);
+        } else {
+            card.reviewed(after.alpha(), after.beta(), halflifeAfter, now);
+        }
         return summarize(List.of(card), now).getFirst();
     }
 
     /** Edit the content sides; the memory model only moves through reviews. */
     @Transactional
     public VocabCardSummary update(UUID id, String front, String back, String metadata,
-            UUID disciplineId, boolean suspended) {
+            VocabLanguage language, String deck, UUID disciplineId, boolean suspended) {
         VocabCard card = get(id);
+        return update(id, front, back, metadata, language, deck, disciplineId, suspended,
+                card.isProductionEnabled());
+    }
+
+    @Transactional
+    public VocabCardSummary update(UUID id, String front, String back, String metadata,
+            VocabLanguage language, String deck, UUID disciplineId, boolean suspended,
+            boolean productionEnabled) {
+        VocabCard card = get(id);
+        String requiredFront = requireText(front, "front", 255);
+        VocabLanguage requiredLanguage = Objects.requireNonNullElseGet(language,
+                () -> VocabLanguage.detect(requiredFront));
         card.edit(requireText(front, "front", 255), requireText(back, "back", 1000),
-                trimToNull(metadata, 4000), disciplineId, suspended);
+                trimToNull(metadata, 4000), requiredLanguage,
+                canonicalDeck(deck, requiredLanguage, cards.findByOrderByCreatedAtDesc()),
+                disciplineId, suspended, productionEnabled);
         return summarize(List.of(card), Instant.now()).getFirst();
     }
 
@@ -174,26 +252,96 @@ public class VocabService {
     }
 
     private List<VocabCardSummary> summarize(List<VocabCard> list, Instant now) {
-        Map<UUID, Long> counts = new HashMap<>();
-        List<UUID> ids = list.stream().map(VocabCard::getId).toList();
-        if (!ids.isEmpty()) {
-            for (VocabReviewLogRepository.CardReviewCount count : reviews.countByCard(ids)) {
-                counts.put(count.getCardId(), count.getReviews());
-            }
-        }
+        Map<ReviewKey, Integer> counts = reviewCounts(list);
         return list.stream().map(card -> {
             double elapsedHours = Math.max(MIN_ELAPSED_HOURS,
                     Duration.between(card.getLastReviewedAt(), now).toMillis() / 3_600_000.0);
             double recall = Ebisu.predictRecall(model(card), elapsedHours);
             return new VocabCardSummary(card.getId(), card.getFront(), card.getBack(),
-                    card.getMetadata(), card.getDisciplineId(), recall, card.getHalflifeHours(),
-                    card.getLastReviewedAt(), counts.getOrDefault(card.getId(), 0L).intValue(),
-                    card.isSuspended(), card.getCreatedAt(), card.getVersion());
+                    card.getMetadata(), card.getLanguage(), card.getDeck(),
+                    card.getDisciplineId(), recall, card.getHalflifeHours(),
+                    card.getLastReviewedAt(), counts.getOrDefault(
+                            new ReviewKey(card.getId(), VocabReviewDirection.RECOGNITION), 0),
+                    card.isSuspended(), card.getCreatedAt(), card.getVersion(),
+                    card.isProductionEnabled(), productionRecall(card, now),
+                    card.isProductionEnabled() ? counts.getOrDefault(
+                            new ReviewKey(card.getId(), VocabReviewDirection.PRODUCTION), 0) : null);
         }).toList();
+    }
+
+    private Map<ReviewKey, Integer> reviewCounts(List<VocabCard> list) {
+        Map<ReviewKey, Integer> counts = new HashMap<>();
+        List<UUID> ids = list.stream().map(VocabCard::getId).toList();
+        if (!ids.isEmpty()) {
+            for (VocabReviewLogRepository.CardReviewCount count : reviews.countByCard(ids)) {
+                counts.put(new ReviewKey(count.getCardId(), count.getDirection()),
+                        Math.toIntExact(count.getReviews()));
+            }
+        }
+        return counts;
+    }
+
+    private VocabReviewCardSummary weakestDirection(VocabCard card, Instant now,
+            Map<ReviewKey, Integer> counts) {
+        VocabReviewDirection direction = VocabReviewDirection.RECOGNITION;
+        double recognition = recall(card, VocabReviewDirection.RECOGNITION, now);
+        double selectedRecall = recognition;
+        if (card.isProductionEnabled()) {
+            double production = recall(card, VocabReviewDirection.PRODUCTION, now);
+            if (production < recognition) {
+                direction = VocabReviewDirection.PRODUCTION;
+                selectedRecall = production;
+            }
+        }
+        return new VocabReviewCardSummary(card.getId(), direction, card.getFront(), card.getBack(),
+                card.getMetadata(), card.getLanguage(), card.getDeck(), card.getDisciplineId(),
+                selectedRecall, halflife(card, direction), lastReviewedAt(card, direction),
+                counts.getOrDefault(new ReviewKey(card.getId(), direction), 0), card.isSuspended(),
+                card.getCreatedAt(), card.getVersion());
+    }
+
+    private static Double productionRecall(VocabCard card, Instant now) {
+        return card.isProductionEnabled() ? recall(card, VocabReviewDirection.PRODUCTION, now) : null;
+    }
+
+    private static double recall(VocabCard card, VocabReviewDirection direction, Instant now) {
+        double elapsedHours = Math.max(MIN_ELAPSED_HOURS,
+                Duration.between(lastReviewedAt(card, direction), now).toMillis() / 3_600_000.0);
+        return Ebisu.predictRecall(model(card, direction), elapsedHours);
     }
 
     private static Ebisu.Model model(VocabCard card) {
         return new Ebisu.Model(card.getHalflifeHours(), card.getAlpha(), card.getBeta());
+    }
+
+    private static Ebisu.Model model(VocabCard card, VocabReviewDirection direction) {
+        if (direction == VocabReviewDirection.PRODUCTION) {
+            requireEnabled(card, direction);
+            return new Ebisu.Model(card.getProductionHalflifeHours(),
+                    card.getProductionAlpha(), card.getProductionBeta());
+        }
+        return model(card);
+    }
+
+    private static double halflife(VocabCard card, VocabReviewDirection direction) {
+        return direction == VocabReviewDirection.PRODUCTION
+                ? Objects.requireNonNull(card.getProductionHalflifeHours())
+                : card.getHalflifeHours();
+    }
+
+    private static Instant lastReviewedAt(VocabCard card, VocabReviewDirection direction) {
+        return direction == VocabReviewDirection.PRODUCTION
+                ? Objects.requireNonNull(card.getProductionLastReviewedAt())
+                : card.getLastReviewedAt();
+    }
+
+    private static void requireEnabled(VocabCard card, VocabReviewDirection direction) {
+        if (direction == VocabReviewDirection.PRODUCTION && !card.isProductionEnabled()) {
+            throw new IllegalArgumentException("Production review is not enabled for " + card.getId());
+        }
+    }
+
+    private record ReviewKey(UUID cardId, VocabReviewDirection direction) {
     }
 
     private static String requireText(String value, String field, int maxLength) {
@@ -220,10 +368,39 @@ public class VocabService {
         return stripped;
     }
 
-    private static String key(String value) {
+    static String canonicalDeck(String value, VocabLanguage language, List<VocabCard> existing) {
+        String normalized = normalizeStoredDeck(value);
+        if (normalized == null) return null;
+        return existing.stream()
+                .filter(card -> card.getLanguage() == language && card.getDeck() != null)
+                .map(VocabCard::getDeck)
+                .filter(deck -> deck.equalsIgnoreCase(normalized))
+                .findFirst()
+                .orElse(normalized);
+    }
+
+    static boolean deckMatches(String stored, String requested) {
+        if (requested == null) return true;
+        if (requested.equalsIgnoreCase("General")) return stored == null;
+        return stored != null && stored.equalsIgnoreCase(requested);
+    }
+
+    private static String normalizeStoredDeck(String value) {
+        if (value == null || value.isBlank()) return null;
+        String deck = requireText(value, "deck", 80);
+        return deck.equalsIgnoreCase("General") ? null : deck;
+    }
+
+    private static String normalizeDeckFilter(String value) {
+        if (value == null || value.isBlank()) return null;
+        return requireText(value, "deck", 80);
+    }
+
+    private static String key(VocabLanguage language, String value) {
         String decomposed = Normalizer.normalize(value, Normalizer.Form.NFD)
                 .replace('đ', 'd')
                 .replace('Đ', 'D');
-        return COMBINING_MARKS.matcher(decomposed).replaceAll("").toLowerCase(Locale.ROOT);
+        return language.name() + ':'
+                + COMBINING_MARKS.matcher(decomposed).replaceAll("").toLowerCase(Locale.ROOT);
     }
 }

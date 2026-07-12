@@ -5,6 +5,7 @@ import static com.northstar.core.assistant.ToolSupport.disciplineIdByName;
 import com.northstar.core.discipline.DisciplineService;
 import com.northstar.core.study.NewVocabCard;
 import com.northstar.core.study.VocabCardSummary;
+import com.northstar.core.study.VocabLanguage;
 import com.northstar.core.study.VocabReviewLog;
 import com.northstar.core.study.VocabService;
 import java.util.List;
@@ -17,9 +18,9 @@ import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
 /**
- * Vocabulary-trainer tools — Anki's card mechanics delivered through chat:
- * the assistant runs the quiz session (ask, grade the free-text answer,
- * record) instead of a flashcard UI.
+ * Vocabulary-trainer tools shared by chat and MCP. The focused page owns the
+ * primary visual review workflow; these tools keep natural-language capture,
+ * search, correction, and optional chat quizzes available.
  */
 @Component
 class VocabTools implements NorthstarTool {
@@ -31,19 +32,26 @@ class VocabTools implements NorthstarTool {
             counts as intent to learn and save it unless the user explicitly \
             says not to save. Do not infer a card from an unresolved pronoun or \
             save incidental words from prose/research. Accepts a LIST — one card per \
-            word = meaning pair. ENRICH each card yourself: reading = \
+            word = meaning pair. Complete the BASE card: reading = \
             pronunciation you know to be correct (tone-marked pinyin for \
-            Chinese, IPA for English; "" when unsure), example = one short \
-            natural sentence using the word with a translation after " — ". \
-            A front that already exists is returned as-is, never duplicated. \
+            Chinese, IPA for English; "" when unsure), partOfSpeech = concise \
+            English lexical category (noun, verb, adjective, adverb, phrase; \
+            "" when unsure). example is ONLY a sentence the user supplied or \
+            explicitly requested; otherwise pass "". Never generate extra \
+            enrichment merely because a card is saved. \
+            language is ENGLISH or CHINESE; deck is an explicitly named flat \
+            deck such as IELTS or HSK4, otherwise "" for General. Never invent \
+            a deck. A front already saved in that language is returned as-is. \
             Pace introductions: more than ~10 new cards in one day dilutes \
             retention, and semantically similar words (near-synonyms) learned \
             together interfere — suggest spreading them across days instead of \
-            refusing. After the call, echo each card (front · back · reading) \
+            refusing. After the call, echo each card (front · back · reading · \
+            part of speech) \
             back in one line each.""";
 
     private static final String QUIZ = """
-            The N cards most likely forgotten RIGHT NOW (lowest predicted \
+            The N cards in ONE required language and optional deck most likely \
+            forgotten RIGHT NOW (lowest predicted \
             recall first) — there are no due dates, so this is always callable \
             and never backlogged. Each entry carries front, back, reading, \
             example, and recallProbability. QUIZ PROTOCOL when the user wants \
@@ -73,7 +81,7 @@ class VocabTools implements NorthstarTool {
 
     private static final String UPDATE_CARD = """
             Fix one card's content by UUID (ids come from find_vocab_cards): \
-            front, back, reading/example, or suspended (true pauses it out of \
+            front, back, reading/part of speech/example, or suspended (true pauses it out of \
             quizzes and the brief without losing history — prefer suspending \
             over deleting a learned word). Pass EVERY field at its intended \
             final value — this is a full replace. The memory model is not \
@@ -85,8 +93,8 @@ class VocabTools implements NorthstarTool {
             này dễ quá khỏi ôn" prefer update_vocab_card with suspended=true.""";
 
     /** One entry of a save_vocab_cards call; "" fields mean "none". */
-    record VocabItem(String front, String back, String reading, String example,
-            String disciplineName) {
+    record VocabItem(String front, String back, String reading, String partOfSpeech,
+            String example, String language, String deck, String disciplineName) {
     }
 
     private final VocabService vocab;
@@ -109,7 +117,8 @@ class VocabTools implements NorthstarTool {
         }
         List<NewVocabCard> resolved = items.stream()
                 .map(item -> new NewVocabCard(item.front(), item.back(),
-                        ToolSupport.vocabMetadata(item.reading(), item.example()),
+                        ToolSupport.vocabMetadata(item.reading(), item.partOfSpeech(), item.example()),
+                        parseLanguage(item.language(), item.front()), item.deck(),
                         disciplineIdByName(disciplines, item.disciplineName())))
                 .toList();
         return vocab.createAll(resolved);
@@ -122,8 +131,15 @@ class VocabTools implements NorthstarTool {
     List<VocabCardSummary> quizVocab(
             @ToolParam(description = "How many cards, 1-50; defaults to 5", required = false)
             @McpToolParam(description = "How many cards, 1-50; defaults to 5",
-                    required = false) Integer count) {
-        return vocab.atRisk(count == null ? 5 : count, null);
+                    required = false) Integer count,
+            @ToolParam(description = "Required review library: ENGLISH or CHINESE")
+            @McpToolParam(description = "Required review library: ENGLISH or CHINESE",
+                    required = true) String language,
+            @ToolParam(description = "Deck name, General, or blank for all decks", required = false)
+            @McpToolParam(description = "Deck name, General, or blank for all decks",
+                    required = false) String deck) {
+        return vocab.atRisk(parseRequiredLanguage(language), deck,
+                count == null ? 5 : count, null);
     }
 
     @Tool(name = "record_vocab_review", description = RECORD_REVIEW)
@@ -136,13 +152,7 @@ class VocabTools implements NorthstarTool {
             @McpToolParam(description = "AGAIN, HARD, GOOD, or EASY",
                     required = true) String rating) {
         VocabReviewLog.Rating parsed = parseRating(rating);
-        double success = switch (parsed) {
-            case AGAIN -> 0.0;
-            case HARD -> 0.6;
-            case GOOD -> 0.9;
-            case EASY -> 1.0;
-        };
-        return vocab.recordReview(UUID.fromString(cardId), success, parsed,
+        return vocab.recordReview(UUID.fromString(cardId), parsed.success(), parsed,
                 VocabReviewLog.ReviewSource.CHAT);
     }
 
@@ -171,16 +181,23 @@ class VocabTools implements NorthstarTool {
             @ToolParam(description = "Pronunciation (pinyin/IPA); pass '' for none", required = false)
             @McpToolParam(description = "Pronunciation (pinyin/IPA); pass '' for none",
                     required = false) String reading,
-            @ToolParam(description = "One example sentence with translation; pass '' for none", required = false)
-            @McpToolParam(description = "One example sentence with translation; pass '' for none",
+            @ToolParam(description = "Part of speech in concise English; pass '' for none", required = false)
+            @McpToolParam(description = "Part of speech in concise English; pass '' for none",
+                    required = false) String partOfSpeech,
+            @ToolParam(description = "User-supplied example with translation; pass '' for none", required = false)
+            @McpToolParam(description = "User-supplied example with translation; pass '' for none",
                     required = false) String example,
+            @ToolParam(description = "ENGLISH or CHINESE")
+            @McpToolParam(description = "ENGLISH or CHINESE", required = true) String language,
+            @ToolParam(description = "Deck name; pass '' for General", required = false)
+            @McpToolParam(description = "Deck name; pass '' for General", required = false) String deck,
             @ToolParam(description = "true pauses the card out of quizzes; false resumes it")
             @McpToolParam(description = "true pauses the card out of quizzes; false resumes it",
                     required = true) boolean suspended) {
         UUID id = UUID.fromString(cardId);
         VocabCardSummary current = vocab.find(id);
-        return vocab.update(id, front, back, ToolSupport.vocabMetadata(reading, example),
-                current.disciplineId(), suspended);
+        return vocab.update(id, front, back, ToolSupport.vocabMetadata(reading, partOfSpeech, example),
+                parseLanguage(language, front), deck, current.disciplineId(), suspended);
     }
 
     @Tool(name = "delete_vocab_card", description = DELETE_CARD)
@@ -205,5 +222,21 @@ class VocabTools implements NorthstarTool {
             throw new IllegalArgumentException(
                     "rating must be AGAIN, HARD, GOOD, or EASY — got '" + rating + "'");
         }
+    }
+
+    private static VocabLanguage parseLanguage(String language, String front) {
+        if (language == null || language.isBlank()) return VocabLanguage.detect(front);
+        try {
+            return VocabLanguage.valueOf(language.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("language must be ENGLISH or CHINESE");
+        }
+    }
+
+    private static VocabLanguage parseRequiredLanguage(String language) {
+        if (language == null || language.isBlank()) {
+            throw new IllegalArgumentException("language must be ENGLISH or CHINESE");
+        }
+        return parseLanguage(language, null);
     }
 }

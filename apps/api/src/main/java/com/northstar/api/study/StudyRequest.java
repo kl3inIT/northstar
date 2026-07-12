@@ -1,6 +1,10 @@
 package com.northstar.api.study;
 
 import com.northstar.core.study.StudyKind;
+import com.northstar.core.study.VocabEnrichmentField;
+import com.northstar.core.study.VocabLanguage;
+import com.northstar.core.study.VocabReviewDirection;
+import com.northstar.core.study.VocabReviewLog;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -12,6 +16,7 @@ import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -45,7 +50,10 @@ final class StudyRequest {
             @NotBlank @Size(max = 255) String front,
             @NotBlank @Size(max = 1000) String back,
             @Size(max = 4000) String metadata,
-            UUID disciplineId) {
+            @NotNull VocabLanguage language,
+            @Size(max = 80) String deck,
+            UUID disciplineId,
+            Boolean productionEnabled) {
     }
 
     /** POST body: every confirmed capture card in one transaction. */
@@ -57,8 +65,25 @@ final class StudyRequest {
             @NotBlank @Size(max = 255) String front,
             @NotBlank @Size(max = 1000) String back,
             @Size(max = 4000) String metadata,
+            @NotNull VocabLanguage language,
+            @Size(max = 80) String deck,
             UUID disciplineId,
-            @NotNull Boolean suspended) {
+            @NotNull Boolean suspended,
+            @NotNull Boolean productionEnabled) {
+    }
+
+    record VocabReviewRequest(@NotNull VocabReviewLog.Rating rating,
+            @NotNull VocabReviewDirection direction) {
+    }
+
+    record VocabAnswerRequest(@NotBlank @Size(max = 1000) String answer,
+            @NotNull VocabReviewDirection direction) {
+    }
+
+    record VocabEnrichmentRequest(@NotEmpty Set<VocabEnrichmentField> fields) {
+    }
+
+    record VocabDeckSettingsRequest(@NotNull Boolean productionDefault) {
     }
 
     record SpeakingQuestionRequest(@Min(1) @Max(3) int part) {

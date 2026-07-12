@@ -2,8 +2,8 @@
 
 ## Current Behavior
 
-Study combines a capture-first practice log, a vocabulary memory reviewed
-through chat, an LLM writing tutor, and measured speech practice with one
+Study combines a capture-first practice log, a focused vocabulary memory,
+an LLM writing tutor, and measured speech practice with one
 shared grammar-error history. There is no due-date queue, streak system,
 lesson content, or conversational voice agent: entries arrive through
 Capture/chat or the focused speech workflows, and `/study` answers "how much,
@@ -42,15 +42,47 @@ via predicted recall, so missed days never build a backlog. New cards start
 balanced (α=β=2) at a one-day half-life; ~10 new cards a day is guidance in
 the tool description, not a hard wall.
 
-- `front` is the word, `back` the meaning. Language specifics (tone-marked
-  pinyin/IPA reading, an AI-generated example sentence with translation)
-  travel in a `metadata` JSON string — never as columns.
+Recognition (target expression → saved meaning) is always enabled. A card may
+also enable production (saved, sense-specific meaning → target expression),
+which owns an independent Ebisu state and review-log direction without copying
+the card content. Deck settings provide the default for newly-created cards;
+existing cards stay recognition-only unless explicitly changed. Each queue
+snapshot selects only the weaker enabled direction for an item, so both sides
+never appear as siblings in one session.
+
+- `front` is the word and `back` its meaning. Tone-marked pinyin/IPA
+  `reading` and `partOfSpeech` are the base language fields. They travel in a
+  `metadata` JSON string — never as columns — and remain empty when the model
+  is unsure. Existing cards without either field remain valid.
+- Every card belongs to exactly one `ENGLISH` or `CHINESE` library and may
+  have one flat deck inside it. A missing deck is displayed as `General`;
+  `All decks` is a review scope, not stored data. Changing language or deck
+  never changes the card's Ebisu model or immutable review history. Existing
+  cards are backfilled deterministically (Han front → Chinese, otherwise
+  English), without an AI call.
+- Examples, collocations, synonyms, antonyms, easily-confused-word contrast,
+  mnemonics, defensible word formation, and a text-free mnemonic illustration
+  are optional enrichment. Creating, loading, or revealing a card never
+  generates them. The learner selects fields and explicitly starts an expiring
+  in-API background preview, then keeps reviewing until a toast offers Apply or
+  Discard. The review header retains a running/ready action until that decision,
+  so preview access does not depend on a transient notification. Word formation
+  is omitted when decomposition is uncertain or malformed. Image bytes remain transient until Apply stores them through
+  Attachments and references them as `frontImageId`; unknown metadata keys and
+  existing user-authored values are preserved.
 - Re-capturing an existing front (accent- and case-insensitive) returns the
   existing card instead of duplicating it.
-- Reviews happen in chat: the assistant quizzes at-risk cards one at a time
-  (never revealing the back first), grades free-text answers by meaning
-  equivalence, and records each review. Ratings map to Ebisu success values:
-  AGAIN=0, HARD=0.6, GOOD=0.9, EASY=1.0 (binary update at ≥0.5).
+- Focused reviews happen on the Vocabulary page; chat may still conduct a
+  quiz. The learner first selects English or Chinese, then `All decks`,
+  `General`, or one saved deck such as IELTS/HSK4. A browser-owned 10/20/30-card
+  snapshot takes the lowest-recall active items only inside that scope, chooses
+  one weakest enabled direction per item, and never mixes languages. Production
+  prompts hide listening until reveal. Optional free-text answer checking
+  returns `CORRECT`, `CLOSE`, or `MISSED` with a short explanation but does
+  not select a rating or update memory. Only the learner's subsequent
+  Again/Hard/Good/Easy action records a `MANUAL` review. Ratings map to Ebisu
+  success values: AGAIN=0, HARD=0.6, GOOD=0.9, EASY=1.0 (binary update at
+  ≥0.5).
 - Every review appends to an immutable log carrying rating, elapsed hours,
   and the model triple before/after — enough for a future FSRS-style
   optimizer to retrain from history.
@@ -152,8 +184,9 @@ skipped, never fatal.
 
 - Capture classifies `STUDY` (practice already done — multi-item, echo-back,
   undo, same contract as expenses) and `VOCAB` (words to memorize; the model
-  enriches with reading and an example sentence only when confident). An
-  intention to study later stays a task.
+  supplies language plus reading and part of speech when known, preserves an
+  explicitly named deck, but invents neither a deck nor optional enrichment).
+  An intention to study later stays a task.
 - Assistant and MCP tools: `log_study_sessions`, `find_study_sessions`,
   `update_study_session`, `delete_study_session`, `study_summary`,
   `list_mock_results`, `save_vocab_cards`, `find_vocab_cards`, `quiz_vocab`,
@@ -171,20 +204,40 @@ skipped, never fatal.
 - `/study` has four tabs. Log: weekly stat strip, mock-trend line chart
   (score percentage per mock, one line per skill, hidden until two scored
   mocks exist), skill/kind filters, sessions table with edit/delete.
-  Vocabulary: tracked/at-risk/new-this-week stats, search across word,
-  meaning, and reading, table sorted most-at-risk first with suspended cards
-  last, pause/resume/edit/delete plus live pronunciation assessment. Writing: essays graded, latest estimate,
+  Vocabulary: separate English/Chinese tabs, a deck selector, and scoped
+  tracked/at-risk/new-this-week stats plus search across word, meaning,
+  reading, and part of speech. Each table row shows its deck and the table is
+  sorted most-at-risk first with suspended cards last. It provides
+  pause/resume/edit/delete, language/deck correction, live
+  pronunciation assessment, and a keyboard-first weak-card reviewer. The
+  reviewer supports recognition and optional production, typed or dictated
+  answers, click-anywhere-on-the-non-interactive-card or Space flipping,
+  explicit semantic checking, and a compact answer face. Answer, reading, part
+  of speech, and one example remain visible; richer usage/relationship/memory
+  fields live under a counted `Study details` disclosure. Expanded details
+  scroll inside the card while the rating footer remains visible,
+  Space to flip between question and answer, 1-4 to rate, R to listen, Escape to exit, a completion
+  tally, deck/per-card two-direction controls, and an opt-in background
+  enrichment Sheet whose ready preview replaces the field picker instead of
+  forcing a scroll. Applied mnemonic images appear only on the question/front
+  face; word-formation parts appear on the answer face. Writing:
+  essays graded, latest estimate,
   trend vs previous essay, recurring-error strip, feedback table with a
   detail dialog (per-criterion justifications, quote-to-fix errors, the
   essay) and delete. Speaking: attempt count and recent delivery trend,
   question generation, 60-second recorder, separately-labelled delivery,
   content, and unofficial IELTS-style ranges, grounded expandable evidence,
   highlighted transcript errors, history detail, and delete.
-- Vocab reviews and writing grading remain in chat; speech assessment runs on
-  the focused page because chat has no audio attachment/output workflow.
+- Vocab review and speech assessment have focused page workflows; chat remains
+  an optional entry path for vocab quizzes. Writing grading remains in chat.
 - REST surface: `/api/study/sessions` (GET/POST/PUT/DELETE), `/summary`,
   `/mocks`, `/skills`, `/vocab` (GET/POST/PUT/DELETE),
-  `/vocab/{id}/pronunciation`, `/writing` (GET/DELETE), and `/speaking`
+  `/vocab/review` (required language, optional deck, direction-specific rows),
+  `/vocab/decks/settings`, `/vocab/{id}/reviews`,
+  `/vocab/{id}/answer-check`,
+  `/vocab/{id}/enrichment`, `/vocab/{id}/enrichment-jobs` plus job
+  status/apply/discard, `/vocab/{id}/pronunciation`, `/writing`
+  (GET/DELETE), and `/speaking`
   history plus `/speaking/question` and `/speaking/attempts`. Week boundaries
   respect the `X-Timezone` header.
 

@@ -14,7 +14,15 @@ import com.northstar.core.study.StudyService;
 import com.northstar.core.study.StudySessionSummary;
 import com.northstar.core.study.StudySource;
 import com.northstar.core.study.StudySummary;
+import com.northstar.core.study.VocabAnswerAssessment;
 import com.northstar.core.study.VocabCardSummary;
+import com.northstar.core.study.VocabCoach;
+import com.northstar.core.study.VocabDeckService;
+import com.northstar.core.study.VocabDeckSettings;
+import com.northstar.core.study.VocabEnrichmentPreview;
+import com.northstar.core.study.VocabLanguage;
+import com.northstar.core.study.VocabReviewCardSummary;
+import com.northstar.core.study.VocabReviewLog;
 import com.northstar.core.study.VocabService;
 import com.northstar.core.study.WritingFeedbackSummary;
 import com.northstar.core.study.WritingService;
@@ -60,16 +68,24 @@ class StudyController {
 
     private final StudyService study;
     private final VocabService vocab;
+    private final VocabCoach vocabCoach;
+    private final VocabDeckService vocabDecks;
+    private final VocabEnrichmentJobService enrichmentJobs;
     private final WritingService writing;
     private final SpeakingService speaking;
     private final ObjectProvider<SpeechAssessor> speechProvider;
     private final ObjectProvider<SpeakingCoach> coachProvider;
 
-    StudyController(StudyService study, VocabService vocab, WritingService writing,
+    StudyController(StudyService study, VocabService vocab, VocabCoach vocabCoach,
+            VocabDeckService vocabDecks, VocabEnrichmentJobService enrichmentJobs,
+            WritingService writing,
             SpeakingService speaking, ObjectProvider<SpeechAssessor> speechProvider,
             ObjectProvider<SpeakingCoach> coachProvider) {
         this.study = study;
         this.vocab = vocab;
+        this.vocabCoach = vocabCoach;
+        this.vocabDecks = vocabDecks;
+        this.enrichmentJobs = enrichmentJobs;
         this.writing = writing;
         this.speaking = speaking;
         this.speechProvider = speechProvider;
@@ -139,8 +155,72 @@ class StudyController {
     /** Every card, newest first, with recall probability computed for now. */
     @GetMapping("/vocab")
     @Operation(operationId = "listVocabCards")
-    List<VocabCardSummary> vocabCards() {
-        return vocab.cards();
+    List<VocabCardSummary> vocabCards(
+            @RequestParam(name = "language", required = false) VocabLanguage language) {
+        return vocab.cards(language);
+    }
+
+    /** Active cards with the lowest predicted recall right now; there are no due dates. */
+    @GetMapping("/vocab/review")
+    @Operation(operationId = "listVocabReviewCards")
+    List<VocabReviewCardSummary> vocabReviewCards(
+            @RequestParam(name = "language") VocabLanguage language,
+            @RequestParam(name = "deck", required = false) String deck,
+            @RequestParam(name = "limit", defaultValue = "20") int limit) {
+        return vocab.reviewQueue(language, deck, limit, null);
+    }
+
+    /** A learner-chosen rating is the only page action that updates the memory model. */
+    @PostMapping("/vocab/{id}/reviews")
+    @Operation(operationId = "recordVocabReview")
+    VocabCardSummary recordVocabReview(@PathVariable("id") UUID id,
+            @Valid @RequestBody StudyRequest.VocabReviewRequest request) {
+        VocabReviewLog.Rating rating = request.rating();
+        return vocab.recordReview(id, request.direction(), rating.success(), rating,
+                VocabReviewLog.ReviewSource.MANUAL);
+    }
+
+    /** Explicit semantic feedback only; this endpoint never records a review. */
+    @PostMapping("/vocab/{id}/answer-check")
+    @Operation(operationId = "checkVocabAnswer")
+    VocabAnswerAssessment checkVocabAnswer(@PathVariable("id") UUID id,
+            @Valid @RequestBody StudyRequest.VocabAnswerRequest request) {
+        return vocabCoach.checkAnswer(vocab.find(id), request.direction(), request.answer());
+    }
+
+    /** Explicit, non-persisting enrichment preview. PUT the card to apply it. */
+    @PostMapping("/vocab/{id}/enrichment")
+    @Operation(operationId = "previewVocabEnrichment")
+    VocabEnrichmentPreview previewVocabEnrichment(@PathVariable("id") UUID id,
+            @Valid @RequestBody StudyRequest.VocabEnrichmentRequest request) {
+        return vocabCoach.enrich(vocab.find(id), request.fields());
+    }
+
+    @PostMapping("/vocab/{id}/enrichment-jobs")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(operationId = "startVocabEnrichmentJob")
+    VocabEnrichmentJobView startVocabEnrichmentJob(@PathVariable("id") UUID id,
+            @Valid @RequestBody StudyRequest.VocabEnrichmentRequest request) {
+        return enrichmentJobs.start(id, request.fields());
+    }
+
+    @GetMapping("/vocab/enrichment-jobs/{jobId}")
+    @Operation(operationId = "getVocabEnrichmentJob")
+    VocabEnrichmentJobView vocabEnrichmentJob(@PathVariable("jobId") UUID jobId) {
+        return enrichmentJobs.get(jobId);
+    }
+
+    @PostMapping("/vocab/enrichment-jobs/{jobId}/apply")
+    @Operation(operationId = "applyVocabEnrichmentJob")
+    VocabCardSummary applyVocabEnrichmentJob(@PathVariable("jobId") UUID jobId) {
+        return enrichmentJobs.apply(jobId);
+    }
+
+    @DeleteMapping("/vocab/enrichment-jobs/{jobId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "discardVocabEnrichmentJob")
+    void discardVocabEnrichmentJob(@PathVariable("jobId") UUID jobId) {
+        enrichmentJobs.discard(jobId);
     }
 
     @PostMapping("/vocab")
@@ -149,7 +229,8 @@ class StudyController {
     List<VocabCardSummary> recordVocabCards(
             @Valid @RequestBody StudyRequest.RecordVocabCardsRequest request) {
         List<NewVocabCard> items = request.items().stream()
-                .map(i -> new NewVocabCard(i.front(), i.back(), i.metadata(), i.disciplineId()))
+                .map(i -> new NewVocabCard(i.front(), i.back(), i.metadata(),
+                        i.language(), i.deck(), i.disciplineId(), i.productionEnabled()))
                 .toList();
         return vocab.createAll(items);
     }
@@ -159,7 +240,23 @@ class StudyController {
     VocabCardSummary updateVocabCard(@PathVariable("id") UUID id,
             @Valid @RequestBody StudyRequest.UpdateVocabCardRequest request) {
         return vocab.update(id, request.front(), request.back(), request.metadata(),
-                request.disciplineId(), request.suspended());
+                request.language(), request.deck(), request.disciplineId(), request.suspended(),
+                request.productionEnabled());
+    }
+
+    @GetMapping("/vocab/decks/settings")
+    @Operation(operationId = "getVocabDeckSettings")
+    VocabDeckSettings vocabDeckSettings(@RequestParam("language") VocabLanguage language,
+            @RequestParam(name = "deck", required = false) String deck) {
+        return vocabDecks.settings(language, deck);
+    }
+
+    @PutMapping("/vocab/decks/settings")
+    @Operation(operationId = "updateVocabDeckSettings")
+    VocabDeckSettings updateVocabDeckSettings(@RequestParam("language") VocabLanguage language,
+            @RequestParam(name = "deck", required = false) String deck,
+            @Valid @RequestBody StudyRequest.VocabDeckSettingsRequest request) {
+        return vocabDecks.update(language, deck, request.productionDefault());
     }
 
     @DeleteMapping("/vocab/{id}")

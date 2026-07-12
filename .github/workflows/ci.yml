@@ -54,4 +54,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Hey API output is gitignored — regenerate from the committed contract.
       - run: pnpm gen:api
+      - run: pnpm test
       - run: pnpm build

@@ -10,13 +10,16 @@ import java.util.UUID;
  * chat quiz reason about. {@code recallProbability} is computed at read time
  * for "now" — there is no due date to expose. {@code metadata} is the raw
  * JSON string ({"reading": ..., "example": ...}); clients parse what they
- * know and ignore the rest.
+ * know and ignore the rest. Base language metadata uses {@code reading} for
+ * IPA/pinyin and {@code partOfSpeech} for the lexical category.
  */
 public record VocabCardSummary(
         @NotNull UUID id,
         @NotNull String front,
         @NotNull String back,
         String metadata,
+        @NotNull VocabLanguage language,
+        String deck,
         UUID disciplineId,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) double recallProbability,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) double halflifeHours,
@@ -24,5 +27,8 @@ public record VocabCardSummary(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int reviewCount,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean suspended,
         @NotNull Instant createdAt,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long version) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long version,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean productionEnabled,
+        Double productionRecallProbability,
+        Integer productionReviewCount) {
 }

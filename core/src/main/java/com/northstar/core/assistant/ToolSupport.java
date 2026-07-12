@@ -111,23 +111,30 @@ final class ToolSupport {
     }
 
     /**
-     * Assembles a vocab card's metadata JSON ({@code {"reading":..,"example":..}})
-     * from the two enrichment fields; null when both are absent.
+     * Assembles a vocab card's metadata JSON. Reading and part of speech are the
+     * base language fields; an example is preserved only when explicitly supplied.
      */
-    static String vocabMetadata(String reading, String example) {
+    static String vocabMetadata(String reading, String partOfSpeech, String example) {
         boolean hasReading = reading != null && !reading.isBlank();
+        boolean hasPartOfSpeech = partOfSpeech != null && !partOfSpeech.isBlank();
         boolean hasExample = example != null && !example.isBlank();
-        if (!hasReading && !hasExample) {
+        if (!hasReading && !hasPartOfSpeech && !hasExample) {
             return null;
         }
         StringBuilder json = new StringBuilder("{");
+        boolean needsComma = false;
         if (hasReading) {
             json.append("\"reading\":\"").append(escapeJson(reading.strip())).append('"');
+            needsComma = true;
+        }
+        if (hasPartOfSpeech) {
+            if (needsComma) json.append(',');
+            json.append("\"partOfSpeech\":\"")
+                    .append(escapeJson(partOfSpeech.strip())).append('"');
+            needsComma = true;
         }
         if (hasExample) {
-            if (hasReading) {
-                json.append(',');
-            }
+            if (needsComma) json.append(',');
             json.append("\"example\":\"").append(escapeJson(example.strip())).append('"');
         }
         return json.append('}').toString();

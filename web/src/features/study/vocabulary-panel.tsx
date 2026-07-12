@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { BookOpenCheck, Ellipsis, Flame, MessageSquareText, Mic, Pencil, PauseCircle, PlayCircle, Search, Sparkles, Trash2 } from 'lucide-react'
+import { BookOpenCheck, ChevronDown, Ellipsis, Flame, Mic, Pencil, PauseCircle, PlayCircle, Search, Sparkles, Trash2 } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
+import { VocabularyReviewer } from './vocabulary-reviewer'
+import { cardMatchesDeck, deckQuery } from './vocabulary-review-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -13,16 +15,23 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 import {
   parseVocabMetadata,
+  mergeVocabMetadata,
   useAssessVocabPronunciation,
   useDeleteVocabCard,
   useUpdateVocabCard,
+  useUpdateVocabDeckSettings,
   useVocabCards,
+  useVocabDeckSettings,
   type VocabCard,
+  type VocabLanguage,
   type PronunciationAssessment,
 } from '@/lib/study-api'
 import { useWavRecorder } from '@/lib/use-wav-recorder'
@@ -37,38 +46,49 @@ function recallTone(probability: number): string {
 }
 
 export function VocabularyPanel() {
-  const cardsQuery = useVocabCards()
+  const [language, setLanguage] = useState<VocabLanguage>('ENGLISH')
+  const [deck, setDeck] = useState('ALL')
+  const cardsQuery = useVocabCards(language)
   const cards = cardsQuery.data ?? EMPTY_CARDS
   const [search, setSearch] = useState('')
   const [editing, setEditing] = useState<VocabCard | null>(null)
   const [deleting, setDeleting] = useState<VocabCard | null>(null)
   const [pronouncing, setPronouncing] = useState<VocabCard | null>(null)
+  const [reviewLimit, setReviewLimit] = useState<number | null>(null)
   const update = useUpdateVocabCard()
+  const selectedDeck = deck === 'ALL' ? undefined : deck
+  const deckSettings = useVocabDeckSettings(language, selectedDeck)
+  const updateDeckSettings = useUpdateVocabDeckSettings()
 
-  const active = useMemo(() => cards.filter((c) => !c.suspended), [cards])
+  const deckOptions = useMemo(() => [...new Set([
+    'General',
+    ...cards.map((card) => card.deck).filter((value): value is string => Boolean(value)),
+  ])].sort((a, b) => a.localeCompare(b)), [cards])
+  const scopedCards = useMemo(() => cards.filter((card) => cardMatchesDeck(card.deck, deck)), [cards, deck])
+  const active = useMemo(() => scopedCards.filter((c) => !c.suspended), [scopedCards])
   const atRiskCount = useMemo(
     () => active.filter((c) => c.recallProbability < 0.7).length,
     [active],
   )
   const newThisWeek = useMemo(() => {
     const cutoff = Date.now() - WEEK_MS
-    return cards.filter((c) => new Date(c.createdAt).getTime() >= cutoff).length
-  }, [cards])
+    return scopedCards.filter((c) => new Date(c.createdAt).getTime() >= cutoff).length
+  }, [scopedCards])
 
   const visible = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
     const filtered = query
-      ? cards.filter((c) =>
+      ? scopedCards.filter((c) =>
           c.front.toLocaleLowerCase().includes(query)
           || c.back.toLocaleLowerCase().includes(query)
           || (parseVocabMetadata(c.metadata).reading ?? '').toLocaleLowerCase().includes(query))
-      : cards
+      : scopedCards
     // At-risk first, suspended last — the table doubles as the priority list.
     return [...filtered].sort((a, b) => {
       if (a.suspended !== b.suspended) return a.suspended ? 1 : -1
       return a.recallProbability - b.recallProbability
     })
-  }, [cards, search])
+  }, [scopedCards, search])
 
   function toggleSuspended(card: VocabCard) {
     update.mutate(
@@ -77,8 +97,11 @@ export function VocabularyPanel() {
         front: card.front,
         back: card.back,
         metadata: card.metadata ?? undefined,
+        language: card.language,
+        deck: card.deck,
         disciplineId: card.disciplineId ?? undefined,
         suspended: !card.suspended,
+        productionEnabled: card.productionEnabled,
       },
       {
         onSuccess: () => toast.success(card.suspended ? `Resumed “${card.front}”` : `Paused “${card.front}”`),
@@ -87,8 +110,54 @@ export function VocabularyPanel() {
     )
   }
 
+  if (reviewLimit !== null) {
+    return (
+      <>
+        <VocabularyReviewer limit={reviewLimit} language={language}
+          deck={deckQuery(deck)} onExit={() => setReviewLimit(null)}
+          onEdit={(reviewCard) => setEditing(cards.find((item) => item.id === reviewCard.id) ?? null)}
+          onPronounce={(reviewCard) => setPronouncing(cards.find((item) => item.id === reviewCard.id) ?? null)} />
+        <EditCardDialog key={editing?.id ?? 'none'} card={editing} onClose={() => setEditing(null)} />
+        <PronunciationDialog key={pronouncing?.id ?? 'no-pronunciation'} card={pronouncing} onClose={() => setPronouncing(null)} />
+      </>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 sm:flex-row sm:items-center sm:justify-between">
+        <Tabs value={language} onValueChange={(value) => {
+          setLanguage(value as VocabLanguage)
+          setDeck('ALL')
+          setSearch('')
+        }}>
+          <TabsList>
+            <TabsTrigger value="ENGLISH">English</TabsTrigger>
+            <TabsTrigger value="CHINESE">Chinese</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        <div className="flex items-center gap-2">
+          <Label htmlFor="vocab-deck" className="text-xs text-muted-foreground">Review deck</Label>
+          <Select value={deck} onValueChange={setDeck}>
+            <SelectTrigger id="vocab-deck" className="w-44"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All decks</SelectItem>
+              {deckOptions.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {selectedDeck && (
+            <Label className="ml-2 flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-xs font-normal">
+              <Switch size="sm" checked={deckSettings.data?.productionDefault ?? false}
+                disabled={deckSettings.isLoading || updateDeckSettings.isPending}
+                onCheckedChange={(productionDefault) => updateDeckSettings.mutate(
+                  { language, deck: selectedDeck, productionDefault },
+                  { onError: (error) => toast.error(error.message) },
+                )} />
+              New cards: two directions
+            </Label>
+          )}
+        </div>
+      </div>
       <VocabStats tracked={active.length} atRisk={atRiskCount} newThisWeek={newThisWeek} />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -98,14 +167,25 @@ export function VocabularyPanel() {
             aria-label="Search vocabulary"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search word, meaning, or pinyin"
+            placeholder={`Search ${language === 'ENGLISH' ? 'English' : 'Chinese'} · ${deck === 'ALL' ? 'all decks' : deck}`}
             className="pl-8"
           />
         </div>
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <MessageSquareText className="size-3.5" />
-          Review happens in chat — tell the Assistant "ôn từ đi"
-        </p>
+        <div className="flex shrink-0 items-center">
+          <Button className="rounded-r-none" disabled={active.length === 0} onClick={() => setReviewLimit(20)}>
+            <PlayCircle /> Review {language === 'ENGLISH' ? 'English' : 'Chinese'} · {deck === 'ALL' ? 'All decks' : deck}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="default" size="icon" className="rounded-l-none border-l border-primary-foreground/20" disabled={active.length === 0} aria-label="Choose review size">
+                <ChevronDown />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {[10, 20, 30].map((limit) => <DropdownMenuItem key={limit} onClick={() => setReviewLimit(limit)}>Review up to {limit} cards</DropdownMenuItem>)}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {cardsQuery.error ? (
@@ -210,7 +290,9 @@ function CardsTable({ rows, isLoading, onEdit, onDelete, onPronounce, onToggleSu
                 <TableCell>
                   <div className="min-w-28">
                     <p className="text-sm font-medium">{card.front}</p>
-                    {meta.reading && <p className="text-xs text-muted-foreground">{meta.reading}</p>}
+                    {(meta.reading || meta.partOfSpeech) && <p className="text-xs text-muted-foreground">{[meta.reading, meta.partOfSpeech].filter(Boolean).join(' · ')}</p>}
+                    <Badge variant="outline" className="mt-1 h-5 rounded px-1.5 text-[10px] font-normal">{card.deck ?? 'General'}</Badge>
+                    {card.productionEnabled && <Badge variant="secondary" className="ml-1 mt-1 h-5 rounded px-1.5 text-[10px] font-normal">2 directions</Badge>}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -277,7 +359,11 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
   const [front, setFront] = useState(card.front)
   const [back, setBack] = useState(card.back)
   const [reading, setReading] = useState(meta.reading ?? '')
+  const [partOfSpeech, setPartOfSpeech] = useState(meta.partOfSpeech ?? '')
   const [example, setExample] = useState(meta.example ?? '')
+  const [language, setLanguage] = useState<VocabLanguage>(card.language)
+  const [deck, setDeck] = useState(card.deck ?? '')
+  const [productionEnabled, setProductionEnabled] = useState(card.productionEnabled)
   const update = useUpdateVocabCard()
 
   function save() {
@@ -285,17 +371,17 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
       toast.error('Enter both the word and its meaning')
       return
     }
-    const metadata: Record<string, string> = {}
-    if (reading.trim()) metadata.reading = reading.trim()
-    if (example.trim()) metadata.example = example.trim()
     update.mutate(
       {
         id: card.id,
         front: front.trim(),
         back: back.trim(),
-        metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+        metadata: mergeVocabMetadata(card.metadata, { reading, partOfSpeech, example }),
+        language,
+        deck: deck.trim() || undefined,
         disciplineId: card.disciplineId ?? undefined,
         suspended: card.suspended,
+        productionEnabled,
       },
       {
         onSuccess: () => { toast.success('Card updated'); onClose() },
@@ -310,6 +396,19 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
       <div className="grid gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-1.5">
+            <Label htmlFor="card-language">Language</Label>
+            <Select value={language} onValueChange={(value) => setLanguage(value as VocabLanguage)}>
+              <SelectTrigger id="card-language" className="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="ENGLISH">English</SelectItem><SelectItem value="CHINESE">Chinese</SelectItem></SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="card-deck">Deck</Label>
+            <Input id="card-deck" placeholder="General" value={deck} onChange={(event) => setDeck(event.target.value)} />
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-1.5">
             <Label htmlFor="card-front">Word</Label>
             <Input id="card-front" value={front} onChange={(event) => setFront(event.target.value)} />
           </div>
@@ -319,6 +418,10 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
           </div>
         </div>
         <div className="grid gap-1.5">
+          <Label htmlFor="card-part-of-speech">Part of speech</Label>
+          <Input id="card-part-of-speech" placeholder="noun / verb / adjective / phrase" value={partOfSpeech} onChange={(event) => setPartOfSpeech(event.target.value)} />
+        </div>
+        <div className="grid gap-1.5">
           <Label htmlFor="card-back">Meaning</Label>
           <Input id="card-back" value={back} onChange={(event) => setBack(event.target.value)} />
         </div>
@@ -326,6 +429,10 @@ function EditCardForm({ card, onClose }: { card: VocabCard; onClose: () => void 
           <Label htmlFor="card-example">Example</Label>
           <Input id="card-example" placeholder="One sentence — translation" value={example} onChange={(event) => setExample(event.target.value)} />
         </div>
+        <Label className="flex cursor-pointer items-center justify-between gap-4 rounded-lg border p-3 font-normal">
+          <span><span className="block text-sm font-medium">Practice both directions</span><span className="block text-xs text-muted-foreground">Meaning → word gets its own memory schedule.</span></span>
+          <Switch checked={productionEnabled} onCheckedChange={setProductionEnabled} />
+        </Label>
       </div>
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>Cancel</Button>

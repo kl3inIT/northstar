@@ -2,21 +2,30 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   assessSpeakingAttempt,
   assessVocabPronunciation,
+  applyVocabEnrichmentJob,
+  checkVocabAnswer,
+  discardVocabEnrichmentJob,
   deleteSpeakingFeedback,
   deleteStudySession,
   deleteVocabCard,
   deleteWritingFeedback,
   generateSpeakingQuestion,
+  getVocabDeckSettings,
+  getVocabEnrichmentJob,
   getStudySummary,
   listMockResults,
   listSpeakingFeedback,
   listStudySessions,
   listStudySkills,
   listVocabCards,
+  listVocabReviewCards,
   listWritingFeedback,
+  recordVocabReview,
   recordStudySessions,
+  startVocabEnrichmentJob,
   updateStudySession,
   updateVocabCard,
+  updateVocabDeckSettings,
 } from './hey-api'
 import { dataOrThrow, voidOrThrow } from './hey-api-result'
 import type {
@@ -27,7 +36,15 @@ import type {
   StudySessionSummary,
   StudySummary,
   UpdateVocabCardRequest,
+  VocabAnswerAssessment,
   VocabCardSummary,
+  VocabDeckSettings,
+  VocabEnrichmentJobView,
+  VocabEnrichmentPreview,
+  VocabEnrichmentRequest,
+  VocabReviewRequest,
+  VocabReviewCardSummary,
+  VocabWordFormation,
   WritingFeedbackSummary,
 } from './hey-api'
 
@@ -35,10 +52,19 @@ export type StudySession = StudySessionSummary
 export type StudyKind = StudySessionSummary['kind']
 export type StudySessionInput = StudyItemRequest
 export type VocabCard = VocabCardSummary
+export type VocabReviewCard = VocabReviewCardSummary
+export type VocabLanguage = VocabCardSummary['language']
 export type WritingFeedback = WritingFeedbackSummary
 export type SpeakingFeedback = SpeakingFeedbackSummary
 export type SpeakingAttempt = SpeakingAttemptResult
 export type PronunciationAssessment = PronunciationResult
+export type VocabAnswerCheck = VocabAnswerAssessment
+export type VocabEnrichment = VocabEnrichmentPreview
+export type VocabEnrichmentJob = VocabEnrichmentJobView
+export type VocabDeckPreference = VocabDeckSettings
+export type VocabReviewDirection = VocabReviewRequest['direction']
+export type VocabEnrichmentField = VocabEnrichmentRequest['fields'][number]
+export type VocabRating = VocabReviewRequest['rating']
 export type { StudySummary }
 
 export interface WritingCriterion {
@@ -161,18 +187,87 @@ export function parseWritingErrors(topErrors: string | undefined | null): Writin
   }
 }
 
-/** The card's metadata JSON parsed leniently — unknown keys are ignored. */
-export function parseVocabMetadata(metadata: string | undefined | null): { reading?: string; example?: string } {
+export interface VocabMetadata {
+  reading?: string
+  partOfSpeech?: string
+  example?: string
+  collocations?: string[]
+  synonyms?: string[]
+  antonyms?: string[]
+  contrast?: string
+  mnemonic?: string
+  wordFormation?: VocabWordFormation
+  frontImageId?: string
+  frontImageAlt?: string
+}
+
+function stringList(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  const values = value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+  return values.length > 0 ? values : undefined
+}
+
+/** The card's metadata JSON parsed leniently — unknown keys are ignored by the reader. */
+export function parseVocabMetadata(metadata: string | undefined | null): VocabMetadata {
   if (!metadata) return {}
   try {
     const parsed = JSON.parse(metadata) as Record<string, unknown>
     return {
       reading: typeof parsed.reading === 'string' ? parsed.reading : undefined,
+      partOfSpeech: typeof parsed.partOfSpeech === 'string' ? parsed.partOfSpeech : undefined,
       example: typeof parsed.example === 'string' ? parsed.example : undefined,
+      collocations: stringList(parsed.collocations),
+      synonyms: stringList(parsed.synonyms),
+      antonyms: stringList(parsed.antonyms),
+      contrast: typeof parsed.contrast === 'string' ? parsed.contrast : undefined,
+      mnemonic: typeof parsed.mnemonic === 'string' ? parsed.mnemonic : undefined,
+      wordFormation: parseWordFormation(parsed.wordFormation),
+      frontImageId: typeof parsed.frontImageId === 'string' ? parsed.frontImageId : undefined,
+      frontImageAlt: typeof parsed.frontImageAlt === 'string' ? parsed.frontImageAlt : undefined,
     }
   } catch {
     return {}
   }
+}
+
+function parseWordFormation(value: unknown): VocabWordFormation | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const candidate = value as Record<string, unknown>
+  if (!Array.isArray(candidate.parts) || typeof candidate.explanation !== 'string') return undefined
+  const parts = candidate.parts.filter((part): part is { form: string; kind: string; meaning: string } => {
+    if (typeof part !== 'object' || part === null) return false
+    const item = part as Record<string, unknown>
+    return typeof item.form === 'string' && typeof item.kind === 'string' && typeof item.meaning === 'string'
+  })
+  if (parts.length !== candidate.parts.length || parts.length < 2) return undefined
+  return { parts, explanation: candidate.explanation, family: stringList(candidate.family) }
+}
+
+/** Merge edited fields while preserving enrichment and future metadata keys. */
+export function mergeVocabMetadata(
+  metadata: string | undefined | null,
+  updates: Record<string, string | string[] | undefined>,
+): string | undefined {
+  let merged: Record<string, unknown> = {}
+  if (metadata) {
+    try {
+      const parsed = JSON.parse(metadata) as unknown
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        merged = { ...(parsed as Record<string, unknown>) }
+      }
+    } catch {
+      // An edit repairs malformed legacy metadata.
+    }
+  }
+  Object.entries(updates).forEach(([key, value]) => {
+    if (value == null || (typeof value === 'string' && value.trim().length === 0)
+      || (Array.isArray(value) && value.length === 0)) {
+      delete merged[key]
+    } else {
+      merged[key] = typeof value === 'string' ? value.trim() : value
+    }
+  })
+  return Object.keys(merged).length > 0 ? JSON.stringify(merged) : undefined
 }
 
 const tzHeaders = { 'X-Timezone': Intl.DateTimeFormat().resolvedOptions().timeZone }
@@ -212,10 +307,100 @@ export function useStudySkills() {
 }
 
 /** Every card, newest first, with recall probability computed server-side for now. */
-export function useVocabCards() {
+export function useVocabCards(language?: VocabLanguage) {
   return useQuery({
-    queryKey: ['study-vocab'],
-    queryFn: async () => dataOrThrow(await listVocabCards()),
+    queryKey: ['study-vocab', language ?? 'ALL'],
+    queryFn: async () => dataOrThrow(await listVocabCards({ query: { language } })),
+  })
+}
+
+export function useVocabReviewCards(
+  limit: number,
+  language: VocabLanguage,
+  deck: string | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ['study-vocab-review', language, deck ?? 'ALL', limit],
+    enabled,
+    queryFn: async () => dataOrThrow(await listVocabReviewCards({ query: { language, deck, limit } })),
+  })
+}
+
+export function useRecordVocabReview() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, rating, direction }: { id: string; rating: VocabRating; direction: VocabReviewDirection }) =>
+      dataOrThrow(await recordVocabReview({ path: { id }, body: { rating, direction } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['study-vocab'] })
+      void queryClient.invalidateQueries({ queryKey: ['study-vocab-review'] })
+    },
+  })
+}
+
+export function useCheckVocabAnswer() {
+  return useMutation({
+    mutationFn: async ({ id, answer, direction }: { id: string; answer: string; direction: VocabReviewDirection }) =>
+      dataOrThrow(await checkVocabAnswer({ path: { id }, body: { answer, direction } })),
+  })
+}
+
+export function useStartVocabEnrichmentJob() {
+  return useMutation({
+    mutationFn: async ({ id, fields }: { id: string; fields: VocabEnrichmentField[] }) =>
+      dataOrThrow(await startVocabEnrichmentJob({ path: { id }, body: { fields } })),
+  })
+}
+
+export function useVocabEnrichmentJob(jobId: string | null) {
+  return useQuery({
+    queryKey: ['study-vocab-enrichment-job', jobId],
+    enabled: Boolean(jobId),
+    queryFn: async () => dataOrThrow(await getVocabEnrichmentJob({ path: { jobId: jobId! } })),
+    refetchInterval: (query) => query.state.data?.status === 'PENDING' ? 1_000 : false,
+  })
+}
+
+export function useApplyVocabEnrichmentJob() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (jobId: string) =>
+      dataOrThrow(await applyVocabEnrichmentJob({ path: { jobId } })),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['study-vocab'] })
+      void queryClient.invalidateQueries({ queryKey: ['study-vocab-review'] })
+    },
+  })
+}
+
+export function useDiscardVocabEnrichmentJob() {
+  return useMutation({
+    mutationFn: async (jobId: string) =>
+      voidOrThrow(await discardVocabEnrichmentJob({ path: { jobId } })),
+  })
+}
+
+export function useVocabDeckSettings(language: VocabLanguage, deck?: string) {
+  return useQuery({
+    queryKey: ['study-vocab-deck-settings', language, deck ?? 'General'],
+    queryFn: async () => dataOrThrow(await getVocabDeckSettings({ query: { language, deck } })),
+  })
+}
+
+export function useUpdateVocabDeckSettings() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ language, deck, productionDefault }: {
+      language: VocabLanguage
+      deck?: string
+      productionDefault: boolean
+    }) => dataOrThrow(await updateVocabDeckSettings({
+      query: { language, deck }, body: { productionDefault },
+    })),
+    onSuccess: (settings) => queryClient.setQueryData(
+      ['study-vocab-deck-settings', settings.language, settings.deck], settings,
+    ),
   })
 }
 

@@ -23,7 +23,7 @@ export default defineConfig({
     proxy: {
       // Dev: forward API calls to the Spring api app.
       '/api': {
-        target: 'http://localhost:8888',
+        target: process.env.NORTHSTAR_API_TARGET ?? 'http://localhost:8888',
         changeOrigin: true,
       },
     },

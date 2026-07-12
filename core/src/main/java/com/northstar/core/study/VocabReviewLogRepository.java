@@ -13,12 +13,15 @@ interface VocabReviewLogRepository extends JpaRepository<VocabReviewLog, UUID> {
     long countByReviewedAtGreaterThanEqual(Instant since);
 
     /** Review counts per card in one query — the card list joins these in memory. */
-    @Query("select l.cardId as cardId, count(l) as reviews from VocabReviewLog l "
-            + "where l.cardId in :cardIds group by l.cardId")
+    @Query("select l.cardId as cardId, l.direction as direction, count(l) as reviews "
+            + "from VocabReviewLog l where l.cardId in :cardIds "
+            + "group by l.cardId, l.direction")
     List<CardReviewCount> countByCard(@Param("cardIds") List<UUID> cardIds);
 
     interface CardReviewCount {
         UUID getCardId();
+
+        VocabReviewDirection getDirection();
 
         long getReviews();
     }
