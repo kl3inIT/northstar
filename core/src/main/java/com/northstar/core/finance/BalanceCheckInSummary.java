@@ -10,7 +10,8 @@ import java.util.UUID;
 public record BalanceCheckInSummary(
         @NotNull UUID id,
         @NotNull LocalDate checkedOn,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long actualBalance,
+        @NotNull BalanceBreakdown breakdown,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long totalBalance,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long expectedBalance,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) long discrepancy,
         TransactionSummary adjustment,

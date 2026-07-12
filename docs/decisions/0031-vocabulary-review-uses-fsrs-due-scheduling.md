@@ -1,4 +1,4 @@
-# 0030 - Vocabulary Review Uses FSRS Due Scheduling
+# 0031 - Vocabulary Review Uses FSRS Due Scheduling
 
 ## Status
 
@@ -53,4 +53,3 @@ modern Anki FSRS workflow. Missed days can produce due cards, but session size
 remains learner-selected and no escalating quota is manufactured. The system
 gains more scheduling state and timezone-aware sibling handling, while keeping
 the algorithm dependency behind one test-pinned boundary.
-

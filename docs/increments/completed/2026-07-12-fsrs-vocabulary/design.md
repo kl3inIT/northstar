@@ -140,5 +140,5 @@ and reset controls.
   Asia/Bangkok midnight. After making that Review card due, the UI showed
   `10m / 10d / 20d / 1mo`; Again persisted Relearning step 0, a 10-minute due
   time, and lapse count 1. All three writes returned 200 and the console was clean.
-- Decision 0030, Study spec/test matrix, roadmap, and Northstar App Behavior
+- Decision 0031, Study spec/test matrix, roadmap, and Northstar App Behavior
   are updated.

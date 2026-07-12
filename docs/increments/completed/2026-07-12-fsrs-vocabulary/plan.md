@@ -1,7 +1,7 @@
 # FSRS Vocabulary Scheduling — Plan
 
 Status: completed 2026-07-12. All four blocks, local gates, clean-schema boot,
-and browser/API/DB verification passed; Decision 0030 and Study sources of truth
+and browser/API/DB verification passed; Decision 0031 and Study sources of truth
 contain the consolidated behavior.
 
 ## Block A — Persistence and scheduler boundary
@@ -35,7 +35,7 @@ contain the consolidated behavior.
 - Run clean-schema Flyway/Hibernate validation and all local Java/web gates.
 - Exercise new-learning, successful review, sibling bury, and lapse/relearning
   in the real browser with a clean console.
-- Add Decision 0030 superseding Decisions 0015/0024 scheduling, update the Study
+- Add Decision 0031 superseding Decisions 0015/0024 scheduling, update the Study
   spec/test matrix and roadmap, append Northstar App Behavior through local MCP,
   and move this increment to `completed/`.
 - Commit logical conventional-commit chunks. Do not push unless explicitly asked.

@@ -24,6 +24,7 @@ import {
   updateSavingsGoal,
   updateSubscription,
   updateTransaction,
+  undoBalanceCheckIn,
 } from './hey-api'
 import { dataOrThrow, voidOrThrow } from './hey-api-result'
 import type {
@@ -147,6 +148,20 @@ export function useCreateBalanceCheckIn() {
   return useMutation({
     mutationFn: async (body: BalanceCheckInRequest) =>
       dataOrThrow(await createBalanceCheckIn({ body, headers: tzHeaders })),
+    onSuccess: () => {
+      invalidateFinance()
+      queryClient.invalidateQueries({ queryKey: ['finance-balance-check-ins'] })
+    },
+  })
+}
+
+export function useUndoBalanceCheckIn() {
+  const queryClient = useQueryClient()
+  const invalidateFinance = useInvalidateFinance()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      voidOrThrow(await undoBalanceCheckIn({ path: { id } }))
+    },
     onSuccess: () => {
       invalidateFinance()
       queryClient.invalidateQueries({ queryKey: ['finance-balance-check-ins'] })
