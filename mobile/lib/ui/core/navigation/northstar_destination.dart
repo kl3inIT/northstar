@@ -7,7 +7,7 @@ enum NorthstarDestination {
     selectedIcon: CupertinoIcons.chat_bubble_2_fill,
   ),
   tasks(
-    label: 'Tasks',
+    label: 'Today',
     icon: CupertinoIcons.check_mark_circled,
     selectedIcon: CupertinoIcons.check_mark_circled_solid,
   ),

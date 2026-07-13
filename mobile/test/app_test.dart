@@ -2,8 +2,11 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:northstar/data/repositories/assistant_repository.dart';
 import 'package:northstar/data/repositories/auth_repository.dart';
+import 'package:northstar/data/repositories/today_repository.dart';
+import 'package:northstar/data/services/device_timezone.dart';
 import 'package:northstar/domain/models/assistant_models.dart';
 import 'package:northstar/domain/models/auth_session.dart';
+import 'package:northstar/domain/models/today_models.dart';
 import 'package:northstar/ui/core/northstar_app.dart';
 
 void main() {
@@ -44,6 +47,22 @@ void main() {
     expect(find.byKey(const Key('capture-page')), findsOneWidget);
     expect(find.text('Capture it now'), findsOneWidget);
     expect(find.byType(CupertinoTabBar), findsNothing);
+  });
+
+  testWidgets('opens the integrated Today daily-actions destination', (
+    tester,
+  ) async {
+    _setWindowSize(tester, const Size(390, 844));
+    await tester.pumpWidget(_testApp(_signedInRepository()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(CupertinoIcons.check_mark_circled));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(find.byKey(const Key('today-page')), findsOneWidget);
+    expect(find.byKey(const Key('today-tasks-empty')), findsOneWidget);
+    expect(find.text('Today'), findsWidgets);
   });
 
   testWidgets('opens the receipt source picker from the Assistant add menu', (
@@ -175,6 +194,8 @@ NorthstarApp _testApp(AuthRepository authRepository) {
   return NorthstarApp(
     authRepository: authRepository,
     assistantRepository: _FakeAssistantRepository(),
+    todayRepository: _FakeTodayRepository(),
+    timezoneProvider: _FakeTimezoneProvider(),
   );
 }
 
@@ -223,6 +244,54 @@ class _FakeAssistantRepository implements AssistantRepository {
     required String conversationId,
     required String message,
   }) => const Stream.empty();
+}
+
+class _FakeTodayRepository implements TodayRepository {
+  @override
+  Future<TodaySnapshot> load({
+    required DateTime now,
+    required String timezone,
+  }) async {
+    return const TodaySnapshot(
+      todayTasks: [],
+      upcomingTasks: [],
+      habits: [],
+      nextEvent: null,
+    );
+  }
+
+  @override
+  Future<TodayTask> setTaskDone({
+    required String id,
+    required bool done,
+    required String timezone,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<TodayHabit> setHabitCheckIn({
+    required String id,
+    required String date,
+    required TodayHabitCheckIn status,
+    required String timezone,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<TodayHabit> clearHabitCheckIn({
+    required String id,
+    required String date,
+    required String timezone,
+  }) {
+    throw UnimplementedError();
+  }
+}
+
+class _FakeTimezoneProvider implements DeviceTimezoneProvider {
+  @override
+  Future<String> currentIdentifier() async => 'Asia/Bangkok';
 }
 
 void _setWindowSize(WidgetTester tester, Size size) {

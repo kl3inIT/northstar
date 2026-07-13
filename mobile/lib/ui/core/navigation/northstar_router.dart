@@ -7,6 +7,8 @@ import 'package:northstar/ui/features/auth/view_models/auth_view_model.dart';
 import 'package:northstar/ui/features/auth/views/login_view.dart';
 import 'package:northstar/ui/features/capture/view_models/capture_view_model.dart';
 import 'package:northstar/ui/features/capture/views/capture_view.dart';
+import 'package:northstar/ui/features/today/view_models/today_view_model.dart';
+import 'package:northstar/ui/features/today/views/today_view.dart';
 import 'package:northstar/ui/features/more/views/more_view.dart';
 import 'package:northstar/ui/features/shell/views/feature_placeholder_view.dart';
 
@@ -15,18 +17,28 @@ abstract final class NorthstarRoutes {
   static const login = '/login';
   static const capture = '/capture';
   static const assistant = '/assistant';
+  static const today = '/today';
   static const tasks = '/tasks';
   static const notes = '/notes';
   static const finance = '/finance';
   static const more = '/more';
 
-  static const protected = {capture, assistant, tasks, notes, finance, more};
+  static const protected = {
+    capture,
+    assistant,
+    today,
+    tasks,
+    notes,
+    finance,
+    more,
+  };
 }
 
 GoRouter createNorthstarRouter(
   AuthViewModel auth,
   AssistantViewModel assistant,
   CaptureViewModel capture,
+  TodayViewModel today,
 ) {
   return GoRouter(
     initialLocation: NorthstarRoutes.startup,
@@ -63,6 +75,10 @@ GoRouter createNorthstarRouter(
     },
     routes: [
       GoRoute(path: '/', redirect: (_, _) => NorthstarRoutes.assistant),
+      GoRoute(
+        path: NorthstarRoutes.tasks,
+        redirect: (_, _) => NorthstarRoutes.today,
+      ),
       GoRoute(
         path: NorthstarRoutes.startup,
         builder: (context, state) => const _StartupView(),
@@ -107,13 +123,8 @@ GoRouter createNorthstarRouter(
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: NorthstarRoutes.tasks,
-                builder: (context, state) => const FeaturePlaceholderView(
-                  pageKey: Key('tasks-page'),
-                  title: 'Tasks',
-                  icon: CupertinoIcons.check_mark_circled,
-                  message: 'Task lists and daily planning are coming next.',
-                ),
+                path: NorthstarRoutes.today,
+                builder: (context, state) => TodayView(viewModel: today),
               ),
             ],
           ),

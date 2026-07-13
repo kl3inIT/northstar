@@ -29,6 +29,9 @@ the 42-test full suite passed.
 
 ## Block C — Today daily actions
 
+**Status:** Complete — 21 focused contract/API/repository/ViewModel/widget tests
+and the 55-test full Flutter suite passed; Dart analysis reported no errors.
+
 - Add typed services, repositories, models, and ViewModels for Tasks Today /
   Upcoming, the next Calendar event, and Habits Today.
 - Implement task completion/reopen plus habit done/excuse/clear with optimistic
