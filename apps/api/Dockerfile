@@ -74,9 +74,13 @@ RUN java -Djarmode=tools -jar /app/app.jar extract --layers --launcher --destina
 FROM bellsoft/liberica-runtime-container:jre-25-glibc
 
 # tini for PID-1 signal handling, curl for the healthcheck probe. Azure Speech's
-# native layer also requires TLS certificates/OpenSSL and ALSA, even when audio
-# enters through an in-memory PCM stream rather than a device.
-RUN apk add --no-cache tini curl ca-certificates openssl alsa-lib
+# native layer also requires the C++ and UUID runtimes, TLS certificates/OpenSSL,
+# and ALSA, even when audio enters through an in-memory PCM stream rather than a
+# device. Keep the explicit file assertions: the JVM can boot without these
+# libraries, but the first SpeechConfig initialization then fails with HTTP 500.
+RUN apk add --no-cache tini curl ca-certificates openssl alsa-lib libstdc++ libuuid && \
+    test -e /usr/lib/libstdc++.so.6 && \
+    test -e /usr/lib/libuuid.so.1
 
 RUN addgroup -g 1654 -S appgroup && \
     adduser  -u 1654 -S appuser -G appgroup

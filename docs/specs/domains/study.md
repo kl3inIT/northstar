@@ -150,6 +150,11 @@ and never persisted.
   an in-memory push stream; only `apps/api` wires it. Core never imports Azure
   types. Blank configuration leaves the API bootable and speech endpoints
   return 503.
+- The production API image includes the Speech SDK's native Linux runtime
+  dependencies, including `libstdc++.so.6`, `libuuid.so.1`, OpenSSL, ALSA, and
+  CA certificates. Image construction fails if either native runtime is absent
+  so pronunciation does not degrade into a first-request `500` after an
+  otherwise healthy boot.
 - Azure is authoritative only for delivery: transcript, pronunciation,
   fluency, prosody, and word/phoneme accuracy. These remain provider 0-100
   values, are never relabelled or directly converted into an IELTS band, and

@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.openai.OpenAiChatModel;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.stereotype.Component;
@@ -65,6 +66,27 @@ public class SpringAiClientRouter implements AiClientRouter {
     public ChatModel model(AiRoute route) {
         validateGateway(route.gatewayId());
         return model(route.gatewayId());
+    }
+
+    @Override
+    public ChatOptions.Builder<?> structuredOutputOptions(AiRoute route, int maxTokens) {
+        validateGateway(route.gatewayId());
+        return providerStructuredOutputOptions(
+                gateways.definition(route.gatewayId()).type(), route.modelId(), maxTokens);
+    }
+
+    static OpenAiChatOptions.Builder providerStructuredOutputOptions(
+            com.northstar.core.ai.AiGatewayType gatewayType, String modelId, int maxTokens) {
+        if (maxTokens < 1) throw new IllegalArgumentException("maxTokens must be positive");
+        OpenAiChatOptions.Builder builder = OpenAiChatOptions.builder().model(modelId);
+        return switch (gatewayType) {
+            // Native OpenAI reasoning models reject legacy max_tokens and explicit
+            // non-default temperature. The compatible gateways accept both and
+            // benefit from deterministic sampling for schema-bound calls.
+            case OPENAI -> builder.maxCompletionTokens(maxTokens);
+            case NINE_ROUTER, OPENAI_CHAT_COMPATIBLE ->
+                    builder.maxTokens(maxTokens).temperature(0.0);
+        };
     }
 
     @Override

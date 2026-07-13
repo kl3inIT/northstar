@@ -22,6 +22,18 @@ While a user turn is submitted or streaming, the web chat renders an assistant
 waiting message until the latest assistant message has visible text, an image,
 or a tool workflow part. This keeps the first turn and pre-tool-call gap from
 looking frozen.
+The web composer acquires a synchronous single-flight lock before attachment
+upload begins, so repeated Enter/click actions cannot submit the same user turn
+twice while the chat status still appears idle. Each submitted AI SDK message
+also sends an `Idempotency-Key`; the API atomically claims it per conversation
+before invoking the model or any tool and rejects a repeated key with `409`.
+Older clients that omit the header remain compatible and receive a fresh
+server-generated key. A claimed key is retained even when route resolution,
+model execution, a tool, streaming, or the client connection fails because a
+tool side effect may already have committed before the failure became visible.
+The explicit Retry action creates a new message and key; deleting a conversation
+removes its claims. This at-most-once boundary is recorded in
+[Decision 0034](../../decisions/0034-assistant-turns-use-durable-idempotency-claims.md).
 
 Model-backed workloads resolve an `AiTask` route at call time. Each route is a
 configured gateway id, capability target id, and optional metadata; application

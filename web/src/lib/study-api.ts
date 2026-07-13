@@ -49,6 +49,7 @@ import type {
   VocabReviewRequest,
   VocabReviewCardSummary,
   VocabWordFormation,
+  VocabWordPart,
   WritingFeedbackSummary,
 } from './hey-api'
 
@@ -251,13 +252,23 @@ function parseWordFormation(value: unknown): VocabWordFormation | undefined {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
   const candidate = value as Record<string, unknown>
   if (!Array.isArray(candidate.parts) || typeof candidate.explanation !== 'string') return undefined
-  const parts = candidate.parts.filter((part): part is { form: string; kind: string; meaning: string } => {
+  const parts = candidate.parts.filter((part): part is {
+    form: string
+    kind: NonNullable<VocabWordPart['kind']>
+    meaning: string
+  } => {
     if (typeof part !== 'object' || part === null) return false
     const item = part as Record<string, unknown>
-    return typeof item.form === 'string' && typeof item.kind === 'string' && typeof item.meaning === 'string'
+    return typeof item.form === 'string'
+      && isVocabWordPartKind(item.kind)
+      && typeof item.meaning === 'string'
   })
-  if (parts.length !== candidate.parts.length || parts.length < 2) return undefined
+  if (parts.length !== candidate.parts.length || parts.length < 2 || parts.length > 4) return undefined
   return { parts, explanation: candidate.explanation, family: stringList(candidate.family) }
+}
+
+function isVocabWordPartKind(value: unknown): value is NonNullable<VocabWordPart['kind']> {
+  return value === 'prefix' || value === 'root' || value === 'base' || value === 'suffix'
 }
 
 /** Merge edited fields while preserving enrichment and future metadata keys. */
