@@ -24,6 +24,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Mobile CI | Done | Path-scoped Linux quality/Web/Android gate and macOS unsigned iOS build pass on GitHub-hosted runners and publish seven-day review artifacts. |
 | iOS Sideload IPA and mobile Assistant | Done | CI packages a checksum-verified unsigned IPA for Sideloadly; Flutter provides authenticated SSE chat with Cupertino builders, history, waiting, partial text, tool progress, stop, failure, and retry. Native install validation remains. |
 | Reviewed Mobile Capture | Done | Focused Cupertino flow for text and receipt-image drafts, editable review, explicit note/task/event/expense writes, batch-safe undo, shared token refresh, compact/dark tests, and a real local API walkthrough. Voice capture and native-device validation remain. |
+| Mobile IA V2 daily client | Done | `Today \| Study \| Assistant \| Finance \| More` keeps Assistant central while adding task/habit actions, Calendar, FSRS review, Finance glance, focused note retrieval, secondary Account/Settings routes, content-free telemetry, real local API/browser verification, and an Orca-hosted Pixel smoke. Native iPhone accessibility/install validation remains. |
 | Study tutor V1 | Done | Capture-first study log with weekly summary and mock trend, FSRS-6 vocabulary scheduling, writing tutor with sourced anchored grading + evaluator loop + error corpus, `/study` page, assistant/MCP tools, weekly review facts. Brief section and bulk imports remain deferred. |
 | Vocabulary review V1 | Done | Focused keyboard-first due-card sessions on `/study`, independent English/Chinese libraries, flat General/IELTS/HSK-style deck scopes, default IPA/pinyin and part of speech, advisory answer checks, learner-owned FSRS ratings with real interval previews, pronunciation, and explicit preview/apply AI enrichment. Chat remains an optional due-card quiz path. |
 | Vocabulary production and rich enrichment | Done | Optional independent meaning→target FSRS schedule with deck defaults and per-card overrides, next-day sibling burying, leech detection, best-effort word formation, provider-routed mnemonic images, and in-API background preview/apply jobs that never persist discarded image data. |
@@ -31,7 +32,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | AI capability catalogs and on-demand text to speech | Done | Explicit Assistant read-aloud, isolated Chat/TTS/STT/Image/Embedding route catalogs, OpenAI/9Router discovery with manual fallback, TTS language/voice selection, persisted content-addressed MP3 reuse, and responsive AI Elements selectors/playback. No automatic generation or playback. |
 | Vocabulary audio practice | Done | Explicit target-language word/example TTS enrichment, applied-audio-first browser fallback, retained pronunciation recordings/history, provider-aware delivery trends, connected-speech live-following Shadowing, and deterministic Dictation are complete. Provider-native scores remain separate from FSRS, do not claim TTS synchronization, and are never presented as IELTS. |
 | Habit tracking V1 | Done | Repeated-behaviour definitions stay separate from Tasks, with selected-day or weekly-target schedules, local-date check-ins, neutral excuse/pause semantics, effective-dated history, consistency-first insights, responsive web workspace, Assistant/MCP tools, and weekly review facts. |
-| Today dashboard | Deferred | Assistant/chat is the daily cockpit for composing tasks, calendar, projects, finance, and review context. Revisit only if a zero-prompt glance surface becomes necessary. |
+| Web Today dashboard | Deferred | Mobile now has a focused Today surface. Keep web Assistant/chat as the daily cockpit unless a separate desktop zero-prompt glance surface becomes necessary. |
 | Repository documentation harness | Done | Thin agent map, architecture source of truth, domain specs/tests, decisions, increment history, and testing guidance are consolidated and maintained with code changes. |
 
 ## Backlog
@@ -46,6 +47,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
   core ships the hook but no implementation; issue #5903).
 - Scholarship/university research workflows.
 - Couple/shared workspace with privacy.
-- Remaining mobile product API integrations and production device flows.
+- Native iPhone installation, VoiceOver, production API login, and remaining
+  focused mobile product flows.
 - Stronger automated/live UI coverage matrix.
 - More complete per-domain specs and tests as future increments touch them.

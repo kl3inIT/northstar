@@ -240,6 +240,28 @@ class CaptureViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void updateStudyItem(int index, StudyCaptureItem item) {
+    final current = _draft;
+    if (current is! StudyCaptureDraft ||
+        index < 0 ||
+        index >= current.items.length) {
+      return;
+    }
+    _draft = current.copyWithItem(index, item);
+    notifyListeners();
+  }
+
+  void updateVocabItem(int index, VocabCaptureItem item) {
+    final current = _draft;
+    if (current is! VocabCaptureDraft ||
+        index < 0 ||
+        index >= current.items.length) {
+      return;
+    }
+    _draft = current.copyWithItem(index, item);
+    notifyListeners();
+  }
+
   Future<void> _runDraft(Future<CaptureDraft> Function() operation) async {
     _phase = CapturePhase.drafting;
     _errorMessage = null;

@@ -1,16 +1,27 @@
 import 'package:flutter/cupertino.dart';
 
 class MoreView extends StatelessWidget {
-  const MoreView({this.username, this.onSignOut, super.key});
+  const MoreView({
+    this.username,
+    this.onSignOut,
+    this.onOpenCalendar,
+    this.onOpenHabits,
+    this.onOpenAccount,
+    this.onOpenSettings,
+    super.key,
+  });
 
   final String? username;
   final Future<void> Function()? onSignOut;
+  final VoidCallback? onOpenCalendar;
+  final VoidCallback? onOpenHabits;
+  final VoidCallback? onOpenAccount;
+  final VoidCallback? onOpenSettings;
 
-  static const _items = [
-    (CupertinoIcons.calendar, 'Calendar'),
-    (CupertinoIcons.folder, 'Projects'),
-    (CupertinoIcons.compass, 'Disciplines'),
-    (CupertinoIcons.gear, 'Settings'),
+  List<(IconData, String, VoidCallback?)> get _items => [
+    (CupertinoIcons.calendar, 'Calendar', onOpenCalendar),
+    (CupertinoIcons.circle_grid_hex, 'Habits', onOpenHabits),
+    (CupertinoIcons.gear, 'Settings', onOpenSettings),
   ];
 
   @override
@@ -29,7 +40,7 @@ class MoreView extends StatelessWidget {
                     leading: Icon(item.$1),
                     title: Text(item.$2),
                     trailing: const CupertinoListTileChevron(),
-                    onTap: () => _showComingNext(context, item.$2),
+                    onTap: item.$3,
                   ),
               ],
             ),
@@ -41,6 +52,10 @@ class MoreView extends StatelessWidget {
                     CupertinoListTile(
                       leading: const Icon(CupertinoIcons.person_crop_circle),
                       title: Text(username!),
+                      trailing: onOpenAccount == null
+                          ? null
+                          : const CupertinoListTileChevron(),
+                      onTap: onOpenAccount,
                     ),
                   CupertinoListTile(
                     key: const Key('sign-out-button'),
@@ -58,24 +73,6 @@ class MoreView extends StatelessWidget {
               ),
           ],
         ),
-      ),
-    );
-  }
-
-  Future<void> _showComingNext(BuildContext context, String title) {
-    return showCupertinoDialog<void>(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: Text(title),
-        content: const Text(
-          'This area is planned for a later mobile increment.',
-        ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
-          ),
-        ],
       ),
     );
   }

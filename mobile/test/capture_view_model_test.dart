@@ -87,6 +87,84 @@ void main() {
     expect(viewModel.phase, CapturePhase.undone);
     expect(repository.undoCalls, 2);
   });
+
+  test('edits and saves a reviewed study activity, then undoes it', () async {
+    final repository = _FakeCaptureRepository(
+      draft: const StudyCaptureDraft([
+        StudyCaptureItem(
+          skill: 'Reading',
+          kind: StudyCaptureKind.practice,
+          occurredOn: '2026-07-13',
+          notes: '',
+          durationMinutes: 30,
+        ),
+      ]),
+    );
+    final viewModel = CaptureViewModel(
+      repository: repository,
+      receiptPicker: _FakeReceiptPicker(),
+    )..setText('Practiced IELTS reading');
+
+    await viewModel.draftText();
+    final original = (viewModel.draft! as StudyCaptureDraft).items.single;
+    viewModel.updateStudyItem(
+      0,
+      StudyCaptureItem(
+        skill: 'IELTS Reading',
+        kind: StudyCaptureKind.mock,
+        occurredOn: original.occurredOn,
+        notes: 'Cambridge 19',
+        durationMinutes: 40,
+        scoreRaw: 34,
+        scoreMax: 40,
+      ),
+    );
+    await viewModel.save();
+
+    final saved = repository.savedDraft! as StudyCaptureDraft;
+    expect(saved.items.single.skill, 'IELTS Reading');
+    expect(saved.items.single.kind, StudyCaptureKind.mock);
+    expect(saved.items.single.scoreRaw, 34);
+
+    await viewModel.undo();
+    expect(viewModel.phase, CapturePhase.undone);
+    expect(repository.undoCalls, 1);
+  });
+
+  test('edits and saves a reviewed vocabulary card', () async {
+    final repository = _FakeCaptureRepository(
+      draft: const VocabCaptureDraft([
+        VocabCaptureItem(
+          front: 'resilient',
+          back: 'able to recover',
+          reading: '',
+          partOfSpeech: 'adjective',
+          example: '',
+          language: VocabCaptureLanguage.english,
+          deck: 'IELTS',
+        ),
+      ]),
+    );
+    final viewModel = CaptureViewModel(
+      repository: repository,
+      receiptPicker: _FakeReceiptPicker(),
+    )..setText('Save resilient to vocabulary');
+
+    await viewModel.draftText();
+    final original = (viewModel.draft! as VocabCaptureDraft).items.single;
+    viewModel.updateVocabItem(
+      0,
+      original.copyWith(
+        back: 'có khả năng phục hồi',
+        example: 'A resilient system recovers quickly.',
+      ),
+    );
+    await viewModel.save();
+
+    final saved = repository.savedDraft! as VocabCaptureDraft;
+    expect(saved.items.single.back, 'có khả năng phục hồi');
+    expect(saved.items.single.example, contains('recovers quickly'));
+  });
 }
 
 class _FakeCaptureRepository implements CaptureRepository {

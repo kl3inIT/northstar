@@ -206,10 +206,11 @@ class AuthControllerIntegrationTests {
         mvc.perform(options("/api/tasks/00000000-0000-0000-0000-000000000000")
                         .header("Origin", "https://mobile-preview.example.com")
                         .header("Access-Control-Request-Method", "PUT")
-                        .header("Access-Control-Request-Headers", "authorization,content-type,accept"))
+                        .header("Access-Control-Request-Headers", "authorization,content-type,accept,x-timezone"))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Access-Control-Allow-Methods", containsString("PUT")))
-                .andExpect(header().string("Access-Control-Allow-Headers", containsString("authorization")));
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("authorization")))
+                .andExpect(header().string("Access-Control-Allow-Headers", containsString("x-timezone")));
 
         mvc.perform(options("/api/auth/mobile/login")
                         .header("Origin", "https://mobile-preview.example.com")

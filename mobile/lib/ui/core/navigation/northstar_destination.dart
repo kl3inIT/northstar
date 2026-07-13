@@ -1,20 +1,20 @@
 import 'package:flutter/cupertino.dart';
 
 enum NorthstarDestination {
+  today(
+    label: 'Today',
+    icon: CupertinoIcons.check_mark_circled,
+    selectedIcon: CupertinoIcons.check_mark_circled_solid,
+  ),
+  study(
+    label: 'Study',
+    icon: CupertinoIcons.book,
+    selectedIcon: CupertinoIcons.book_fill,
+  ),
   assistant(
     label: 'Assistant',
     icon: CupertinoIcons.chat_bubble_2,
     selectedIcon: CupertinoIcons.chat_bubble_2_fill,
-  ),
-  tasks(
-    label: 'Tasks',
-    icon: CupertinoIcons.check_mark_circled,
-    selectedIcon: CupertinoIcons.check_mark_circled_solid,
-  ),
-  notes(
-    label: 'Notes',
-    icon: CupertinoIcons.doc_text,
-    selectedIcon: CupertinoIcons.doc_text_fill,
   ),
   finance(
     label: 'Finance',

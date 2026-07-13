@@ -14,10 +14,14 @@ class AssistantLandingView extends StatefulWidget {
     super.key,
     required this.viewModel,
     this.onOpenCapture,
+    this.onOpenReceiptCapture,
+    this.onOpenDocument,
   });
 
   final AssistantViewModel viewModel;
   final VoidCallback? onOpenCapture;
+  final VoidCallback? onOpenReceiptCapture;
+  final ValueChanged<String>? onOpenDocument;
 
   @override
   State<AssistantLandingView> createState() => _AssistantLandingViewState();
@@ -80,6 +84,43 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
         await _chatController.updateMessage(current[index], next[index]);
       }
     }
+  }
+
+  Future<void> _showAddActions() async {
+    await showCupertinoModalPopup<void>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('Add to Northstar'),
+        message: const Text(
+          'Draft first, then review every field before saving.',
+        ),
+        actions: [
+          if (widget.onOpenCapture case final onOpenCapture?)
+            CupertinoActionSheetAction(
+              key: const Key('assistant-add-quick-capture'),
+              onPressed: () {
+                Navigator.of(sheetContext).pop();
+                onOpenCapture();
+              },
+              child: const Text('Quick capture'),
+            ),
+          if (widget.onOpenReceiptCapture case final onOpenReceiptCapture?)
+            CupertinoActionSheetAction(
+              key: const Key('assistant-add-receipt'),
+              onPressed: () {
+                Navigator.of(sheetContext).pop();
+                onOpenReceiptCapture();
+              },
+              child: const Text('Scan receipt'),
+            ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          key: const Key('assistant-add-cancel'),
+          onPressed: () => Navigator.of(sheetContext).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
   }
 
   Message _toChatMessage(AssistantMessage message) {
@@ -145,7 +186,11 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
     );
   }
 
-  Future<void> _openSource(String value) async {
+  Future<void> _openSource(String value, {required bool isDocument}) async {
+    if (isDocument) {
+      widget.onOpenDocument?.call(value);
+      return;
+    }
     final uri = Uri.tryParse(value);
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
       return;
@@ -197,29 +242,14 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
             semanticLabel: 'Conversation history',
           ),
         ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (widget.onOpenCapture != null)
-              CupertinoButton(
-                key: const Key('assistant-capture-button'),
-                padding: EdgeInsets.zero,
-                onPressed: widget.onOpenCapture,
-                child: const Icon(
-                  CupertinoIcons.plus_circle,
-                  semanticLabel: 'Capture',
-                ),
-              ),
-            CupertinoButton(
-              key: const Key('assistant-new-chat-button'),
-              padding: EdgeInsets.zero,
-              onPressed: _viewModel.startNewConversation,
-              child: const Icon(
-                CupertinoIcons.square_pencil,
-                semanticLabel: 'New conversation',
-              ),
-            ),
-          ],
+        trailing: CupertinoButton(
+          key: const Key('assistant-new-chat-button'),
+          padding: EdgeInsets.zero,
+          onPressed: _viewModel.startNewConversation,
+          child: const Icon(
+            CupertinoIcons.square_pencil,
+            semanticLabel: 'New conversation',
+          ),
         ),
       ),
       child: SafeArea(
@@ -295,6 +325,11 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
           isSending: _viewModel.isSending,
           onSend: _submit,
           onStop: _viewModel.stop,
+          onAdd:
+              widget.onOpenCapture == null &&
+                  widget.onOpenReceiptCapture == null
+              ? null
+              : _showAddActions,
           modelLabel: _viewModel.models
               .where((model) => model.id == _viewModel.modelSelection?.modelId)
               .map((model) => model.displayName)
@@ -397,7 +432,11 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
                   title: source['title']?.toString() ?? 'Source',
                   uri: source['uri']?.toString() ?? '',
                   isDocument: source['kind']?.toString() == 'document',
-                  onOpen: _openSource,
+                  onOpen: (uri) => _openSource(
+                    uri,
+                    isDocument:
+                        source['kind'] == AssistantSourceKind.document.name,
+                  ),
                 ),
             ],
             if (error != null) ...[
@@ -472,7 +511,9 @@ class _AssistantSourceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final parsed = Uri.tryParse(uri);
     final canOpen =
-        parsed != null && (parsed.scheme == 'http' || parsed.scheme == 'https');
+        isDocument ||
+        (parsed != null &&
+            (parsed.scheme == 'http' || parsed.scheme == 'https'));
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(vertical: NorthstarSpacing.xs),
       minimumSize: const Size(0, 36),
@@ -537,6 +578,7 @@ class _AssistantComposer extends StatelessWidget {
     required this.isSending,
     required this.onSend,
     required this.onStop,
+    required this.onAdd,
     required this.modelLabel,
     required this.onSelectModel,
   });
@@ -546,6 +588,7 @@ class _AssistantComposer extends StatelessWidget {
   final bool isSending;
   final VoidCallback onSend;
   final VoidCallback onStop;
+  final VoidCallback? onAdd;
   final String? modelLabel;
   final VoidCallback? onSelectModel;
 
@@ -611,7 +654,24 @@ class _AssistantComposer extends StatelessWidget {
                 placeholder: 'Ask Northstar…',
                 minLines: 1,
                 maxLines: 5,
-                padding: const EdgeInsets.fromLTRB(16, 12, 48, 12),
+                padding: const EdgeInsets.fromLTRB(4, 12, 48, 12),
+                prefix: onAdd == null
+                    ? const SizedBox(width: 12)
+                    : Padding(
+                        padding: const EdgeInsets.only(
+                          left: NorthstarSpacing.xs,
+                        ),
+                        child: CupertinoButton(
+                          key: const Key('assistant-add-button'),
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size.square(40),
+                          onPressed: isSending ? null : onAdd,
+                          child: const Icon(
+                            CupertinoIcons.add,
+                            semanticLabel: 'Add to Northstar',
+                          ),
+                        ),
+                      ),
                 suffix: Padding(
                   padding: const EdgeInsets.only(right: NorthstarSpacing.xs),
                   child: CupertinoButton(

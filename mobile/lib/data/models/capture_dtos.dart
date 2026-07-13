@@ -7,18 +7,29 @@ class CaptureDraftDto {
     this.task,
     this.event,
     this.expense,
+    this.study,
+    this.vocab,
   });
 
   factory CaptureDraftDto.fromJson(Map<String, Object?> json) {
-    final kind = CaptureKind.values.byName(
-      _requiredString(json, 'kind').toLowerCase(),
-    );
+    final rawKind = _requiredString(json, 'kind').toUpperCase();
+    final kind = switch (rawKind) {
+      'NOTE' => CaptureKind.note,
+      'TASK' => CaptureKind.task,
+      'EVENT' => CaptureKind.event,
+      'EXPENSE' => CaptureKind.expense,
+      'STUDY' => CaptureKind.study,
+      'VOCAB' => CaptureKind.vocab,
+      _ => throw UnsupportedCaptureKindException(rawKind),
+    };
     return CaptureDraftDto(
       kind: kind,
       note: _map(json['note'], NoteDraftDto.fromJson),
       task: _map(json['task'], TaskDraftDto.fromJson),
       event: _map(json['event'], EventDraftDto.fromJson),
       expense: _map(json['expense'], ExpenseDraftDto.fromJson),
+      study: _map(json['study'], StudyDraftDto.fromJson),
+      vocab: _map(json['vocab'], VocabDraftDto.fromJson),
     );
   }
 
@@ -27,6 +38,17 @@ class CaptureDraftDto {
   final TaskDraftDto? task;
   final EventDraftDto? event;
   final ExpenseDraftDto? expense;
+  final StudyDraftDto? study;
+  final VocabDraftDto? vocab;
+}
+
+class UnsupportedCaptureKindException implements Exception {
+  const UnsupportedCaptureKindException(this.kind);
+
+  final String kind;
+
+  @override
+  String toString() => 'This Northstar version does not support $kind capture.';
 }
 
 class NoteDraftDto {
@@ -162,6 +184,111 @@ class ExpenseItemDto {
   final String description;
   final String category;
   final bool exceptional;
+}
+
+class StudyDraftDto {
+  const StudyDraftDto(this.items);
+
+  factory StudyDraftDto.fromJson(Map<String, Object?> json) {
+    return StudyDraftDto(_objectList(json, 'items', StudyItemDto.fromJson));
+  }
+
+  final List<StudyItemDto> items;
+}
+
+class StudyItemDto {
+  const StudyItemDto({
+    required this.skill,
+    required this.kind,
+    required this.durationMinutes,
+    required this.scoreRaw,
+    required this.scoreMax,
+    required this.notes,
+    required this.occurredOn,
+    required this.disciplineName,
+  });
+
+  factory StudyItemDto.fromJson(Map<String, Object?> json) {
+    return StudyItemDto(
+      skill: _optionalString(json, 'skill'),
+      kind: _optionalString(json, 'kind'),
+      durationMinutes: _optionalString(json, 'durationMinutes'),
+      scoreRaw: _optionalString(json, 'scoreRaw'),
+      scoreMax: _optionalString(json, 'scoreMax'),
+      notes: _optionalString(json, 'notes'),
+      occurredOn: _optionalString(json, 'occurredOn'),
+      disciplineName: _optionalString(json, 'disciplineName'),
+    );
+  }
+
+  final String skill;
+  final String kind;
+  final String durationMinutes;
+  final String scoreRaw;
+  final String scoreMax;
+  final String notes;
+  final String occurredOn;
+  final String disciplineName;
+}
+
+class VocabDraftDto {
+  const VocabDraftDto(this.items);
+
+  factory VocabDraftDto.fromJson(Map<String, Object?> json) {
+    return VocabDraftDto(_objectList(json, 'items', VocabItemDto.fromJson));
+  }
+
+  final List<VocabItemDto> items;
+}
+
+class VocabItemDto {
+  const VocabItemDto({
+    required this.front,
+    required this.back,
+    required this.reading,
+    required this.partOfSpeech,
+    required this.example,
+    required this.language,
+    required this.deck,
+    required this.disciplineName,
+  });
+
+  factory VocabItemDto.fromJson(Map<String, Object?> json) {
+    return VocabItemDto(
+      front: _optionalString(json, 'front'),
+      back: _optionalString(json, 'back'),
+      reading: _optionalString(json, 'reading'),
+      partOfSpeech: _optionalString(json, 'partOfSpeech'),
+      example: _optionalString(json, 'example'),
+      language: _optionalString(json, 'language'),
+      deck: _optionalString(json, 'deck'),
+      disciplineName: _optionalString(json, 'disciplineName'),
+    );
+  }
+
+  final String front;
+  final String back;
+  final String reading;
+  final String partOfSpeech;
+  final String example;
+  final String language;
+  final String deck;
+  final String disciplineName;
+}
+
+List<T> _objectList<T>(
+  Map<String, Object?> json,
+  String key,
+  T Function(Map<String, Object?>) fromJson,
+) {
+  final raw = json[key];
+  if (raw is! List<Object?>) {
+    return const [];
+  }
+  return raw
+      .whereType<Map<Object?, Object?>>()
+      .map((item) => fromJson(_normalize(item)))
+      .toList(growable: false);
 }
 
 T? _map<T>(Object? value, T Function(Map<String, Object?>) fromJson) {
