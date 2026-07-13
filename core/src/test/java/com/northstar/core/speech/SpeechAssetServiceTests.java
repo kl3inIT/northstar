@@ -71,4 +71,24 @@ class SpeechAssetServiceTests {
         verify(gateway, never()).validate(any());
         verify(gateway, never()).synthesize(any(), any(), any());
     }
+
+    @Test
+    void previewDoesNotPersistUntilTheExistingBytesAreStored() {
+        byte[] mp3 = {0x49, 0x44, 0x33, 2};
+        UUID attachmentId = UUID.randomUUID();
+        when(repository.findByCacheKey(any())).thenReturn(Optional.empty());
+        when(gateway.synthesize(route, "meticulous", "en-us"))
+                .thenReturn(new SpeechAudio(mp3, "audio/mpeg", "mp3"));
+        when(attachments.store(any(), eq("audio/mpeg"), any()))
+                .thenReturn(new AttachmentView(attachmentId, "speech.mp3", "audio/mpeg",
+                        mp3.length, "hash", Instant.now()));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SpeechAudio preview = service.preview(route, "meticulous", "en-US");
+        verify(attachments, never()).store(any(), any(), any());
+
+        SpeechAssetResult applied = service.store(route, "meticulous", "en-US", preview);
+        assertEquals(attachmentId, applied.asset().attachmentId());
+        verify(attachments).store(any(), eq("audio/mpeg"), any());
+    }
 }
