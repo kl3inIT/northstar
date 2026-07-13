@@ -44,8 +44,47 @@ class AuthenticatedJsonClient {
     Map<String, String>? query,
     String? timezone,
   }) async {
+    return _writeObject(
+      'POST',
+      path,
+      body: body,
+      query: query,
+      timezone: timezone,
+    );
+  }
+
+  Future<Map<String, Object?>> putObject(
+    String path, {
+    required Map<String, Object?> body,
+    Map<String, String>? query,
+    String? timezone,
+  }) {
+    return _writeObject(
+      'PUT',
+      path,
+      body: body,
+      query: query,
+      timezone: timezone,
+    );
+  }
+
+  Future<Map<String, Object?>> deleteObject(
+    String path, {
+    Map<String, String>? query,
+    String? timezone,
+  }) {
+    return _writeObject('DELETE', path, query: query, timezone: timezone);
+  }
+
+  Future<Map<String, Object?>> _writeObject(
+    String method,
+    String path, {
+    Map<String, Object?>? body,
+    Map<String, String>? query,
+    String? timezone,
+  }) async {
     return _asObject(
-      await _send('POST', path, query: query, timezone: timezone, body: body),
+      await _send(method, path, query: query, timezone: timezone, body: body),
     );
   }
 

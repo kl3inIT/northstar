@@ -1,12 +1,7 @@
 import 'package:flutter/cupertino.dart';
 
 enum NorthstarDestination {
-  assistant(
-    label: 'Assistant',
-    icon: CupertinoIcons.chat_bubble_2,
-    selectedIcon: CupertinoIcons.chat_bubble_2_fill,
-  ),
-  tasks(
+  today(
     label: 'Today',
     icon: CupertinoIcons.check_mark_circled,
     selectedIcon: CupertinoIcons.check_mark_circled_solid,
@@ -15,6 +10,11 @@ enum NorthstarDestination {
     label: 'Study',
     icon: CupertinoIcons.book,
     selectedIcon: CupertinoIcons.book_fill,
+  ),
+  assistant(
+    label: 'Assistant',
+    icon: CupertinoIcons.chat_bubble_2,
+    selectedIcon: CupertinoIcons.chat_bubble_2_fill,
   ),
   finance(
     label: 'Finance',

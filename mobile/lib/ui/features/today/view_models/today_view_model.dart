@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:northstar/data/repositories/today_repository.dart';
 import 'package:northstar/data/services/device_timezone.dart';
+import 'package:northstar/data/services/interaction_telemetry.dart';
 import 'package:northstar/domain/models/today_models.dart';
 
 enum TodayLoadPhase { idle, loading, ready, error }
@@ -9,19 +10,27 @@ class TodayViewModel extends ChangeNotifier {
   factory TodayViewModel({
     required TodayRepository repository,
     required DeviceTimezoneProvider timezoneProvider,
+    InteractionTelemetry telemetry = const NoopInteractionTelemetry(),
     DateTime Function()? clock,
   }) {
     return TodayViewModel._(
       repository,
       timezoneProvider,
+      telemetry,
       clock ?? DateTime.now,
     );
   }
 
-  TodayViewModel._(this._repository, this._timezoneProvider, this._clock);
+  TodayViewModel._(
+    this._repository,
+    this._timezoneProvider,
+    this._telemetry,
+    this._clock,
+  );
 
   final TodayRepository _repository;
   final DeviceTimezoneProvider _timezoneProvider;
+  final InteractionTelemetry _telemetry;
   final DateTime Function() _clock;
 
   TodayLoadPhase _phase = TodayLoadPhase.idle;
@@ -135,6 +144,7 @@ class TodayViewModel extends ChangeNotifier {
       );
       _todayTasks = _replaceTask(_todayTasks, id, (_) => saved);
       _upcomingTasks = _replaceTask(_upcomingTasks, id, (_) => saved);
+      _telemetry.record(done ? 'task.completed' : 'task.reopened');
     } on Object catch (error) {
       _todayTasks = originalToday;
       _upcomingTasks = originalUpcoming;
@@ -195,6 +205,9 @@ class TodayViewModel extends ChangeNotifier {
               timezone: timezone,
             );
       _habits = _replaceHabit(_habits, id, (_) => saved);
+      _telemetry.record(
+        checkIn == null ? 'habit.cleared' : 'habit.${checkIn.name}',
+      );
     } on Object catch (error) {
       _habits = original;
       _actionError = _messageFor(error);

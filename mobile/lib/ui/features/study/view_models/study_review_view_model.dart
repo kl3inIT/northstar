@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:northstar/data/repositories/study_review_repository.dart';
 import 'package:northstar/data/services/device_timezone.dart';
+import 'package:northstar/data/services/interaction_telemetry.dart';
 import 'package:northstar/domain/models/study_review_models.dart';
 
 enum StudyReviewPhase { idle, loading, ready, error }
@@ -9,14 +10,20 @@ class StudyReviewViewModel extends ChangeNotifier {
   factory StudyReviewViewModel({
     required StudyReviewRepository repository,
     required DeviceTimezoneProvider timezoneProvider,
+    InteractionTelemetry telemetry = const NoopInteractionTelemetry(),
   }) {
-    return StudyReviewViewModel._(repository, timezoneProvider);
+    return StudyReviewViewModel._(repository, timezoneProvider, telemetry);
   }
 
-  StudyReviewViewModel._(this._repository, this._timezoneProvider);
+  StudyReviewViewModel._(
+    this._repository,
+    this._timezoneProvider,
+    this._telemetry,
+  );
 
   final StudyReviewRepository _repository;
   final DeviceTimezoneProvider _timezoneProvider;
+  final InteractionTelemetry _telemetry;
 
   StudyReviewPhase _phase = StudyReviewPhase.idle;
   VocabLanguage _language = VocabLanguage.english;
@@ -98,6 +105,7 @@ class StudyReviewViewModel extends ChangeNotifier {
       _tally[rating] = tallyFor(rating) + 1;
       _index += 1;
       _revealed = false;
+      _telemetry.record('study.rating.${rating.name}');
     } on Object catch (error) {
       _errorMessage = _messageFor(error);
     } finally {

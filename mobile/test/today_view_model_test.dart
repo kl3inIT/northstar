@@ -87,10 +87,7 @@ class _TimezoneProvider implements DeviceTimezoneProvider {
 }
 
 class _TodayRepository implements TodayRepository {
-  _TodayRepository({
-    this.taskFailures = 0,
-    this.habitFailures = 0,
-  });
+  _TodayRepository({this.taskFailures = 0, this.habitFailures = 0});
 
   int taskFailures;
   int habitFailures;

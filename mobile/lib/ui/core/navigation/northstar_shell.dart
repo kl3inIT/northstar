@@ -2,30 +2,43 @@ import 'package:flutter/cupertino.dart';
 import 'package:go_router/go_router.dart';
 import 'package:northstar/ui/core/design_system/northstar_tokens.dart';
 import 'package:northstar/ui/core/navigation/northstar_destination.dart';
+import 'package:northstar/data/services/interaction_telemetry.dart';
 
 class NorthstarShell extends StatelessWidget {
-  const NorthstarShell({required this.navigationShell, super.key});
+  const NorthstarShell({
+    required this.navigationShell,
+    required this.telemetry,
+    super.key,
+  });
 
   final StatefulNavigationShell navigationShell;
+  final InteractionTelemetry telemetry;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < NorthstarLayout.compactBreakpoint) {
-          return _CompactShell(navigationShell: navigationShell);
+          return _CompactShell(
+            navigationShell: navigationShell,
+            telemetry: telemetry,
+          );
         }
 
-        return _ExpandedShell(navigationShell: navigationShell);
+        return _ExpandedShell(
+          navigationShell: navigationShell,
+          telemetry: telemetry,
+        );
       },
     );
   }
 }
 
 class _CompactShell extends StatelessWidget {
-  const _CompactShell({required this.navigationShell});
+  const _CompactShell({required this.navigationShell, required this.telemetry});
 
   final StatefulNavigationShell navigationShell;
+  final InteractionTelemetry telemetry;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +48,7 @@ class _CompactShell extends StatelessWidget {
           Expanded(child: navigationShell),
           CupertinoTabBar(
             currentIndex: navigationShell.currentIndex,
-            onTap: (index) => _goToBranch(navigationShell, index),
+            onTap: (index) => _goToBranch(navigationShell, index, telemetry),
             items: [
               for (final destination in NorthstarDestination.values)
                 BottomNavigationBarItem(
@@ -52,16 +65,23 @@ class _CompactShell extends StatelessWidget {
 }
 
 class _ExpandedShell extends StatelessWidget {
-  const _ExpandedShell({required this.navigationShell});
+  const _ExpandedShell({
+    required this.navigationShell,
+    required this.telemetry,
+  });
 
   final StatefulNavigationShell navigationShell;
+  final InteractionTelemetry telemetry;
 
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
       child: Row(
         children: [
-          _CupertinoSidebar(navigationShell: navigationShell),
+          _CupertinoSidebar(
+            navigationShell: navigationShell,
+            telemetry: telemetry,
+          ),
           Expanded(child: navigationShell),
         ],
       ),
@@ -70,9 +90,13 @@ class _ExpandedShell extends StatelessWidget {
 }
 
 class _CupertinoSidebar extends StatelessWidget {
-  const _CupertinoSidebar({required this.navigationShell});
+  const _CupertinoSidebar({
+    required this.navigationShell,
+    required this.telemetry,
+  });
 
   final StatefulNavigationShell navigationShell;
+  final InteractionTelemetry telemetry;
 
   @override
   Widget build(BuildContext context) {
@@ -123,50 +147,58 @@ class _CupertinoSidebar extends StatelessWidget {
                   in NorthstarDestination.values.indexed)
                 Padding(
                   padding: const EdgeInsets.only(bottom: NorthstarSpacing.xxs),
-                  child: SizedBox(
-                    height: 48,
-                    child: CupertinoButton(
-                      key: Key('destination-${destination.name}'),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: NorthstarSpacing.sm,
-                      ),
-                      color: navigationShell.currentIndex == index
-                          ? NorthstarColors.accent
-                                .resolveFrom(context)
-                                .withValues(alpha: 0.14)
-                          : null,
-                      borderRadius: BorderRadius.circular(NorthstarRadii.sm),
-                      onPressed: () => _goToBranch(navigationShell, index),
-                      child: Row(
-                        children: [
-                          Icon(
-                            navigationShell.currentIndex == index
-                                ? destination.selectedIcon
-                                : destination.icon,
-                            color: navigationShell.currentIndex == index
-                                ? NorthstarColors.accent.resolveFrom(context)
-                                : NorthstarColors.primaryText.resolveFrom(
-                                    context,
-                                  ),
-                          ),
-                          const SizedBox(width: NorthstarSpacing.sm),
-                          Expanded(
-                            child: Text(
-                              destination.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: NorthstarTextStyles.body(context).copyWith(
-                                color: NorthstarColors.primaryText.resolveFrom(
-                                  context,
-                                ),
-                                fontWeight:
-                                    navigationShell.currentIndex == index
-                                    ? FontWeight.w600
-                                    : FontWeight.w400,
+                  child: Semantics(
+                    key: Key('destination-${destination.name}-semantics'),
+                    label: destination.label,
+                    button: true,
+                    selected: navigationShell.currentIndex == index,
+                    excludeSemantics: true,
+                    child: SizedBox(
+                      height: 48,
+                      child: CupertinoButton(
+                        key: Key('destination-${destination.name}'),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: NorthstarSpacing.sm,
+                        ),
+                        color: navigationShell.currentIndex == index
+                            ? NorthstarColors.accent
+                                  .resolveFrom(context)
+                                  .withValues(alpha: 0.14)
+                            : null,
+                        borderRadius: BorderRadius.circular(NorthstarRadii.sm),
+                        onPressed: () =>
+                            _goToBranch(navigationShell, index, telemetry),
+                        child: Row(
+                          children: [
+                            Icon(
+                              navigationShell.currentIndex == index
+                                  ? destination.selectedIcon
+                                  : destination.icon,
+                              color: navigationShell.currentIndex == index
+                                  ? NorthstarColors.accent.resolveFrom(context)
+                                  : NorthstarColors.primaryText.resolveFrom(
+                                      context,
+                                    ),
+                            ),
+                            const SizedBox(width: NorthstarSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                destination.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: NorthstarTextStyles.body(context)
+                                    .copyWith(
+                                      color: NorthstarColors.primaryText
+                                          .resolveFrom(context),
+                                      fontWeight:
+                                          navigationShell.currentIndex == index
+                                          ? FontWeight.w600
+                                          : FontWeight.w400,
+                                    ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -179,7 +211,12 @@ class _CupertinoSidebar extends StatelessWidget {
   }
 }
 
-void _goToBranch(StatefulNavigationShell navigationShell, int index) {
+void _goToBranch(
+  StatefulNavigationShell navigationShell,
+  int index,
+  InteractionTelemetry telemetry,
+) {
+  telemetry.record('destination.${NorthstarDestination.values[index].name}');
   navigationShell.goBranch(
     index,
     initialLocation: index == navigationShell.currentIndex,

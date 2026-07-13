@@ -60,10 +60,15 @@ errors.
 
 ## Block E — Stable shell and secondary routes
 
+**Status:** Complete — Calendar, dedicated Habits, Account, Settings, and
+Assistant-opened Note detail are routed from the five-destination shell; Dart
+analysis reported no issues and the 79-test full Flutter suite passed, including
+medium-width large-text and sidebar semantics coverage.
+
 - Change the shared destination model and shell to `Today | Study | Assistant |
   Finance | More`, keeping Assistant as the default route.
 - Preserve independent branch stacks with `StatefulShellRoute.indexedStack`.
-- Implement Calendar and full Habits as routable screens under More, alongside
+- Implement Calendar and dedicated Habits as routable screens under More, alongside
   Account and Settings. Keep note detail routable from Assistant results without
   exposing a Notes tab.
 - Add content-free interaction telemetry for destination opens and completed

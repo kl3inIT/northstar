@@ -46,10 +46,10 @@ completed actions without prompt, note, or financial content so the ordering
 can be revisited after real iPhone use.
 
 `More` is a deliberate grouped directory, not an automatic overflow tab. It
-contains real secondary mobile routes: Calendar, full Habit history/settings,
+contains real secondary mobile routes: Calendar, dedicated Habit check-ins,
 Account, and Settings. Projects, Disciplines, Briefs, and note detail links are
-added only when their mobile workflow exists. Calendar remains routable but is
-not a permanent tab.
+added only when their mobile workflow exists. Habit schedule editing and dense
+history remain web-first. Calendar remains routable but is not a permanent tab.
 
 ### D2 — Capture moves into the Assistant input affordance
 

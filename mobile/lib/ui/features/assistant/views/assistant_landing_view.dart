@@ -15,11 +15,13 @@ class AssistantLandingView extends StatefulWidget {
     required this.viewModel,
     this.onOpenCapture,
     this.onOpenReceiptCapture,
+    this.onOpenDocument,
   });
 
   final AssistantViewModel viewModel;
   final VoidCallback? onOpenCapture;
   final VoidCallback? onOpenReceiptCapture;
+  final ValueChanged<String>? onOpenDocument;
 
   @override
   State<AssistantLandingView> createState() => _AssistantLandingViewState();
@@ -184,7 +186,11 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
     );
   }
 
-  Future<void> _openSource(String value) async {
+  Future<void> _openSource(String value, {required bool isDocument}) async {
+    if (isDocument) {
+      widget.onOpenDocument?.call(value);
+      return;
+    }
     final uri = Uri.tryParse(value);
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
       return;
@@ -426,7 +432,11 @@ class _AssistantLandingViewState extends State<AssistantLandingView> {
                   title: source['title']?.toString() ?? 'Source',
                   uri: source['uri']?.toString() ?? '',
                   isDocument: source['kind']?.toString() == 'document',
-                  onOpen: _openSource,
+                  onOpen: (uri) => _openSource(
+                    uri,
+                    isDocument:
+                        source['kind'] == AssistantSourceKind.document.name,
+                  ),
                 ),
             ],
             if (error != null) ...[
@@ -501,7 +511,9 @@ class _AssistantSourceRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final parsed = Uri.tryParse(uri);
     final canOpen =
-        parsed != null && (parsed.scheme == 'http' || parsed.scheme == 'https');
+        isDocument ||
+        (parsed != null &&
+            (parsed.scheme == 'http' || parsed.scheme == 'https'));
     return CupertinoButton(
       padding: const EdgeInsets.symmetric(vertical: NorthstarSpacing.xs),
       minimumSize: const Size(0, 36),
