@@ -6,6 +6,7 @@ import com.northstar.core.automation.AutomationDefinitionNotFoundException;
 import com.northstar.core.discipline.DisciplineNotFoundException;
 import com.northstar.core.finance.FinancePlanningNotFoundException;
 import com.northstar.core.finance.TransactionNotFoundException;
+import com.northstar.core.habit.HabitNotFoundException;
 import com.northstar.core.note.NoteNotFoundException;
 import com.northstar.core.project.ProjectNotFoundException;
 import com.northstar.core.study.StudySessionNotFoundException;
@@ -60,7 +61,7 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             ProjectNotFoundException.class, TransactionNotFoundException.class,
             FinancePlanningNotFoundException.class, StudySessionNotFoundException.class,
             VocabCardNotFoundException.class, WritingFeedbackNotFoundException.class,
-            SpeakingFeedbackNotFoundException.class})
+            SpeakingFeedbackNotFoundException.class, HabitNotFoundException.class})
     ProblemDetail notFound(RuntimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, e.getMessage());
     }
