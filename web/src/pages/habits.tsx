@@ -60,7 +60,7 @@ function TodayPanel({ onEdit }: { onEdit: (habit: Habit) => void }) {
         </div>
         <div className="flex items-center gap-3">
           <div className="h-1.5 w-28 overflow-hidden rounded-full bg-muted sm:w-44">
-            <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-200" style={{ width: `${progress.rate}%` }} />
+            <div className="h-full rounded-full bg-success transition-[width] duration-200" style={{ width: `${progress.rate}%` }} />
           </div>
           <span className="text-sm font-medium tabular-nums">{progress.rate}%</span>
         </div>

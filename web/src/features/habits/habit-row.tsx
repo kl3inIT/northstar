@@ -32,7 +32,7 @@ import {
 import { COLOR_DOT, localDate, recentDayLabel, scheduleLabel } from './habit-utils'
 
 const STATE_STYLE: Record<TodayHabit['todayState'], string> = {
-  DONE: 'border-emerald-500 bg-emerald-500 text-white',
+  DONE: 'border-success bg-success text-white',
   EXCUSED: 'border-muted-foreground/30 bg-muted text-muted-foreground',
   OPEN: 'border-border bg-background text-transparent',
   MISSED: 'border-rose-400/50 bg-rose-500/10 text-transparent',

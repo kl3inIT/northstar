@@ -70,10 +70,10 @@ export function HabitsInsights() {
                     className={cn(
                       'stroke-background stroke-[1px]',
                       'data-[level="0"]:fill-muted',
-                      'data-[level="1"]:fill-emerald-200 dark:data-[level="1"]:fill-emerald-950',
-                      'data-[level="2"]:fill-emerald-400 dark:data-[level="2"]:fill-emerald-800',
-                      'data-[level="3"]:fill-emerald-600 dark:data-[level="3"]:fill-emerald-600',
-                      'data-[level="4"]:fill-emerald-800 dark:data-[level="4"]:fill-emerald-400',
+                      'data-[level="1"]:fill-success/20',
+                      'data-[level="2"]:fill-success/40',
+                      'data-[level="3"]:fill-success/70',
+                      'data-[level="4"]:fill-success',
                     )}
                   />
                   <title>{activity.date}: {activity.count} completed</title>
