@@ -598,7 +598,7 @@ function AssistantChat({
       api: '/api/assistant/chat',
       fetch: apiFetch,
       credentials: 'same-origin',
-      prepareSendMessagesRequest: ({ messages }) => {
+      prepareSendMessagesRequest: ({ messages, messageId }) => {
         const last = messages.at(-1)
         const text = (last?.parts ?? [])
           .filter((p) => p.type === 'text')
@@ -611,7 +611,9 @@ function AssistantChat({
           .filter((p): p is FileUIPart => p.type === 'file')
           .map((p) => p.url.split('/').pop())
           .filter(Boolean)
+        const clientTurnId = messageId ?? last?.id
         return {
+          headers: clientTurnId ? { 'Idempotency-Key': clientTurnId } : undefined,
           body: {
             message: text,
             conversationId,
@@ -625,6 +627,8 @@ function AssistantChat({
   })
 
   const [text, setText] = useState('')
+  const submitLock = useRef(false)
+  const [isUploading, setIsUploading] = useState(false)
   const busy = status === 'submitted' || status === 'streaming'
   const latestMessage = messages.at(-1)
   const showWaiting = busy && (
@@ -634,18 +638,29 @@ function AssistantChat({
   )
 
   async function onSubmit(message: PromptInputMessage) {
+    // Reject rather than resolve so PromptInput keeps its text/attachments while
+    // the first submission owns them.
+    if (submitLock.current || busy) throw new Error('Assistant turn already in progress')
     const trimmed = message.text.trim()
     const images = message.files.filter((f) => f.mediaType?.startsWith('image/'))
     if (!trimmed && images.length === 0) return
-    let uploaded: FileUIPart[] = []
+    submitLock.current = true
+    setIsUploading(true)
     try {
-      uploaded = await Promise.all(images.map(uploadImage))
-    } catch {
-      toast.error('Image upload failed — try again.')
-      throw new Error('upload failed') // keeps the composer content for retry
+      let uploaded: FileUIPart[]
+      try {
+        uploaded = await Promise.all(images.map(uploadImage))
+      } catch {
+        toast.error('Image upload failed — try again.')
+        throw new Error('upload failed') // keeps the composer content for retry
+      }
+      setIsUploading(false)
+      setText('')
+      await sendMessage({ text: trimmed, files: uploaded })
+    } finally {
+      submitLock.current = false
+      setIsUploading(false)
     }
-    setText('')
-    await sendMessage({ text: trimmed, files: uploaded })
   }
 
   const input = (
@@ -703,7 +718,12 @@ function AssistantChat({
         </PromptInputTools>
         <div className="flex items-center gap-1">
           <MicButton value={text} onChange={setText} compact />
-          <PromptInputSubmit status={status} onStop={stop} className="rounded-full" />
+          <PromptInputSubmit
+            status={isUploading ? 'submitted' : status}
+            onStop={stop}
+            disabled={isUploading}
+            className="rounded-full"
+          />
         </div>
       </PromptInputFooter>
     </PromptInput>

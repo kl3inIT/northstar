@@ -2,6 +2,8 @@ package com.northstar.api.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.northstar.core.ai.AiClientRouter;
@@ -133,6 +135,39 @@ class AssistantControllerIntegrationTests {
                         URI.create("http://localhost:" + port + "/api/assistant/conversations"))
                 .GET().build(), HttpResponse.BodyHandlers.ofString());
         assertThat(after.body()).doesNotContain("test-convo");
+    }
+
+    @Test
+    void repeatedIdempotencyKeyDoesNotRunTheTurnTwice() throws Exception {
+        when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
+        ChatResponse reply = new ChatResponse(List.of(new Generation(
+                new AssistantMessage("Created once."))));
+        when(chatModel.stream(any(Prompt.class))).thenReturn(Flux.just(reply));
+        when(chatModel.call(any(Prompt.class))).thenReturn(reply);
+
+        String key = UUID.randomUUID().toString();
+        HttpRequest request = HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/assistant/chat"))
+                .header("Content-Type", "application/json")
+                .header("Idempotency-Key", key)
+                .POST(HttpRequest.BodyPublishers.ofString("""
+                        {"message":"create this once","conversationId":"idempotent-convo"}"""))
+                .build();
+
+        HttpResponse<String> first = http.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> duplicate = http.send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertThat(first.statusCode()).isEqualTo(200);
+        assertThat(duplicate.statusCode()).isEqualTo(409);
+        verify(chatModel, times(1)).stream(any(Prompt.class));
+        assertThat(jdbc.sql("""
+                SELECT COUNT(*) FROM spring_ai_chat_memory
+                 WHERE conversation_id = 'idempotent-convo' AND type = 'USER'
+                """).query(Long.class).single()).isEqualTo(1L);
+        assertThat(jdbc.sql("""
+                SELECT COUNT(*) FROM northstar_assistant_turn
+                 WHERE conversation_id = 'idempotent-convo'
+                """).query(Long.class).single()).isEqualTo(1L);
     }
 
     @Test

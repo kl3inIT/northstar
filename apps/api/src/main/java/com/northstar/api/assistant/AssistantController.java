@@ -43,10 +43,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import tools.jackson.databind.ObjectMapper;
@@ -153,7 +155,9 @@ class AssistantController {
 
     @PostMapping(value = "/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(operationId = "streamAssistantChat")
-    ResponseEntity<Flux<ServerSentEvent<String>>> chat(@Valid @RequestBody ChatRequest request) {
+    ResponseEntity<Flux<ServerSentEvent<String>>> chat(
+            @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
+            @Valid @RequestBody ChatRequest request) {
         List<AttachmentContent> images = request.attachmentIds() == null ? List.of()
                 : request.attachmentIds().stream().map(this::imageById).toList();
         String message = request.message() == null ? "" : request.message().strip();
@@ -171,13 +175,14 @@ class AssistantController {
                 : markers.isBlank() ? message : message + "\n\n" + markers;
 
         String conversationId = conversationId(request.conversationId());
+        String turnId = claimTurn(conversationId, idempotencyKey);
         AiRoute route = conversationRoutes.resolve(conversationId, request.gatewayId(), request.modelId());
         Flux<ServerSentEvent<String>> stream = UiMessageStream.encode(streamTurn(
                 stored,
                 toMedia(images),
                 conversationId,
                 route,
-                UUID.randomUUID().toString()),
+                turnId),
                 json, TURN_TIMEOUT);
         return ResponseEntity.ok()
                 .header(UI_MESSAGE_STREAM_HEADER, "v1")
@@ -354,11 +359,48 @@ class AssistantController {
         jdbc.sql("DELETE FROM northstar_assistant_tool_trace WHERE conversation_id = ?")
                 .param(id)
                 .update();
+        jdbc.sql("DELETE FROM northstar_assistant_turn WHERE conversation_id = ?")
+                .param(id)
+                .update();
         jdbc.sql("DELETE FROM northstar_conversation_title WHERE conversation_id = ?")
                 .param(id)
                 .update();
         conversationRoutes.delete(id);
         memory.clear(id);
+    }
+
+    /**
+     * Claims a client action before any model or tool can run. The header is
+     * optional for older clients; those receive a fresh server key and keep the
+     * pre-idempotency behavior. A repeated supplied key is a conflict rather
+     * than a second streamed turn.
+     */
+    private String claimTurn(String conversationId, String requestedKey) {
+        String clientTurnId = StringUtils.hasText(requestedKey)
+                ? requestedKey.strip()
+                : UUID.randomUUID().toString();
+        if (clientTurnId.length() > 160) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Idempotency-Key must be at most 160 characters.");
+        }
+        String turnId = UUID.randomUUID().toString();
+        int inserted = jdbc.sql("""
+                INSERT INTO northstar_assistant_turn (
+                    id, conversation_id, client_turn_id, turn_id
+                )
+                VALUES (:id, :conversationId, :clientTurnId, :turnId)
+                ON CONFLICT (conversation_id, client_turn_id) DO NOTHING
+                """)
+                .param("id", UUID.randomUUID())
+                .param("conversationId", conversationId)
+                .param("clientTurnId", clientTurnId)
+                .param("turnId", turnId)
+                .update();
+        if (inserted == 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "This assistant turn is already being processed.");
+        }
+        return turnId;
     }
 
     private static String truncate(String title) {
