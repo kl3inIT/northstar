@@ -14,7 +14,6 @@ export const ASSISTANT_WIDGET_STORAGE_KEY = 'northstar.assistant-widget.position
 
 const DEFAULT_RIGHT = 20
 const DEFAULT_BOTTOM = 80
-const DRAG_THRESHOLD = 5
 
 export function clampAssistantWidgetPosition(
   position: AssistantWidgetPosition,
@@ -50,8 +49,4 @@ export function parseAssistantWidgetPosition(
   } catch {
     return null
   }
-}
-
-export function crossedAssistantWidgetDragThreshold(deltaX: number, deltaY: number): boolean {
-  return Math.hypot(deltaX, deltaY) >= DRAG_THRESHOLD
 }

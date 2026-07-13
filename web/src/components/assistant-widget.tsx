@@ -1,11 +1,11 @@
 import { Link, useLocation } from '@tanstack/react-router'
 import { Bot, Loader2, Maximize2, X } from 'lucide-react'
+import { motion, useMotionValue } from 'motion/react'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   ASSISTANT_WIDGET_STORAGE_KEY,
   clampAssistantWidgetPosition,
-  crossedAssistantWidgetDragThreshold,
   defaultAssistantWidgetPosition,
   parseAssistantWidgetPosition,
   type AssistantWidgetPosition,
@@ -21,20 +21,16 @@ const AssistantWorkspace = lazy(() =>
     default: module.AssistantWorkspace,
   })),
 )
+const MotionButton = motion.create(Button)
 
 export function AssistantWidget() {
   const pathname = useLocation({ select: (location) => location.pathname })
   const [open, setOpen] = useState(false)
-  const [position, setPosition] = useState<AssistantWidgetPosition | null>(null)
-  const positionRef = useRef<AssistantWidgetPosition | null>(null)
+  const [positioned, setPositioned] = useState(false)
+  const constraintsRef = useRef<HTMLDivElement>(null)
   const suppressClickRef = useRef(false)
-  const dragRef = useRef<{
-    pointerId: number
-    pointerX: number
-    pointerY: number
-    start: AssistantWidgetPosition
-    moved: boolean
-  } | null>(null)
+  const x = useMotionValue(0)
+  const y = useMotionValue(0)
   const available = pathname !== '/assistant' && pathname !== '/login'
 
   function viewport() {
@@ -43,8 +39,8 @@ export function AssistantWidget() {
 
   function updatePosition(next: AssistantWidgetPosition, persist = false) {
     const clamped = clampAssistantWidgetPosition(next, viewport())
-    positionRef.current = clamped
-    setPosition(clamped)
+    x.set(clamped.x)
+    y.set(clamped.y)
     if (persist) localStorage.setItem(ASSISTANT_WIDGET_STORAGE_KEY, JSON.stringify(clamped))
   }
 
@@ -54,11 +50,11 @@ export function AssistantWidget() {
       localStorage.getItem(ASSISTANT_WIDGET_STORAGE_KEY),
       currentViewport,
     ) ?? defaultAssistantWidgetPosition(currentViewport)
-    positionRef.current = initial
-    setPosition(initial)
+    updatePosition(initial)
+    setPositioned(true)
 
     function keepInsideViewport() {
-      if (positionRef.current) updatePosition(positionRef.current, true)
+      updatePosition({ x: x.get(), y: y.get() }, true)
     }
 
     window.addEventListener('resize', keepInsideViewport)
@@ -70,45 +66,6 @@ export function AssistantWidget() {
   useEffect(() => {
     if (!available) setOpen(false)
   }, [available])
-
-  function startDrag(event: React.PointerEvent<HTMLButtonElement>) {
-    if (event.button !== 0) return
-    const rect = event.currentTarget.getBoundingClientRect()
-    dragRef.current = {
-      pointerId: event.pointerId,
-      pointerX: event.clientX,
-      pointerY: event.clientY,
-      start: { x: rect.left, y: rect.top },
-      moved: false,
-    }
-    event.currentTarget.setPointerCapture(event.pointerId)
-  }
-
-  function moveDrag(event: React.PointerEvent<HTMLButtonElement>) {
-    const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-    const deltaX = event.clientX - drag.pointerX
-    const deltaY = event.clientY - drag.pointerY
-    if (!drag.moved && !crossedAssistantWidgetDragThreshold(deltaX, deltaY)) return
-    if (!drag.moved) {
-      drag.moved = true
-      setOpen(false)
-    }
-    event.preventDefault()
-    updatePosition({ x: drag.start.x + deltaX, y: drag.start.y + deltaY })
-  }
-
-  function finishDrag(event: React.PointerEvent<HTMLButtonElement>, suppressClick = true) {
-    const drag = dragRef.current
-    if (!drag || drag.pointerId !== event.pointerId) return
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-    dragRef.current = null
-    if (!drag.moved) return
-    suppressClickRef.current = suppressClick
-    if (positionRef.current) updatePosition(positionRef.current, true)
-  }
 
   function moveWithKeyboard(event: React.KeyboardEvent<HTMLButtonElement>) {
     if (!event.altKey) return
@@ -122,7 +79,9 @@ export function AssistantWidget() {
     const offset = offsets[event.key]
     if (!offset) return
     event.preventDefault()
-    const current = positionRef.current ?? defaultAssistantWidgetPosition(viewport())
+    const current = positioned
+      ? { x: x.get(), y: y.get() }
+      : defaultAssistantWidgetPosition(viewport())
     updatePosition({ x: current.x + offset.x, y: current.y + offset.y }, true)
   }
 
@@ -142,37 +101,47 @@ export function AssistantWidget() {
   if (!available) return null
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          size="icon"
-          className="fixed z-40 size-11 cursor-grab rounded-full shadow-lg active:cursor-grabbing"
-          style={position ? { left: position.x, top: position.y, touchAction: 'none' } : { right: 20, bottom: 80, touchAction: 'none' }}
-          aria-label="Open Assistant; drag to reposition"
-          title="Open Assistant (Ctrl+J) · Drag to move · Alt+Arrow to reposition"
-          onPointerDown={startDrag}
-          onPointerMove={moveDrag}
-          onPointerUp={finishDrag}
-          onPointerCancel={(event) => finishDrag(event, false)}
-          onKeyDown={moveWithKeyboard}
-          onClickCapture={(event) => {
-            if (!suppressClickRef.current) return
-            suppressClickRef.current = false
-            event.preventDefault()
-            event.stopPropagation()
-          }}
+    <>
+      <div ref={constraintsRef} className="pointer-events-none fixed inset-2" aria-hidden="true" />
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <MotionButton
+            size="icon"
+            className="fixed z-40 size-11 cursor-grab rounded-full shadow-lg active:cursor-grabbing"
+            style={positioned
+              ? { left: 0, top: 0, x, y, touchAction: 'none' }
+              : { right: 20, bottom: 80, touchAction: 'none' }}
+            drag={positioned}
+            dragConstraints={constraintsRef}
+            dragElastic={0}
+            dragMomentum={false}
+            whileDrag={{ scale: 1.06 }}
+            aria-label="Open Assistant; drag to reposition"
+            title="Open Assistant (Ctrl+J) · Drag to move · Alt+Arrow to reposition"
+            onDragStart={() => {
+              suppressClickRef.current = true
+              setOpen(false)
+            }}
+            onDragEnd={() => updatePosition({ x: x.get(), y: y.get() }, true)}
+            onKeyDown={moveWithKeyboard}
+            onClickCapture={(event) => {
+              if (!suppressClickRef.current) return
+              suppressClickRef.current = false
+              event.preventDefault()
+              event.stopPropagation()
+            }}
+          >
+            <Bot className="size-5" />
+          </MotionButton>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          align="end"
+          sideOffset={12}
+          collisionPadding={8}
+          aria-label="Assistant chat widget"
+          className="flex h-[min(36rem,calc(100dvh-7rem))] w-[min(28rem,calc(100vw-1rem))] flex-col gap-0 overflow-hidden rounded-xl p-0 shadow-xl"
         >
-          <Bot className="size-5" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="top"
-        align="end"
-        sideOffset={12}
-        collisionPadding={8}
-        aria-label="Assistant chat widget"
-        className="flex h-[min(36rem,calc(100dvh-7rem))] w-[min(28rem,calc(100vw-1rem))] flex-col gap-0 overflow-hidden rounded-xl p-0 shadow-xl"
-      >
         <header className="flex shrink-0 items-center gap-3 border-b px-4 py-3 text-left">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
             <Bot className="size-4" />
@@ -217,7 +186,8 @@ export function AssistantWidget() {
             </Suspense>
           )}
         </div>
-      </PopoverContent>
-    </Popover>
+        </PopoverContent>
+      </Popover>
+    </>
   )
 }
