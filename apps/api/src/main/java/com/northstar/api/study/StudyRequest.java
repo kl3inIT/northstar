@@ -86,6 +86,12 @@ final class StudyRequest {
     record VocabEnrichmentRequest(@NotEmpty Set<VocabEnrichmentField> fields) {
     }
 
+    record DictationAttemptRequest(@NotBlank @Size(max = 2000) String answer) {
+    }
+
+    record RecordingPinRequest(@NotNull Boolean pinned) {
+    }
+
     record VocabDeckSettingsRequest(@NotNull Boolean productionDefault) {
     }
 

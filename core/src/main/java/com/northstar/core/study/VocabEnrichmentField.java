@@ -9,5 +9,6 @@ public enum VocabEnrichmentField {
     CONTRAST,
     MNEMONIC,
     WORD_FORMATION,
-    IMAGE
+    IMAGE,
+    AUDIO
 }

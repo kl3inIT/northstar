@@ -5,6 +5,8 @@ import com.northstar.core.ai.AiTask;
 import com.northstar.core.ai.GeneratedImage;
 import com.northstar.core.ai.ImageGenerationGateway;
 import com.northstar.core.attachment.AttachmentService;
+import com.northstar.core.speech.SpeechAssetService;
+import com.northstar.core.speech.SpeechAudio;
 import com.northstar.core.study.VocabCardSummary;
 import com.northstar.core.study.VocabCoach;
 import com.northstar.core.study.VocabEnrichmentField;
@@ -43,12 +45,14 @@ class VocabEnrichmentJobService {
     private final AiClientRouter ai;
     private final ImageGenerationGateway images;
     private final AttachmentService attachments;
+    private final SpeechAssetService speech;
     private final AsyncTaskExecutor executor;
     private final ObjectMapper json;
     private final Map<UUID, Job> jobs = new ConcurrentHashMap<>();
 
     VocabEnrichmentJobService(VocabService vocab, VocabCoach coach, AiClientRouter ai,
             ImageGenerationGateway images, AttachmentService attachments,
+            SpeechAssetService speech,
             @Qualifier("applicationTaskExecutor") AsyncTaskExecutor executor,
             ObjectMapper json) {
         this.vocab = vocab;
@@ -56,6 +60,7 @@ class VocabEnrichmentJobService {
         this.ai = ai;
         this.images = images;
         this.attachments = attachments;
+        this.speech = speech;
         this.executor = executor;
         this.json = json;
     }
@@ -101,6 +106,22 @@ class VocabEnrichmentJobService {
             merged.put("frontImageAlt", job.imageAlt);
             metadata = json.writeValueAsString(merged);
         }
+        if (job.wordAudio != null) {
+            UUID wordAssetId = speech.store(job.speechRoute, job.wordAudioText,
+                    job.audioLocale, job.wordAudio).asset().id();
+            Map<String, Object> merged = metadata(metadata);
+            merged.put("frontAudioAssetId", wordAssetId.toString());
+            merged.put("frontAudioText", job.wordAudioText);
+            merged.put("frontAudioTargetId", job.speechRoute.modelId());
+            merged.put("frontAudioLocale", job.audioLocale);
+            if (job.exampleAudio != null) {
+                UUID exampleAssetId = speech.store(job.speechRoute, job.exampleAudioText,
+                        job.audioLocale, job.exampleAudio).asset().id();
+                merged.put("exampleAudioAssetId", exampleAssetId.toString());
+                merged.put("exampleAudioText", job.exampleAudioText);
+            }
+            metadata = json.writeValueAsString(merged);
+        }
         VocabCardSummary updated = vocab.update(current.id(), current.front(), current.back(), metadata,
                 current.language(), current.deck(), current.disciplineId(), current.suspended(),
                 current.productionEnabled());
@@ -116,10 +137,23 @@ class VocabEnrichmentJobService {
         try {
             EnumSet<VocabEnrichmentField> textFields = EnumSet.copyOf(job.fields);
             textFields.remove(VocabEnrichmentField.IMAGE);
+            textFields.remove(VocabEnrichmentField.AUDIO);
             job.preview = textFields.isEmpty() ? unchanged(job.card) : coach.enrich(job.card, textFields);
             if (job.fields.contains(VocabEnrichmentField.IMAGE)) {
                 job.image = images.generate(ai.route(AiTask.IMAGE_GENERATION), imagePrompt(job.card));
                 job.imageAlt = "Mnemonic illustration for this vocabulary card";
+            }
+            if (job.fields.contains(VocabEnrichmentField.AUDIO)) {
+                job.speechRoute = ai.route(AiTask.TEXT_TO_SPEECH);
+                job.audioLocale = job.card.language() == com.northstar.core.study.VocabLanguage.CHINESE
+                        ? "zh-CN" : "en-US";
+                job.wordAudioText = job.card.front();
+                job.wordAudio = speech.preview(job.speechRoute, job.wordAudioText, job.audioLocale);
+                job.exampleAudioText = example(job.preview.metadata());
+                if (job.exampleAudioText != null) {
+                    job.exampleAudio = speech.preview(job.speechRoute, job.exampleAudioText,
+                            job.audioLocale);
+                }
             }
             job.status = VocabEnrichmentJobStatus.READY;
         } catch (Exception exception) {
@@ -154,6 +188,11 @@ class VocabEnrichmentJobService {
             });
         }
         return result;
+    }
+
+    private String example(String metadata) {
+        Object value = metadata(metadata).get("example");
+        return value instanceof String text && !text.isBlank() ? text.strip() : null;
     }
 
     private void evictExpired() {
@@ -201,6 +240,12 @@ class VocabEnrichmentJobService {
         private volatile VocabEnrichmentPreview preview;
         private volatile GeneratedImage image;
         private volatile String imageAlt;
+        private volatile com.northstar.core.ai.AiRoute speechRoute;
+        private volatile String wordAudioText;
+        private volatile SpeechAudio wordAudio;
+        private volatile String exampleAudioText;
+        private volatile SpeechAudio exampleAudio;
+        private volatile String audioLocale;
         private volatile String error;
 
         private Job(UUID id, VocabCardSummary card, EnumSet<VocabEnrichmentField> fields) {
@@ -212,7 +257,12 @@ class VocabEnrichmentJobService {
         private VocabEnrichmentJobView view() {
             return new VocabEnrichmentJobView(id, card.id(), card.front(), status, preview,
                     image == null ? null : Base64.getEncoder().encodeToString(image.data()),
-                    image == null ? null : image.mediaType(), imageAlt, error);
+                    image == null ? null : image.mediaType(), imageAlt,
+                    wordAudio == null ? null : Base64.getEncoder().encodeToString(wordAudio.data()),
+                    wordAudio == null ? null : wordAudio.mimeType(),
+                    exampleAudio == null ? null : Base64.getEncoder().encodeToString(exampleAudio.data()),
+                    exampleAudio == null ? null : exampleAudio.mimeType(),
+                    speechRoute == null ? null : speechRoute.modelId(), audioLocale, error);
         }
     }
 }
