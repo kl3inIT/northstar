@@ -641,6 +641,7 @@ function EnrichmentSheet({
 }) {
   const [selected, setSelected] = useState<Set<VocabEnrichmentField>>(new Set())
   const existing = parseVocabMetadata(card.metadata)
+  const allSelected = selected.size === ENRICHMENT_OPTIONS.length
 
   function toggle(field: VocabEnrichmentField, checked: boolean) {
     setSelected((current) => {
@@ -654,6 +655,12 @@ function EnrichmentSheet({
     const fields = enrichmentFieldsForRequest(selected, true)
     if (!fields) return
     onGenerate(fields)
+  }
+
+  function toggleAll() {
+    setSelected(allSelected
+      ? new Set()
+      : new Set(ENRICHMENT_OPTIONS.map((option) => option.field)))
   }
 
   const hasExisting = (field: VocabEnrichmentField) => {
@@ -717,6 +724,20 @@ function EnrichmentSheet({
             </div>
           ) : (
             <div className="space-y-2">
+              <div className="flex items-center justify-between px-1 pb-1">
+                <span className="text-xs text-muted-foreground">
+                  {selected.size} of {ENRICHMENT_OPTIONS.length} selected
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-pressed={allSelected}
+                  onClick={toggleAll}
+                >
+                  {allSelected ? 'Clear all' : 'Select all'}
+                </Button>
+              </div>
               {ENRICHMENT_OPTIONS.map((option) => (
                 <Label key={option.field} className="flex min-h-14 cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-muted/40">
                   <Checkbox checked={selected.has(option.field)} onCheckedChange={(value) => toggle(option.field, value === true)} />

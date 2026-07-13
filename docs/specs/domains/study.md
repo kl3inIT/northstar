@@ -65,7 +65,8 @@ enabled sibling until the next midnight in the browser's timezone.
   mnemonics, defensible word formation, a text-free mnemonic illustration, and
   provider-routed word/example audio
   are optional enrichment. Creating, loading, or revealing a card never
-  generates them. The learner selects fields and explicitly starts an expiring
+  generates them. The learner can select fields individually or use the
+  reversible Select all/Clear all action, then explicitly starts an expiring
   in-API background preview, then keeps reviewing until a toast offers Apply or
   Discard. The review header retains a running/ready action until that decision,
   so preview access does not depend on a transient notification. Enrichment
@@ -78,6 +79,10 @@ enabled sibling until the next midnight in the browser's timezone.
   Apply stores them through Attachments and references them as `frontImageId`;
   unknown metadata keys and existing user-authored values are preserved. Audio previews are likewise
   transient until Apply stores them in the content-addressed speech cache.
+  Image inference keeps the configured connection deadline but allows a
+  five-minute response window because provider-routed image generation may
+  legitimately exceed the shared 60-second gateway timeout. Northstar does not
+  automatically retry the potentially non-idempotent generation POST.
   Applied audio is bound to its exact source text; editing the front or example
   makes the binding stale and Listen falls back to browser speech rather than
   playing the wrong recording.
@@ -254,7 +259,7 @@ skipped, never fatal.
   interval, R to listen, Escape to exit, a completion
   tally, deck/per-card two-direction controls, applied-audio-first Listen with
   browser fallback, and an opt-in background
-  enrichment Sheet whose ready preview (including audio players) replaces the field picker instead of
+  enrichment Sheet with Select all/Clear all whose ready preview (including audio players) replaces the field picker instead of
   forcing a scroll. Applied mnemonic images appear only on the question/front
   face; word-formation parts appear on the answer face. Writing:
   essays graded, latest estimate,

@@ -78,6 +78,14 @@ class OpenAiCompatibleImageGenerationGatewayTests {
         }
     }
 
+    @Test
+    void allowsSlowImageInferenceWithoutChangingLongerConfiguredTimeouts() {
+        assertEquals(Duration.ofMinutes(5),
+                OpenAiCompatibleImageGenerationGateway.imageRequestTimeout(Duration.ofSeconds(60)));
+        assertEquals(Duration.ofMinutes(10),
+                OpenAiCompatibleImageGenerationGateway.imageRequestTimeout(Duration.ofMinutes(10)));
+    }
+
     private static OpenAiCompatibleImageGenerationGateway gateway(TestServer server,
             AiGatewayType type) {
         String id = type == AiGatewayType.OPENAI ? "openai" : "nine-router";

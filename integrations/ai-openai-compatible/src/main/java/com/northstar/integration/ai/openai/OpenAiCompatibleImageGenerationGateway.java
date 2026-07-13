@@ -28,6 +28,7 @@ import org.springframework.web.client.RestClientException;
 public class OpenAiCompatibleImageGenerationGateway implements ImageGenerationGateway {
 
     private static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+    private static final Duration MIN_IMAGE_REQUEST_TIMEOUT = Duration.ofMinutes(5);
 
     private final AiGatewayConnectionResolver gateways;
     private final RestClient.Builder restClient;
@@ -143,10 +144,15 @@ public class OpenAiCompatibleImageGenerationGateway implements ImageGenerationGa
             http.version(HttpClient.Version.HTTP_1_1);
         }
         JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http.build());
-        requests.setReadTimeout(gateway.timeout());
+        requests.setReadTimeout(imageRequestTimeout(gateway.timeout()));
         return restClient.clone().baseUrl(gateway.baseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + gateway.apiKey())
                 .requestFactory(requests).build();
+    }
+
+    static Duration imageRequestTimeout(Duration configuredTimeout) {
+        return configuredTimeout.compareTo(MIN_IMAGE_REQUEST_TIMEOUT) >= 0
+                ? configuredTimeout : MIN_IMAGE_REQUEST_TIMEOUT;
     }
 
     private record ImageResponse(List<ImageData> data) {
