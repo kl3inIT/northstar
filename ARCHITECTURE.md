@@ -224,6 +224,8 @@ docker compose up -d
 
 pnpm -C web install
 pnpm -C web dev
+pnpm -C web test
+pnpm -C web test:e2e
 pnpm -C web typecheck
 pnpm -C web build
 pnpm -C web gen:api
