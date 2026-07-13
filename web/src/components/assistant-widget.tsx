@@ -3,13 +3,10 @@ import { Bot, Loader2, Maximize2, X } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 
 const AssistantWorkspace = lazy(() =>
   import('@/components/assistant-workspace').then((module) => ({
@@ -17,7 +14,7 @@ const AssistantWorkspace = lazy(() =>
   })),
 )
 
-export function AssistantDrawer() {
+export function AssistantWidget() {
   const pathname = useLocation({ select: (location) => location.pathname })
   const [open, setOpen] = useState(false)
   const available = pathname !== '/assistant' && pathname !== '/login'
@@ -42,8 +39,8 @@ export function AssistantDrawer() {
   if (!available) return null
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
         <Button
           size="icon"
           className="fixed bottom-20 right-5 z-40 size-11 rounded-full shadow-lg"
@@ -52,21 +49,24 @@ export function AssistantDrawer() {
         >
           <Bot className="size-5" />
         </Button>
-      </SheetTrigger>
-      <SheetContent
-        side="right"
-        showCloseButton={false}
-        className="w-full gap-0 p-0 sm:max-w-[30rem]"
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={12}
+        collisionPadding={8}
+        aria-label="Assistant chat widget"
+        className="flex h-[min(36rem,calc(100dvh-7rem))] w-[min(28rem,calc(100vw-1rem))] flex-col gap-0 overflow-hidden rounded-xl p-0 shadow-xl"
       >
-        <SheetHeader className="flex-row items-center gap-3 border-b px-4 py-3 text-left">
+        <header className="flex shrink-0 items-center gap-3 border-b px-4 py-3 text-left">
           <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
             <Bot className="size-4" />
           </div>
           <div className="min-w-0 flex-1">
-            <SheetTitle className="text-sm">Assistant</SheetTitle>
-            <SheetDescription className="truncate text-xs">
+            <h2 className="text-sm font-semibold">Assistant</h2>
+            <p className="truncate text-xs text-muted-foreground">
               Your current Northstar conversation
-            </SheetDescription>
+            </p>
           </div>
           <Button size="icon" variant="ghost" className="size-8" asChild>
             <Link
@@ -88,7 +88,7 @@ export function AssistantDrawer() {
           >
             <X className="size-4" />
           </Button>
-        </SheetHeader>
+        </header>
         <div className="flex min-h-0 flex-1 overflow-hidden">
           {open && (
             <Suspense
@@ -102,7 +102,7 @@ export function AssistantDrawer() {
             </Suspense>
           )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </PopoverContent>
+    </Popover>
   )
 }

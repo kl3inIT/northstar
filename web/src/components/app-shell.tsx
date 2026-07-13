@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import { useEffect } from 'react'
 import { CommandMenu } from '@/components/command-menu'
-import { AssistantDrawer } from '@/components/assistant-drawer'
+import { AssistantWidget } from '@/components/assistant-widget'
 import { PageTransition } from '@/components/motion'
 import { ModeToggle } from '@/components/mode-toggle'
 import { Button } from '@/components/ui/button'
@@ -125,7 +125,7 @@ export function AppShell() {
   return (
     <SidebarProvider>
       <CommandMenu onCapture={() => navigate({ to: '/capture' })} />
-      <AssistantDrawer />
+      <AssistantWidget />
       <Toaster position="bottom-right" richColors />
       <Sidebar collapsible="icon">
         <SidebarHeader>

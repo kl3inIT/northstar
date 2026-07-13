@@ -26,6 +26,7 @@ import {
   Trash2,
   Volume2,
   Wrench,
+  X,
   XCircle,
   type LucideIcon,
 } from 'lucide-react'
@@ -101,11 +102,10 @@ import { Suggestion } from '@/components/ai-elements/suggestion'
 import { Source, Sources, SourcesContent, SourcesTrigger } from '@/components/ai-elements/sources'
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from '@/components/ai-elements/tool'
 import { Button } from '@/components/ui/button'
+import { Bubble, BubbleContent } from '@/components/ui/bubble'
 import {
   Sheet,
   SheetContent,
-  SheetHeader,
-  SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { MicButton } from '@/components/mic-button'
@@ -336,47 +336,68 @@ export function AssistantWorkspace({ compact = false }: { compact?: boolean }) {
     <div className="relative flex h-full w-full flex-1 overflow-hidden">
       <ChatColumn key={conversationId} conversationId={conversationId} compact={compact} />
 
-      {/* Mobile: history lives in a right-side Sheet (the aside is lg-only). */}
-      <Sheet open={mobileHistoryOpen} onOpenChange={setMobileHistoryOpen}>
-        <SheetTrigger asChild>
+      {compact ? (
+        <>
           <Button
             size="icon"
             variant="ghost"
-            className={cn('absolute right-3 top-3 size-7', !compact && 'lg:hidden')}
+            className="absolute right-3 top-3 size-7"
             aria-label="Chat history"
             title="Chat history"
+            onClick={() => setMobileHistoryOpen(true)}
           >
             <HistoryIcon className="size-4" />
           </Button>
-        </SheetTrigger>
-        <SheetContent side="right" className="flex w-80 flex-col gap-0 p-0">
-          <SheetHeader className="flex-row items-center justify-between space-y-0 border-b px-4 py-3">
-            <SheetTitle className="text-sm font-semibold">Chat history</SheetTitle>
+          {mobileHistoryOpen && (
+            <div className="absolute inset-0 z-20 bg-background">
+              <HistoryPanel
+                conversations={conversations}
+                activeId={conversationId}
+                onNew={() => {
+                  setConversationId(crypto.randomUUID())
+                  setMobileHistoryOpen(false)
+                }}
+                onSelect={(id) => {
+                  setConversationId(id)
+                  setMobileHistoryOpen(false)
+                }}
+                onRemove={remove}
+                onClose={() => setMobileHistoryOpen(false)}
+              />
+            </div>
+          )}
+        </>
+      ) : (
+        <Sheet open={mobileHistoryOpen} onOpenChange={setMobileHistoryOpen}>
+          <SheetTrigger asChild>
             <Button
               size="icon"
               variant="ghost"
-              className="mr-6 size-7"
-              aria-label="New chat"
-              title="New chat"
-              onClick={() => {
+              className="absolute right-3 top-3 size-7 lg:hidden"
+              aria-label="Chat history"
+              title="Chat history"
+            >
+              <HistoryIcon className="size-4" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="right" showCloseButton={false} className="flex w-80 flex-col gap-0 p-0">
+            <HistoryPanel
+              conversations={conversations}
+              activeId={conversationId}
+              onNew={() => {
                 setConversationId(crypto.randomUUID())
                 setMobileHistoryOpen(false)
               }}
-            >
-              <MessageSquarePlus className="size-4" />
-            </Button>
-          </SheetHeader>
-          <HistoryList
-            conversations={conversations}
-            activeId={conversationId}
-            onSelect={(id) => {
-              setConversationId(id)
-              setMobileHistoryOpen(false)
-            }}
-            onRemove={remove}
-          />
-        </SheetContent>
-      </Sheet>
+              onSelect={(id) => {
+                setConversationId(id)
+                setMobileHistoryOpen(false)
+              }}
+              onRemove={remove}
+              onClose={() => setMobileHistoryOpen(false)}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
 
       {!compact && !historyOpen && (
         <Button
@@ -426,6 +447,44 @@ export function AssistantWorkspace({ compact = false }: { compact?: boolean }) {
         />
       </aside>
       )}
+    </div>
+  )
+}
+
+function HistoryPanel({
+  conversations,
+  activeId,
+  onNew,
+  onSelect,
+  onRemove,
+  onClose,
+}: {
+  conversations: ConversationSummary[]
+  activeId: string
+  onNew: () => void
+  onSelect: (id: string) => void
+  onRemove: (id: string) => void
+  onClose: () => void
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex items-center justify-between border-b px-4 py-3">
+        <h2 className="text-sm font-semibold">Chat history</h2>
+        <div className="flex items-center gap-1">
+          <Button size="icon" variant="ghost" className="size-7" aria-label="New chat" title="New chat" onClick={onNew}>
+            <MessageSquarePlus className="size-4" />
+          </Button>
+          <Button size="icon" variant="ghost" className="size-7" aria-label="Close history" title="Close history" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </div>
+      </header>
+      <HistoryList
+        conversations={conversations}
+        activeId={activeId}
+        onSelect={onSelect}
+        onRemove={onRemove}
+      />
     </div>
   )
 }
@@ -718,22 +777,24 @@ function AssistantChat({
                     ))}
                   </Attachments>
                 )}
-                <MessageContent>
+                <MessageContent
+                  className={compact
+                    ? 'w-full group-[.is-user]:rounded-none group-[.is-user]:bg-transparent group-[.is-user]:p-0'
+                    : undefined}
+                >
                   {m.role === 'assistant' && toolParts.length > 0 && <ToolWorkflow tools={toolParts} />}
-                  <div id={speechTextId}>
-                    {m.parts.map((part, i) => {
-                    if (part.type === 'text') {
-                      return (
-                        <MessageResponse key={i} components={CHAT_MARKDOWN_COMPONENTS}>
-                          {part.text}
-                        </MessageResponse>
-                      )
-                    }
-                    if (part.type === 'file') return null
-                    if (isToolPart(part)) return null
-                    return null
-                    })}
-                  </div>
+                  {compact && messageText.trim() ? (
+                    <Bubble
+                      align={m.role === 'user' ? 'end' : 'start'}
+                      variant={m.role === 'user' ? 'default' : 'secondary'}
+                    >
+                      <BubbleContent>
+                        <MessageText parts={m.parts} speechTextId={speechTextId} />
+                      </BubbleContent>
+                    </Bubble>
+                  ) : (
+                    <MessageText parts={m.parts} speechTextId={speechTextId} />
+                  )}
                 </MessageContent>
                 {sources.length > 0 && (
                   <Sources className="mb-0">
@@ -783,6 +844,23 @@ function AssistantChat({
         'mx-auto w-full max-w-3xl px-4',
         compact ? 'pb-4' : 'pb-6',
       )}>{input}</div>
+    </div>
+  )
+}
+
+function MessageText({ parts, speechTextId }: { parts: UIMessage['parts']; speechTextId: string }) {
+  return (
+    <div id={speechTextId}>
+      {parts.map((part, index) => {
+        if (part.type === 'text') {
+          return (
+            <MessageResponse key={index} components={CHAT_MARKDOWN_COMPONENTS}>
+              {part.text}
+            </MessageResponse>
+          )
+        }
+        return null
+      })}
     </div>
   )
 }
