@@ -135,9 +135,14 @@ public class OpenAiCompatibleImageGenerationGateway implements ImageGenerationGa
     }
 
     private RestClient client(AiGatewayConnection gateway) {
-        HttpClient http = HttpClient.newBuilder().connectTimeout(gateway.timeout())
-                .followRedirects(HttpClient.Redirect.NEVER).build();
-        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
+        HttpClient.Builder http = HttpClient.newBuilder().connectTimeout(gateway.timeout())
+                .followRedirects(HttpClient.Redirect.NEVER);
+        if (gateway.baseUrl().regionMatches(true, 0, "http://", 0, 7)) {
+            // Internal gateways such as 9Router are clear-text HTTP/1.1 services.
+            // Avoid an HTTP/2 preference/fallback handshake on long binary responses.
+            http.version(HttpClient.Version.HTTP_1_1);
+        }
+        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http.build());
         requests.setReadTimeout(gateway.timeout());
         return restClient.clone().baseUrl(gateway.baseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + gateway.apiKey())
