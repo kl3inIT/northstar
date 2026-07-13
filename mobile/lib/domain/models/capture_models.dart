@@ -1,4 +1,4 @@
-enum CaptureKind { note, task, event, expense }
+enum CaptureKind { note, task, event, expense, study, vocab }
 
 enum ReceiptSource { camera, photoLibrary }
 
@@ -175,6 +175,154 @@ final class ExpenseCaptureDraft extends CaptureDraft {
     final next = items.toList();
     next[index] = item;
     return ExpenseCaptureDraft(List.unmodifiable(next));
+  }
+}
+
+enum StudyCaptureKind { practice, mock }
+
+class StudyCaptureItem {
+  const StudyCaptureItem({
+    required this.skill,
+    required this.kind,
+    required this.occurredOn,
+    required this.notes,
+    this.durationMinutes,
+    this.scoreRaw,
+    this.scoreMax,
+    this.disciplineName,
+  });
+
+  final String skill;
+  final StudyCaptureKind kind;
+  final String occurredOn;
+  final String notes;
+  final int? durationMinutes;
+  final int? scoreRaw;
+  final int? scoreMax;
+  final String? disciplineName;
+
+  StudyCaptureItem copyWith({
+    String? skill,
+    StudyCaptureKind? kind,
+    String? occurredOn,
+    String? notes,
+    int? durationMinutes,
+    int? scoreRaw,
+    int? scoreMax,
+    String? disciplineName,
+  }) {
+    return StudyCaptureItem(
+      skill: skill ?? this.skill,
+      kind: kind ?? this.kind,
+      occurredOn: occurredOn ?? this.occurredOn,
+      notes: notes ?? this.notes,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      scoreRaw: scoreRaw ?? this.scoreRaw,
+      scoreMax: scoreMax ?? this.scoreMax,
+      disciplineName: disciplineName ?? this.disciplineName,
+    );
+  }
+}
+
+final class StudyCaptureDraft extends CaptureDraft {
+  const StudyCaptureDraft(this.items);
+
+  final List<StudyCaptureItem> items;
+
+  @override
+  CaptureKind get kind => CaptureKind.study;
+
+  @override
+  String get title {
+    if (items.isEmpty) {
+      return 'Study';
+    }
+    return items
+        .map((item) {
+          final details = <String>[
+            item.skill,
+            if (item.durationMinutes case final minutes?) '${minutes}m',
+            if (item.scoreRaw case final raw?)
+              if (item.scoreMax case final max?) '$raw/$max',
+          ];
+          return details.join(' · ');
+        })
+        .join('  |  ');
+  }
+
+  StudyCaptureDraft copyWithItem(int index, StudyCaptureItem item) {
+    final next = items.toList();
+    next[index] = item;
+    return StudyCaptureDraft(List.unmodifiable(next));
+  }
+}
+
+enum VocabCaptureLanguage { english, chinese }
+
+class VocabCaptureItem {
+  const VocabCaptureItem({
+    required this.front,
+    required this.back,
+    required this.reading,
+    required this.partOfSpeech,
+    required this.example,
+    required this.language,
+    required this.deck,
+    this.disciplineName,
+  });
+
+  final String front;
+  final String back;
+  final String reading;
+  final String partOfSpeech;
+  final String example;
+  final VocabCaptureLanguage language;
+  final String deck;
+  final String? disciplineName;
+
+  VocabCaptureItem copyWith({
+    String? front,
+    String? back,
+    String? reading,
+    String? partOfSpeech,
+    String? example,
+    VocabCaptureLanguage? language,
+    String? deck,
+    String? disciplineName,
+  }) {
+    return VocabCaptureItem(
+      front: front ?? this.front,
+      back: back ?? this.back,
+      reading: reading ?? this.reading,
+      partOfSpeech: partOfSpeech ?? this.partOfSpeech,
+      example: example ?? this.example,
+      language: language ?? this.language,
+      deck: deck ?? this.deck,
+      disciplineName: disciplineName ?? this.disciplineName,
+    );
+  }
+}
+
+final class VocabCaptureDraft extends CaptureDraft {
+  const VocabCaptureDraft(this.items);
+
+  final List<VocabCaptureItem> items;
+
+  @override
+  CaptureKind get kind => CaptureKind.vocab;
+
+  @override
+  String get title {
+    if (items.isEmpty) {
+      return 'Vocabulary';
+    }
+    return items.map((item) => '${item.front} · ${item.back}').join('  |  ');
+  }
+
+  VocabCaptureDraft copyWithItem(int index, VocabCaptureItem item) {
+    final next = items.toList();
+    next[index] = item;
+    return VocabCaptureDraft(List.unmodifiable(next));
   }
 }
 

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:northstar/data/models/capture_dtos.dart';
 import 'package:northstar/data/services/capture_api.dart';
 import 'package:northstar/domain/models/capture_models.dart';
@@ -45,6 +47,8 @@ class RemoteCaptureRepository implements CaptureRepository {
       TaskCaptureDraft() => _saveTask(draft),
       EventCaptureDraft() => _saveEvent(draft),
       ExpenseCaptureDraft() => _saveExpense(draft),
+      StudyCaptureDraft() => _saveStudy(draft),
+      VocabCaptureDraft() => _saveVocab(draft),
     };
   }
 
@@ -55,6 +59,8 @@ class RemoteCaptureRepository implements CaptureRepository {
       CaptureKind.task => '/api/tasks',
       CaptureKind.event => '/api/calendar/events',
       CaptureKind.expense => '/api/finance',
+      CaptureKind.study => '/api/study/sessions',
+      CaptureKind.vocab => '/api/study/vocab',
     };
     for (final id in saved.ids) {
       await _api.delete('$prefix/${Uri.encodeComponent(id)}');
@@ -67,6 +73,8 @@ class RemoteCaptureRepository implements CaptureRepository {
       CaptureKind.task => _taskDraft(dto.task, fallbackText),
       CaptureKind.event => _eventDraft(dto.event, fallbackText),
       CaptureKind.expense => _expenseDraft(dto.expense),
+      CaptureKind.study => _studyDraft(dto.study),
+      CaptureKind.vocab => _vocabDraft(dto.vocab),
     };
   }
 
@@ -132,6 +140,66 @@ class RemoteCaptureRepository implements CaptureRepository {
       );
     }
     return ExpenseCaptureDraft(List.unmodifiable(items));
+  }
+
+  StudyCaptureDraft _studyDraft(StudyDraftDto? dto) {
+    if (dto == null) {
+      throw const FormatException('The study draft is missing.');
+    }
+    final items = dto.items
+        .map((item) {
+          final raw = _nonNegativeIntOrNull(item.scoreRaw);
+          final max = _positiveIntOrNull(item.scoreMax);
+          return StudyCaptureItem(
+            skill: _fallback(item.skill, 'Other'),
+            kind: item.kind.toUpperCase() == 'MOCK'
+                ? StudyCaptureKind.mock
+                : StudyCaptureKind.practice,
+            occurredOn: _dateOrNull(item.occurredOn) ?? _today(),
+            notes: item.notes.trim(),
+            durationMinutes: _positiveIntOrNull(item.durationMinutes),
+            scoreRaw: raw,
+            scoreMax: max,
+            disciplineName: _textOrNull(item.disciplineName),
+          );
+        })
+        .toList(growable: false);
+    if (items.isEmpty) {
+      throw const FormatException('The study draft has no activities.');
+    }
+    return StudyCaptureDraft(List.unmodifiable(items));
+  }
+
+  VocabCaptureDraft _vocabDraft(VocabDraftDto? dto) {
+    if (dto == null) {
+      throw const FormatException('The vocabulary draft is missing.');
+    }
+    final items = dto.items
+        .map((item) {
+          final language = switch (item.language.toUpperCase()) {
+            'CHINESE' => VocabCaptureLanguage.chinese,
+            'ENGLISH' => VocabCaptureLanguage.english,
+            _ =>
+              _containsHan(item.front)
+                  ? VocabCaptureLanguage.chinese
+                  : VocabCaptureLanguage.english,
+          };
+          return VocabCaptureItem(
+            front: _fallback(item.front, '(word)'),
+            back: _fallback(item.back, '(meaning)'),
+            reading: item.reading.trim(),
+            partOfSpeech: item.partOfSpeech.trim(),
+            example: item.example.trim(),
+            language: language,
+            deck: item.deck.trim(),
+            disciplineName: _textOrNull(item.disciplineName),
+          );
+        })
+        .toList(growable: false);
+    if (items.isEmpty) {
+      throw const FormatException('The vocabulary draft has no cards.');
+    }
+    return VocabCaptureDraft(List.unmodifiable(items));
   }
 
   Future<SavedCapture> _saveNote(NoteCaptureDraft draft) async {
@@ -235,6 +303,83 @@ class RemoteCaptureRepository implements CaptureRepository {
     );
   }
 
+  Future<SavedCapture> _saveStudy(StudyCaptureDraft draft) async {
+    if (draft.items.isEmpty) {
+      throw const FormatException('Add at least one study activity.');
+    }
+    final items = <Map<String, Object?>>[];
+    for (final item in draft.items) {
+      _requireText(item.skill, 'Study skill');
+      if (_dateOrNull(item.occurredOn) == null) {
+        throw const FormatException('Study date must use yyyy-MM-dd.');
+      }
+      if (item.durationMinutes case final minutes?) {
+        if (minutes <= 0 || minutes > 1440) {
+          throw const FormatException(
+            'Study duration must be between 1 and 1,440 minutes.',
+          );
+        }
+      }
+      final raw = item.scoreRaw;
+      final max = item.scoreMax;
+      if ((raw == null) != (max == null) ||
+          (raw != null && max != null && (raw < 0 || max <= 0 || raw > max))) {
+        throw const FormatException(
+          'Study score needs a valid raw and maximum value.',
+        );
+      }
+      final disciplineId = await _disciplineId(item.disciplineName);
+      items.add({
+        'occurredOn': item.occurredOn,
+        'skill': item.skill.trim(),
+        'kind': item.kind.name.toUpperCase(),
+        'durationMinutes': ?item.durationMinutes,
+        'scoreRaw': ?raw,
+        'scoreMax': ?max,
+        if (item.notes.trim().isNotEmpty) 'notes': item.notes.trim(),
+        'disciplineId': ?disciplineId,
+      });
+    }
+    final created = await _api.createStudySessions({'items': items});
+    final ids = created.map(_requiredId).toList(growable: false);
+    if (ids.isEmpty) {
+      throw const FormatException('No study activity was saved.');
+    }
+    return SavedCapture(kind: CaptureKind.study, ids: ids, title: draft.title);
+  }
+
+  Future<SavedCapture> _saveVocab(VocabCaptureDraft draft) async {
+    if (draft.items.isEmpty) {
+      throw const FormatException('Add at least one vocabulary card.');
+    }
+    final items = <Map<String, Object?>>[];
+    for (final item in draft.items) {
+      _requireText(item.front, 'Vocabulary word');
+      _requireText(item.back, 'Vocabulary meaning');
+      final metadata = <String, String>{
+        if (item.reading.trim().isNotEmpty) 'reading': item.reading.trim(),
+        if (item.partOfSpeech.trim().isNotEmpty)
+          'partOfSpeech': item.partOfSpeech.trim(),
+        if (item.example.trim().isNotEmpty) 'example': item.example.trim(),
+      };
+      final disciplineId = await _disciplineId(item.disciplineName);
+      items.add({
+        'front': item.front.trim(),
+        'back': item.back.trim(),
+        if (metadata.isNotEmpty) 'metadata': jsonEncode(metadata),
+        'language': item.language.name.toUpperCase(),
+        if (item.deck.trim().isNotEmpty) 'deck': item.deck.trim(),
+        'disciplineId': ?disciplineId,
+      });
+    }
+    final created = await _api.createVocabCards({'items': items});
+    final ids = created.map(_requiredId).toList(growable: false);
+    if (ids.isEmpty) {
+      throw const FormatException('No vocabulary card was saved.');
+    }
+    return SavedCapture(kind: CaptureKind.vocab, ids: ids, title: draft.title);
+  }
+
   Future<String?> _disciplineId(String? name) async {
     if (name == null || name.trim().isEmpty) {
       return null;
@@ -293,6 +438,25 @@ class RemoteCaptureRepository implements CaptureRepository {
       return null;
     }
     return value.substring(0, 5);
+  }
+
+  int? _positiveIntOrNull(String value) {
+    final parsed = int.tryParse(value.trim());
+    return parsed != null && parsed > 0 ? parsed : null;
+  }
+
+  int? _nonNegativeIntOrNull(String value) {
+    final parsed = int.tryParse(value.trim());
+    return parsed != null && parsed >= 0 ? parsed : null;
+  }
+
+  String? _textOrNull(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  bool _containsHan(String value) {
+    return RegExp(r'[\u3400-\u4DBF\u4E00-\u9FFF]').hasMatch(value);
   }
 
   String _fallback(String value, String fallback) {

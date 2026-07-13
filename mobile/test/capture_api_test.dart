@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+import 'package:northstar/data/models/capture_dtos.dart';
 import 'package:northstar/data/services/authenticated_api_client.dart';
 import 'package:northstar/data/services/capture_api.dart';
 import 'package:northstar/domain/models/capture_models.dart';
@@ -76,6 +77,104 @@ void main() {
     expect(captured.method, 'DELETE');
     expect(captured.headers['authorization'], 'Bearer access-token');
   });
+
+  test('parses current study and vocabulary draft kinds', () async {
+    final responses = <String>[
+      jsonEncode({
+        'kind': 'STUDY',
+        'study': {
+          'items': [
+            {
+              'skill': 'Listening',
+              'kind': 'PRACTICE',
+              'durationMinutes': '25',
+              'scoreRaw': '18',
+              'scoreMax': '25',
+              'notes': 'HSK4',
+              'occurredOn': '2026-07-13',
+              'disciplineName': 'IELTS',
+            },
+          ],
+        },
+      }),
+      jsonEncode({
+        'kind': 'VOCAB',
+        'vocab': {
+          'items': [
+            {
+              'front': 'meticulous',
+              'back': 'tỉ mỉ',
+              'reading': '/məˈtɪkjələs/',
+              'partOfSpeech': 'adjective',
+              'example': '',
+              'language': 'ENGLISH',
+              'deck': 'IELTS',
+              'disciplineName': 'IELTS',
+            },
+          ],
+        },
+      }),
+    ];
+    final client = _HandlerClient(
+      (_) async => _response(responses.removeAt(0)),
+    );
+    final api = _api(client);
+
+    final study = await api.draftText(text: 'studied');
+    final vocab = await api.draftText(text: 'meticulous = tỉ mỉ');
+
+    expect(study.kind, CaptureKind.study);
+    expect(study.study?.items.single.scoreRaw, '18');
+    expect(vocab.kind, CaptureKind.vocab);
+    expect(vocab.vocab?.items.single.language, 'ENGLISH');
+  });
+
+  test('reports an explicit unsupported capture kind', () async {
+    final client = _HandlerClient((_) async {
+      return _response(jsonEncode({'kind': 'BOOKMARK'}));
+    });
+
+    await expectLater(
+      _api(client).draftText(text: 'save this'),
+      throwsA(
+        isA<UnsupportedCaptureKindException>().having(
+          (error) => error.kind,
+          'kind',
+          'BOOKMARK',
+        ),
+      ),
+    );
+  });
+
+  test(
+    'posts confirmed study and vocabulary batches to typed endpoints',
+    () async {
+      final captured = <http.Request>[];
+      final client = _HandlerClient((request) async {
+        captured.add(request as http.Request);
+        return _response('[]');
+      });
+      final api = _api(client);
+
+      await api.createStudySessions({
+        'items': [
+          {'skill': 'Listening', 'occurredOn': '2026-07-13'},
+        ],
+      });
+      await api.createVocabCards({
+        'items': [
+          {'front': 'meticulous', 'back': 'tỉ mỉ', 'language': 'ENGLISH'},
+        ],
+      });
+
+      expect(captured.map((request) => request.url.path), [
+        '/api/study/sessions',
+        '/api/study/vocab',
+      ]);
+      expect((jsonDecode(captured.first.body) as Map)['items'], hasLength(1));
+      expect(captured.every((request) => request.method == 'POST'), isTrue);
+    },
+  );
 }
 
 CaptureApi _api(http.Client client) {

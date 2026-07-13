@@ -130,7 +130,8 @@ class _CaptureInput extends StatelessWidget {
                 ),
                 const SizedBox(height: NorthstarSpacing.xs),
                 Text(
-                  'Northstar will draft a task, note, event, or expense. '
+                  'Northstar will draft a task, note, event, expense, study '
+                  'log, or vocabulary card. '
                   'You review it before anything is saved.',
                   style: NorthstarTextStyles.body(context).copyWith(
                     color: NorthstarColors.secondaryText.resolveFrom(context),
@@ -360,6 +361,14 @@ class _DraftEditor extends StatelessWidget {
         key: ValueKey('expense-${viewModel.draftVersion}'),
         viewModel: viewModel,
         draft: draft as ExpenseCaptureDraft,
+      ),
+      StudyCaptureDraft() => _StudyDraftSummary(
+        key: ValueKey('study-${viewModel.draftVersion}'),
+        draft: draft as StudyCaptureDraft,
+      ),
+      VocabCaptureDraft() => _VocabDraftSummary(
+        key: ValueKey('vocab-${viewModel.draftVersion}'),
+        draft: draft as VocabCaptureDraft,
       ),
     };
   }
@@ -595,6 +604,80 @@ class _ExpenseItemEditor extends StatelessWidget {
   }
 }
 
+class _StudyDraftSummary extends StatelessWidget {
+  const _StudyDraftSummary({super.key, required this.draft});
+
+  final StudyCaptureDraft draft;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var index = 0; index < draft.items.length; index += 1)
+          CupertinoFormSection.insetGrouped(
+            key: Key('capture-study-item-$index'),
+            header: Text('ACTIVITY ${index + 1}'),
+            children: [
+              CupertinoFormRow(
+                prefix: const Text('Skill'),
+                child: Text(draft.items[index].skill),
+              ),
+              CupertinoFormRow(
+                prefix: const Text('Date'),
+                child: Text(draft.items[index].occurredOn),
+              ),
+              if (draft.items[index].durationMinutes case final minutes?)
+                CupertinoFormRow(
+                  prefix: const Text('Duration'),
+                  child: Text('$minutes minutes'),
+                ),
+              if (draft.items[index].scoreRaw case final raw?)
+                if (draft.items[index].scoreMax case final max?)
+                  CupertinoFormRow(
+                    prefix: const Text('Score'),
+                    child: Text('$raw/$max'),
+                  ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+class _VocabDraftSummary extends StatelessWidget {
+  const _VocabDraftSummary({super.key, required this.draft});
+
+  final VocabCaptureDraft draft;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var index = 0; index < draft.items.length; index += 1)
+          CupertinoFormSection.insetGrouped(
+            key: Key('capture-vocab-item-$index'),
+            header: Text('CARD ${index + 1}'),
+            children: [
+              CupertinoFormRow(
+                prefix: const Text('Word'),
+                child: Text(draft.items[index].front),
+              ),
+              CupertinoFormRow(
+                prefix: const Text('Meaning'),
+                child: Text(draft.items[index].back),
+              ),
+              if (draft.items[index].reading.isNotEmpty)
+                CupertinoFormRow(
+                  prefix: const Text('Reading'),
+                  child: Text(draft.items[index].reading),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+}
+
 class _CaptureSaved extends StatelessWidget {
   const _CaptureSaved({super.key, required this.viewModel});
 
@@ -755,6 +838,8 @@ String _kindLabel(CaptureKind kind) {
     CaptureKind.task => 'Task',
     CaptureKind.event => 'Event',
     CaptureKind.expense => 'Expense',
+    CaptureKind.study => 'Study',
+    CaptureKind.vocab => 'Vocab',
   };
 }
 
@@ -764,6 +849,8 @@ IconData _kindIcon(CaptureKind kind) {
     CaptureKind.task => CupertinoIcons.check_mark_circled,
     CaptureKind.event => CupertinoIcons.calendar,
     CaptureKind.expense => CupertinoIcons.money_dollar_circle,
+    CaptureKind.study => CupertinoIcons.book,
+    CaptureKind.vocab => CupertinoIcons.tag,
   };
 }
 

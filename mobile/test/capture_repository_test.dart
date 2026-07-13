@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:northstar/data/models/capture_dtos.dart';
 import 'package:northstar/data/repositories/capture_repository.dart';
@@ -84,6 +86,124 @@ void main() {
       ]);
     },
   );
+
+  test('maps, saves, and fully undoes a study batch', () async {
+    final api = _FakeCaptureDataSource(
+      draft: const CaptureDraftDto(
+        kind: CaptureKind.study,
+        study: StudyDraftDto([
+          StudyItemDto(
+            skill: 'Listening',
+            kind: 'PRACTICE',
+            durationMinutes: '25',
+            scoreRaw: '18',
+            scoreMax: '25',
+            notes: 'HSK4',
+            occurredOn: '2026-07-13',
+            disciplineName: 'IELTS',
+          ),
+          StudyItemDto(
+            skill: 'Writing',
+            kind: 'MOCK',
+            durationMinutes: '40',
+            scoreRaw: '',
+            scoreMax: '',
+            notes: 'Task 2',
+            occurredOn: '2026-07-13',
+            disciplineName: '',
+          ),
+        ]),
+      ),
+    );
+    final repository = RemoteCaptureRepository(api);
+
+    final draft = await repository.draftText(text: 'Study log');
+    final saved = await repository.save(draft);
+    await repository.undo(saved);
+
+    expect(draft, isA<StudyCaptureDraft>());
+    final items = api.createdStudySessions?['items'] as List;
+    expect(items, hasLength(2));
+    expect((items.first as Map)['durationMinutes'], 25);
+    expect((items.first as Map)['disciplineId'], 'discipline-1');
+    expect((items.last as Map)['kind'], 'MOCK');
+    expect(saved.ids, ['study-1', 'study-2']);
+    expect(api.deletedPaths, [
+      '/api/study/sessions/study-1',
+      '/api/study/sessions/study-2',
+    ]);
+  });
+
+  test('maps, saves, and fully undoes vocabulary cards', () async {
+    final api = _FakeCaptureDataSource(
+      draft: const CaptureDraftDto(
+        kind: CaptureKind.vocab,
+        vocab: VocabDraftDto([
+          VocabItemDto(
+            front: '磨蹭',
+            back: 'lề mề',
+            reading: 'mócèng',
+            partOfSpeech: 'verb',
+            example: '',
+            language: '',
+            deck: 'HSK4',
+            disciplineName: 'IELTS',
+          ),
+        ]),
+      ),
+    );
+    final repository = RemoteCaptureRepository(api);
+
+    final draft = await repository.draftText(text: '磨蹭 = lề mề');
+    final saved = await repository.save(draft);
+    await repository.undo(saved);
+
+    expect(draft, isA<VocabCaptureDraft>());
+    final requestItems = api.createdVocabCards?['items'] as List;
+    final request = requestItems.single as Map;
+    expect(request['language'], 'CHINESE');
+    expect(request['disciplineId'], 'discipline-1');
+    expect(jsonDecode(request['metadata']! as String), {
+      'reading': 'mócèng',
+      'partOfSpeech': 'verb',
+    });
+    expect(saved.ids, ['vocab-1']);
+    expect(api.deletedPaths, ['/api/study/vocab/vocab-1']);
+  });
+
+  test('rejects an incomplete study score before persistence', () async {
+    final api = _FakeCaptureDataSource(
+      draft: const CaptureDraftDto(
+        kind: CaptureKind.study,
+        study: StudyDraftDto([
+          StudyItemDto(
+            skill: 'Reading',
+            kind: 'PRACTICE',
+            durationMinutes: '',
+            scoreRaw: '18',
+            scoreMax: '',
+            notes: '',
+            occurredOn: '2026-07-13',
+            disciplineName: '',
+          ),
+        ]),
+      ),
+    );
+    final repository = RemoteCaptureRepository(api);
+    final draft = await repository.draftText(text: 'Reading 18');
+
+    await expectLater(
+      repository.save(draft),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('raw and maximum'),
+        ),
+      ),
+    );
+    expect(api.createCalls, 0);
+  });
 }
 
 class _FakeCaptureDataSource implements CaptureDataSource {
@@ -93,6 +213,8 @@ class _FakeCaptureDataSource implements CaptureDataSource {
   int createCalls = 0;
   Map<String, Object?>? createdTask;
   Map<String, Object?>? createdTransactions;
+  Map<String, Object?>? createdStudySessions;
+  Map<String, Object?>? createdVocabCards;
   final List<String> deletedPaths = [];
 
   @override
@@ -125,6 +247,29 @@ class _FakeCaptureDataSource implements CaptureDataSource {
     return [
       {'id': 'transaction-1'},
       {'id': 'transaction-2'},
+    ];
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> createStudySessions(
+    Map<String, Object?> body,
+  ) async {
+    createCalls += 1;
+    createdStudySessions = body;
+    return [
+      {'id': 'study-1'},
+      {'id': 'study-2'},
+    ];
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> createVocabCards(
+    Map<String, Object?> body,
+  ) async {
+    createCalls += 1;
+    createdVocabCards = body;
+    return [
+      {'id': 'vocab-1'},
     ];
   }
 

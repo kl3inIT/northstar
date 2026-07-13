@@ -27,6 +27,14 @@ abstract interface class CaptureDataSource {
     Map<String, Object?> body,
   );
 
+  Future<List<Map<String, Object?>>> createStudySessions(
+    Map<String, Object?> body,
+  );
+
+  Future<List<Map<String, Object?>>> createVocabCards(
+    Map<String, Object?> body,
+  );
+
   Future<void> delete(String path);
 }
 
@@ -103,9 +111,30 @@ class CaptureApi implements CaptureDataSource {
   @override
   Future<List<Map<String, Object?>>> createTransactions(
     Map<String, Object?> body,
+  ) {
+    return _postObjectList('/api/finance', body);
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> createStudySessions(
+    Map<String, Object?> body,
+  ) {
+    return _postObjectList('/api/study/sessions', body);
+  }
+
+  @override
+  Future<List<Map<String, Object?>>> createVocabCards(
+    Map<String, Object?> body,
+  ) {
+    return _postObjectList('/api/study/vocab', body);
+  }
+
+  Future<List<Map<String, Object?>>> _postObjectList(
+    String path,
+    Map<String, Object?> body,
   ) async {
     final response = await _authenticated.send((token) {
-      return _jsonRequest('POST', '/api/finance', token, body);
+      return _jsonRequest('POST', path, token, body);
     });
     return _readObjectList(response);
   }
