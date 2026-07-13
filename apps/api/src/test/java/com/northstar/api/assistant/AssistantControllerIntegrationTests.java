@@ -171,6 +171,33 @@ class AssistantControllerIntegrationTests {
     }
 
     @Test
+    void failedTurnKeepsItsIdempotencyClaim() throws Exception {
+        when(chatModel.getOptions()).thenReturn(ChatOptions.builder().build());
+        when(chatModel.stream(any(Prompt.class)))
+                .thenReturn(Flux.error(new IllegalStateException("provider failed")));
+
+        String key = UUID.randomUUID().toString();
+        HttpRequest request = HttpRequest.newBuilder(
+                        URI.create("http://localhost:" + port + "/api/assistant/chat"))
+                .header("Content-Type", "application/json")
+                .header("Idempotency-Key", key)
+                .POST(HttpRequest.BodyPublishers.ofString("""
+                        {"message":"run an action","conversationId":"failed-turn-convo"}"""))
+                .build();
+
+        HttpResponse<String> failed = http.send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> duplicate = http.send(request, HttpResponse.BodyHandlers.ofString());
+
+        assertThat(failed.statusCode()).isEqualTo(200);
+        assertThat(duplicate.statusCode()).isEqualTo(409);
+        verify(chatModel, times(1)).stream(any(Prompt.class));
+        assertThat(jdbc.sql("""
+                SELECT COUNT(*) FROM northstar_assistant_turn
+                 WHERE conversation_id = 'failed-turn-convo'
+                """).query(Long.class).single()).isEqualTo(1L);
+    }
+
+    @Test
     void historyRehydratesPersistedToolParts() throws Exception {
         Instant now = Instant.now();
         jdbc.sql("""

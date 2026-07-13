@@ -373,7 +373,11 @@ class AssistantController {
      * Claims a client action before any model or tool can run. The header is
      * optional for older clients; those receive a fresh server key and keep the
      * pre-idempotency behavior. A repeated supplied key is a conflict rather
-     * than a second streamed turn.
+     * than a second streamed turn. Claims deliberately survive route, model,
+     * tool, stream, and client failures: a tool may have committed its side
+     * effect before the failure became visible, so releasing the key would make
+     * a transport retry unsafe. An explicit retry is a new user action and uses
+     * a new key. Deleting the conversation removes its claims.
      */
     private String claimTurn(String conversationId, String requestedKey) {
         String clientTurnId = StringUtils.hasText(requestedKey)

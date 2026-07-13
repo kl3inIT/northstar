@@ -655,8 +655,8 @@ function AssistantChat({
         throw new Error('upload failed') // keeps the composer content for retry
       }
       setIsUploading(false)
-      setText('')
       await sendMessage({ text: trimmed, files: uploaded })
+      setText('')
     } finally {
       submitLock.current = false
       setIsUploading(false)
