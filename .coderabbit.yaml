@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+reviews:
+  auto_review:
+    drafts: true
+    auto_pause_after_reviewed_commits: 10
+    ignore_title_keywords:
+      - "[skip review]"
+      - "DO NOT MERGE"
+  path_filters:
+    - "!contracts/openapi.json"
+    - "!web/src/lib/hey-api/**"
+
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      - ".agents/rules/*.md"
+      - "docs/conventions.md"
+      - "docs/guidelines/agent-safety.md"
+      - "docs/guidelines/testing-harness.md"
