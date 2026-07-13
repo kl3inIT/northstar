@@ -1,5 +1,9 @@
 # Study Audio Practice — Plan
 
+Completed on 2026-07-13. All four blocks, local gates, clean-schema boot, live
+9Router/Azure verification, and the Playwright walkthrough passed; temporary
+fixtures were removed during closeout.
+
 Execute in order. End each block with the relevant local static gates and a
 logical conventional commit.
 
