@@ -62,6 +62,26 @@ For user-facing or flow changes:
 
 Context-load tests do not prove a new view renders or a workflow works.
 
+### Web Test Pyramid
+
+Keep the web suite intentionally small:
+
+- `pnpm -C web test` runs Vitest in Node for deterministic domain/view logic.
+  Unit tests are colocated as `*.test.ts` beside their source; do not duplicate
+  browser or third-party component behavior there.
+- `pnpm -C web test:e2e` runs committed Playwright specs under
+  `web/test/e2e/`. Add a spec only for a critical user-visible flow that types,
+  layout checks, or a DOM simulator cannot prove. Mock external/provider APIs;
+  live-provider verification remains an explicit manual gate.
+- Prefer role/label locators and web-first assertions. Keep tests isolated and
+  fail on unexpected API calls or browser errors.
+- Do not add a coverage percentage quota. Add assertions for a concrete
+  regression or business invariant, not to increase a number.
+
+CI installs only Chromium and records a trace only on the first retry. This
+keeps the browser gate useful without making every web change pay for a
+multi-browser or always-on artifact suite.
+
 ## Completion Evidence
 
 When reporting completion, include:

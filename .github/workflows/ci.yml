@@ -58,3 +58,14 @@ jobs:
       - run: pnpm gen:api
       - run: pnpm test
       - run: pnpm build
+      - name: Install Playwright Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run critical browser regression
+        run: pnpm test:e2e
+      - name: Upload Playwright failure report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: playwright-report
+          path: output/playwright
+          retention-days: 7
