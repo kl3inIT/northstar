@@ -121,9 +121,9 @@ class TodayViewModel extends ChangeNotifier {
     if (_pendingTaskIds.contains(id)) {
       return;
     }
-    final originalToday = _todayTasks;
-    final originalUpcoming = _upcomingTasks;
-    if (_findTask(id) == null) {
+    final originalTodayTask = _findTaskIn(_todayTasks, id);
+    final originalUpcomingTask = _findTaskIn(_upcomingTasks, id);
+    if (originalTodayTask == null && originalUpcomingTask == null) {
       return;
     }
     _pendingTaskIds.add(id);
@@ -135,6 +135,8 @@ class TodayViewModel extends ChangeNotifier {
       id,
       (task) => task.withDone(done),
     );
+    final optimisticTodayTask = _findTaskIn(_todayTasks, id);
+    final optimisticUpcomingTask = _findTaskIn(_upcomingTasks, id);
     notifyListeners();
     try {
       final saved = await _repository.setTaskDone(
@@ -146,8 +148,18 @@ class TodayViewModel extends ChangeNotifier {
       _upcomingTasks = _replaceTask(_upcomingTasks, id, (_) => saved);
       _telemetry.record(done ? 'task.completed' : 'task.reopened');
     } on Object catch (error) {
-      _todayTasks = originalToday;
-      _upcomingTasks = originalUpcoming;
+      _todayTasks = _restoreTask(
+        _todayTasks,
+        id,
+        expected: optimisticTodayTask,
+        original: originalTodayTask,
+      );
+      _upcomingTasks = _restoreTask(
+        _upcomingTasks,
+        id,
+        expected: optimisticUpcomingTask,
+        original: originalUpcomingTask,
+      );
       _actionError = _messageFor(error);
       if (rememberFailure) {
         _retryAction = () => _setTaskDone(id, done, rememberFailure: false);
@@ -174,7 +186,7 @@ class TodayViewModel extends ChangeNotifier {
     if (index < 0) {
       return;
     }
-    final original = _habits;
+    final original = _habits[index];
     final optimisticState = switch (checkIn) {
       TodayHabitCheckIn.done => TodayHabitState.done,
       TodayHabitCheckIn.excused => TodayHabitState.excused,
@@ -188,6 +200,7 @@ class TodayViewModel extends ChangeNotifier {
       id,
       (habit) => habit.withOptimisticState(optimisticState),
     );
+    final optimistic = _findHabitIn(_habits, id);
     notifyListeners();
     try {
       final date = _dateString(_clock());
@@ -209,7 +222,12 @@ class TodayViewModel extends ChangeNotifier {
         checkIn == null ? 'habit.cleared' : 'habit.${checkIn.name}',
       );
     } on Object catch (error) {
-      _habits = original;
+      _habits = _restoreHabit(
+        _habits,
+        id,
+        expected: optimistic,
+        original: original,
+      );
       _actionError = _messageFor(error);
       if (rememberFailure) {
         _retryAction = () =>
@@ -236,15 +254,19 @@ class TodayViewModel extends ChangeNotifier {
   }
 
   TodayTask? _findTask(String id) {
-    for (final task in _todayTasks) {
-      if (task.id == id) {
-        return task;
-      }
+    return _findTaskIn(_todayTasks, id) ?? _findTaskIn(_upcomingTasks, id);
+  }
+
+  TodayTask? _findTaskIn(List<TodayTask> source, String id) {
+    for (final task in source) {
+      if (task.id == id) return task;
     }
-    for (final task in _upcomingTasks) {
-      if (task.id == id) {
-        return task;
-      }
+    return null;
+  }
+
+  TodayHabit? _findHabitIn(List<TodayHabit> source, String id) {
+    for (final habit in source) {
+      if (habit.id == id) return habit;
     }
     return null;
   }
@@ -270,6 +292,35 @@ class TodayViewModel extends ChangeNotifier {
   ) {
     return List.unmodifiable(
       source.map((habit) => habit.id == id ? update(habit) : habit),
+    );
+  }
+
+  List<TodayTask> _restoreTask(
+    List<TodayTask> source,
+    String id, {
+    required TodayTask? expected,
+    required TodayTask? original,
+  }) {
+    if (expected == null || original == null) return source;
+    return List.unmodifiable(
+      source.map(
+        (task) => task.id == id && identical(task, expected) ? original : task,
+      ),
+    );
+  }
+
+  List<TodayHabit> _restoreHabit(
+    List<TodayHabit> source,
+    String id, {
+    required TodayHabit? expected,
+    required TodayHabit original,
+  }) {
+    if (expected == null) return source;
+    return List.unmodifiable(
+      source.map(
+        (habit) =>
+            habit.id == id && identical(habit, expected) ? original : habit,
+      ),
     );
   }
 

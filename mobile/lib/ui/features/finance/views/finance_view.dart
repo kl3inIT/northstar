@@ -50,7 +50,8 @@ class _FinanceViewState extends State<FinanceView> {
   }
 
   Widget _buildBody(BuildContext context) {
-    if (_viewModel.phase == FinancePhase.loading) {
+    final glance = _viewModel.glance;
+    if (_viewModel.phase == FinancePhase.loading && glance == null) {
       return const Center(
         child: CupertinoActivityIndicator(
           key: Key('finance-loading-indicator'),
@@ -58,7 +59,7 @@ class _FinanceViewState extends State<FinanceView> {
         ),
       );
     }
-    if (_viewModel.phase == FinancePhase.error) {
+    if (_viewModel.phase == FinancePhase.error && glance == null) {
       return _FinanceMessage(
         key: const Key('finance-load-error'),
         icon: CupertinoIcons.wifi_exclamationmark,
@@ -67,7 +68,6 @@ class _FinanceViewState extends State<FinanceView> {
         onRetry: _viewModel.load,
       );
     }
-    final glance = _viewModel.glance;
     if (glance == null) return const SizedBox.shrink();
     return _FinanceContent(glance: glance, onRefresh: _viewModel.load);
   }

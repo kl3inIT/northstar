@@ -307,6 +307,9 @@ class RemoteCaptureRepository implements CaptureRepository {
     if (draft.items.isEmpty) {
       throw const FormatException('Add at least one study activity.');
     }
+    final disciplineIds = await _disciplineIdsFor(
+      draft.items.map((item) => item.disciplineName),
+    );
     final items = <Map<String, Object?>>[];
     for (final item in draft.items) {
       _requireText(item.skill, 'Study skill');
@@ -328,7 +331,7 @@ class RemoteCaptureRepository implements CaptureRepository {
           'Study score needs a valid raw and maximum value.',
         );
       }
-      final disciplineId = await _disciplineId(item.disciplineName);
+      final disciplineId = disciplineIds[item.disciplineName];
       items.add({
         'occurredOn': item.occurredOn,
         'skill': item.skill.trim(),
@@ -352,6 +355,9 @@ class RemoteCaptureRepository implements CaptureRepository {
     if (draft.items.isEmpty) {
       throw const FormatException('Add at least one vocabulary card.');
     }
+    final disciplineIds = await _disciplineIdsFor(
+      draft.items.map((item) => item.disciplineName),
+    );
     final items = <Map<String, Object?>>[];
     for (final item in draft.items) {
       _requireText(item.front, 'Vocabulary word');
@@ -362,7 +368,7 @@ class RemoteCaptureRepository implements CaptureRepository {
           'partOfSpeech': item.partOfSpeech.trim(),
         if (item.example.trim().isNotEmpty) 'example': item.example.trim(),
       };
-      final disciplineId = await _disciplineId(item.disciplineName);
+      final disciplineId = disciplineIds[item.disciplineName];
       items.add({
         'front': item.front.trim(),
         'back': item.back.trim(),
@@ -391,6 +397,25 @@ class RemoteCaptureRepository implements CaptureRepository {
       }
     }
     return null;
+  }
+
+  Future<Map<String, String>> _disciplineIdsFor(Iterable<String?> names) async {
+    final requested = names
+        .whereType<String>()
+        .map((name) => name.trim())
+        .where((name) => name.isNotEmpty)
+        .toSet();
+    if (requested.isEmpty) return const {};
+
+    final resolved = <String, String>{};
+    for (final discipline in await _api.listDisciplines()) {
+      final name = discipline['name'];
+      final id = discipline['id'];
+      if (name is String && id is String && requested.contains(name)) {
+        resolved[name] = id;
+      }
+    }
+    return resolved;
   }
 
   String _requiredId(Map<String, Object?> json) {

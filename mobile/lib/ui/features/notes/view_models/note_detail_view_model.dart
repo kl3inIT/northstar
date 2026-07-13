@@ -32,18 +32,10 @@ class NoteDetailViewModel extends ChangeNotifier {
     try {
       _note = await _repository.get(slug);
       _phase = NoteDetailPhase.ready;
-    } on Object catch (error) {
+    } on Exception {
       _phase = NoteDetailPhase.error;
-      _errorMessage = _messageFor(error);
+      _errorMessage = 'This note is unavailable.';
     }
     notifyListeners();
-  }
-
-  String _messageFor(Object error) {
-    final text = error.toString().replaceFirst(
-      RegExp(r'^\w+Exception:\s*'),
-      '',
-    );
-    return text.isEmpty ? 'This note is unavailable.' : text;
   }
 }

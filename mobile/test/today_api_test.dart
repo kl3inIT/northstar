@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:northstar/data/services/authenticated_api_client.dart';
+import 'package:northstar/data/services/authenticated_json_client.dart';
 import 'package:northstar/data/services/today_api.dart';
 import 'package:northstar/domain/models/today_models.dart';
 
@@ -86,17 +88,39 @@ void main() {
     expect(captured[1].url.path, '/api/habits/habit-1/check-ins/2026-07-13');
     expect(jsonDecode(captured[1].body), {'status': 'DONE'});
   });
+
+  test('times out when a JSON response body never completes', () async {
+    final body = StreamController<List<int>>();
+    addTearDown(body.close);
+    final client = _HandlerClient(
+      (_) async => http.StreamedResponse(body.stream, 200),
+    );
+
+    await expectLater(
+      _api(
+        client,
+        timeout: const Duration(milliseconds: 20),
+      ).listTodayTasks('Asia/Bangkok'),
+      throwsA(isA<AuthenticatedJsonTimeoutException>()),
+    );
+  });
 }
 
-TodayApi _api(http.Client client) {
+TodayApi _api(
+  http.Client client, {
+  Duration timeout = const Duration(seconds: 30),
+}) {
   return TodayApi(
-    authenticatedClient: AuthenticatedApiClient(
-      client: client,
-      accessToken: () => 'access-token',
-      refreshAccessToken: () async => null,
-      onUnauthorized: () {},
+    AuthenticatedJsonClient(
+      authenticatedClient: AuthenticatedApiClient(
+        client: client,
+        accessToken: () => 'access-token',
+        refreshAccessToken: () async => null,
+        onUnauthorized: () {},
+      ),
+      baseUrl: Uri.parse('https://northstar.example'),
+      timeout: timeout,
     ),
-    baseUrl: Uri.parse('https://northstar.example'),
   );
 }
 

@@ -183,17 +183,7 @@ class _NorthstarAppState extends State<NorthstarApp> {
   }
 
   TodayRepository _createTodayRepository() {
-    return RemoteTodayRepository(
-      TodayApi(
-        authenticatedClient: AuthenticatedApiClient(
-          client: _client!,
-          accessToken: () => _authRepository.accessToken,
-          refreshAccessToken: _authRepository.refreshAccessToken,
-          onUnauthorized: _auth.expireSession,
-        ),
-        baseUrl: Uri.parse(_configuredBaseUrl),
-      ),
-    );
+    return RemoteTodayRepository(TodayApi(_createJsonClient()));
   }
 
   StudyReviewRepository _createStudyRepository() {

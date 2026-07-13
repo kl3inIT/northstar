@@ -67,8 +67,8 @@ class HabitsViewModel extends ChangeNotifier {
 
   Future<void> setCheckIn(String id, TodayHabitCheckIn? checkIn) async {
     if (_pendingIds.contains(id)) return;
-    final original = _habits;
-    if (!original.any((habit) => habit.id == id)) return;
+    final original = _find(id);
+    if (original == null) return;
     final optimistic = switch (checkIn) {
       TodayHabitCheckIn.done => TodayHabitState.done,
       TodayHabitCheckIn.excused => TodayHabitState.excused,
@@ -77,6 +77,7 @@ class HabitsViewModel extends ChangeNotifier {
     _pendingIds.add(id);
     _errorMessage = null;
     _habits = _replace(id, (habit) => habit.withOptimisticState(optimistic));
+    final optimisticHabit = _find(id);
     notifyListeners();
     try {
       final timezone = _timezone ??= await _timezoneProvider
@@ -99,7 +100,7 @@ class HabitsViewModel extends ChangeNotifier {
         checkIn == null ? 'habit.cleared' : 'habit.${checkIn.name}',
       );
     } on Object catch (error) {
-      _habits = original;
+      _habits = _restore(id, expected: optimisticHabit, original: original);
       _errorMessage = _messageFor(error);
     } finally {
       _pendingIds.remove(id);
@@ -110,6 +111,27 @@ class HabitsViewModel extends ChangeNotifier {
   List<TodayHabit> _replace(String id, TodayHabit Function(TodayHabit) update) {
     return List.unmodifiable(
       _habits.map((habit) => habit.id == id ? update(habit) : habit),
+    );
+  }
+
+  TodayHabit? _find(String id) {
+    for (final habit in _habits) {
+      if (habit.id == id) return habit;
+    }
+    return null;
+  }
+
+  List<TodayHabit> _restore(
+    String id, {
+    required TodayHabit? expected,
+    required TodayHabit original,
+  }) {
+    if (expected == null) return _habits;
+    return List.unmodifiable(
+      _habits.map(
+        (habit) =>
+            habit.id == id && identical(habit, expected) ? original : habit,
+      ),
     );
   }
 

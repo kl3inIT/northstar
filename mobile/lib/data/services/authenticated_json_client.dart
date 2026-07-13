@@ -7,14 +7,20 @@ class AuthenticatedJsonClient {
   factory AuthenticatedJsonClient({
     required AuthenticatedApiClient authenticatedClient,
     required Uri baseUrl,
+    Duration timeout = const Duration(seconds: 30),
   }) {
-    return AuthenticatedJsonClient._(authenticatedClient, baseUrl);
+    return AuthenticatedJsonClient._(authenticatedClient, baseUrl, timeout);
   }
 
-  const AuthenticatedJsonClient._(this._authenticated, this._baseUrl);
+  const AuthenticatedJsonClient._(
+    this._authenticated,
+    this._baseUrl,
+    this._timeout,
+  ) : assert(_timeout > Duration.zero);
 
   final AuthenticatedApiClient _authenticated;
   final Uri _baseUrl;
+  final Duration _timeout;
 
   Future<List<Map<String, Object?>>> getList(
     String path, {
@@ -68,6 +74,21 @@ class AuthenticatedJsonClient {
     );
   }
 
+  Future<Map<String, Object?>> patchObject(
+    String path, {
+    required Map<String, Object?> body,
+    Map<String, String>? query,
+    String? timezone,
+  }) {
+    return _writeObject(
+      'PATCH',
+      path,
+      body: body,
+      query: query,
+      timezone: timezone,
+    );
+  }
+
   Future<Map<String, Object?>> deleteObject(
     String path, {
     Map<String, String>? query,
@@ -89,6 +110,25 @@ class AuthenticatedJsonClient {
   }
 
   Future<Object?> _send(
+    String method,
+    String path, {
+    Map<String, String>? query,
+    String? timezone,
+    Map<String, Object?>? body,
+  }) {
+    return _sendWithoutTimeout(
+      method,
+      path,
+      query: query,
+      timezone: timezone,
+      body: body,
+    ).timeout(
+      _timeout,
+      onTimeout: () => throw const AuthenticatedJsonTimeoutException(),
+    );
+  }
+
+  Future<Object?> _sendWithoutTimeout(
     String method,
     String path, {
     Map<String, String>? query,
@@ -161,4 +201,11 @@ class AuthenticatedJsonException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class AuthenticatedJsonTimeoutException implements Exception {
+  const AuthenticatedJsonTimeoutException();
+
+  @override
+  String toString() => 'Northstar took too long to respond. Try again.';
 }

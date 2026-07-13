@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:northstar/data/repositories/finance_repository.dart';
@@ -113,6 +115,34 @@ void main() {
     await _pumpAsync(tester);
     expect(find.byKey(const Key('finance-expanded-layout')), findsOneWidget);
   });
+
+  testWidgets('keeps Finance content visible during a failed refresh', (
+    tester,
+  ) async {
+    _setWindowSize(tester, const Size(390, 844));
+    final repository = _FinanceViewRepository();
+    final viewModel = FinanceViewModel(
+      repository: repository,
+      timezoneProvider: _TimezoneProvider(),
+      clock: () => DateTime(2026, 7, 13),
+    );
+    await tester.pumpWidget(
+      CupertinoApp(home: FinanceView(viewModel: viewModel)),
+    );
+    await _pumpAsync(tester);
+
+    repository.next = Completer<FinanceGlance>();
+    final refresh = viewModel.load();
+    await tester.pump();
+    expect(find.byKey(const Key('finance-compact-layout')), findsOneWidget);
+    expect(find.byKey(const Key('finance-loading-indicator')), findsNothing);
+
+    repository.next!.completeError(Exception('Offline'));
+    await refresh;
+    await tester.pump();
+    expect(find.byKey(const Key('finance-compact-layout')), findsOneWidget);
+    expect(find.byKey(const Key('finance-load-error')), findsNothing);
+  });
 }
 
 class _TimezoneProvider implements DeviceTimezoneProvider {
@@ -155,12 +185,17 @@ class _FinanceViewRepository implements FinanceRepository {
   _FinanceViewRepository({this.failures = 0});
 
   int failures;
+  Completer<FinanceGlance>? next;
 
   @override
   Future<FinanceGlance> glance({
     required String month,
     required String timezone,
   }) async {
+    final pending = next;
+    if (pending != null) {
+      return pending.future;
+    }
     if (failures > 0) {
       failures -= 1;
       throw StateError('Offline');

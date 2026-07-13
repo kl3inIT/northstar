@@ -80,11 +80,38 @@ void main() {
     expect(repository.timezone, 'Asia/Bangkok');
     expect(viewModel.glance?.summary.net, 5000000);
   });
+
+  test('refreshes Finance with the current device timezone', () async {
+    final repository = _FinanceRepository();
+    final viewModel = FinanceViewModel(
+      repository: repository,
+      timezoneProvider: _SequenceTimezoneProvider([
+        'Asia/Bangkok',
+        'Asia/Tokyo',
+      ]),
+      clock: () => DateTime(2026, 7, 13),
+    );
+
+    await viewModel.initialize();
+    await viewModel.load();
+
+    expect(repository.timezones, ['Asia/Bangkok', 'Asia/Tokyo']);
+  });
 }
 
 class _TimezoneProvider implements DeviceTimezoneProvider {
   @override
   Future<String> currentIdentifier() async => 'Asia/Bangkok';
+}
+
+class _SequenceTimezoneProvider implements DeviceTimezoneProvider {
+  _SequenceTimezoneProvider(this._values);
+
+  final List<String> _values;
+  int _index = 0;
+
+  @override
+  Future<String> currentIdentifier() async => _values[_index++];
 }
 
 class _StudyRepository implements StudyReviewRepository {
@@ -124,6 +151,7 @@ class _StudyRepository implements StudyReviewRepository {
 class _FinanceRepository implements FinanceRepository {
   String? month;
   String? timezone;
+  final List<String> timezones = [];
 
   @override
   Future<FinanceGlance> glance({
@@ -132,6 +160,7 @@ class _FinanceRepository implements FinanceRepository {
   }) async {
     this.month = month;
     this.timezone = timezone;
+    timezones.add(timezone);
     return _glance();
   }
 }

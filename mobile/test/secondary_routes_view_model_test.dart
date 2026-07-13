@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:northstar/data/repositories/calendar_repository.dart';
 import 'package:northstar/data/repositories/habits_repository.dart';
@@ -64,6 +66,24 @@ void main() {
     },
   );
 
+  test('Habits rollback preserves a concurrent check-in', () async {
+    final repository = _ConcurrentHabitsRepository();
+    final viewModel = HabitsViewModel(
+      repository: repository,
+      timezoneProvider: _TimezoneProvider(),
+      clock: () => DateTime(2026, 7, 13, 9),
+    );
+    await viewModel.initialize();
+
+    final failed = viewModel.setCheckIn('habit-1', TodayHabitCheckIn.done);
+    await viewModel.setCheckIn('habit-2', TodayHabitCheckIn.done);
+    repository.failure.completeError(Exception('Check-in failed'));
+    await failed;
+
+    expect(_habitById(viewModel.habits, 'habit-1').state, TodayHabitState.open);
+    expect(_habitById(viewModel.habits, 'habit-2').state, TodayHabitState.done);
+  });
+
   test(
     'Note detail exposes a stable retryable error and then content',
     () async {
@@ -75,7 +95,7 @@ void main() {
 
       await viewModel.load();
       expect(viewModel.phase, NoteDetailPhase.error);
-      expect(viewModel.errorMessage, contains('Note unavailable'));
+      expect(viewModel.errorMessage, 'This note is unavailable.');
 
       await viewModel.load();
       expect(viewModel.phase, NoteDetailPhase.ready);
@@ -138,6 +158,35 @@ class _HabitsRepository implements HabitsRepository {
   }) async => _habit();
 }
 
+class _ConcurrentHabitsRepository implements HabitsRepository {
+  final failure = Completer<TodayHabit>();
+
+  @override
+  Future<List<TodayHabit>> list(String timezone) async => [
+    _habit(id: 'habit-1'),
+    _habit(id: 'habit-2'),
+  ];
+
+  @override
+  Future<TodayHabit> setCheckIn({
+    required String id,
+    required String date,
+    required TodayHabitCheckIn status,
+    required String timezone,
+  }) {
+    return id == 'habit-1'
+        ? failure.future
+        : Future.value(_habit(id: id, state: TodayHabitState.done));
+  }
+
+  @override
+  Future<TodayHabit> clearCheckIn({
+    required String id,
+    required String date,
+    required String timezone,
+  }) async => _habit(id: id);
+}
+
 class _NoteRepository implements NoteDetailRepository {
   _NoteRepository({this.failures = 0});
 
@@ -147,7 +196,7 @@ class _NoteRepository implements NoteDetailRepository {
   Future<NoteDetail> get(String slug) async {
     if (failures > 0) {
       failures -= 1;
-      throw StateError('Note unavailable');
+      throw Exception('internal repository detail');
     }
     return _note();
   }
@@ -160,8 +209,11 @@ class _Telemetry implements InteractionTelemetry {
   void record(String action) => actions.add(action);
 }
 
-TodayHabit _habit({TodayHabitState state = TodayHabitState.open}) => TodayHabit(
-  id: 'habit-1',
+TodayHabit _habit({
+  String id = 'habit-1',
+  TodayHabitState state = TodayHabitState.open,
+}) => TodayHabit(
+  id: id,
   title: 'Read 20 minutes',
   color: 'INDIGO',
   state: state,
@@ -185,3 +237,7 @@ NoteDetail _note() => NoteDetail(
   status: 'ACTIVE',
   updatedAt: DateTime.utc(2026, 7, 13),
 );
+
+TodayHabit _habitById(List<TodayHabit> habits, String id) {
+  return habits.singleWhere((habit) => habit.id == id);
+}

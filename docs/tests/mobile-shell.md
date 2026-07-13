@@ -2,7 +2,7 @@
 
 | Behavior | Coverage | Status |
 | --- | --- | --- |
-| Compact window renders `Today | Study | Assistant | Finance | More` with Assistant selected by default | Widget test at 390x844 | Covered |
+| Compact window renders `Today \| Study \| Assistant \| Finance \| More` with Assistant selected by default | Widget test at 390x844 | Covered |
 | Today, Study, Assistant, Finance, and More are selectable from compact navigation | Widget interaction and navigation tests | Covered |
 | Expanded window renders the same five destinations in a Cupertino sidebar | Widget test at 1024x768 plus real Chromium screenshot | Covered |
 | Medium width, large text, and sidebar semantics remain usable | Widget resize/text-scale/semantics tests | Covered |
@@ -19,7 +19,7 @@
 | Signed-out startup redirects to a Cupertino login screen | Widget test with fake repository | Covered |
 | Successful login opens the protected Assistant route | Widget interaction test | Covered |
 | Sign out clears state and redirects to login | Widget interaction test | Covered |
-| Flutter static analysis, 79-test suite, and Web release compilation | `flutter analyze`, `flutter test`, `flutter build web --release` | Covered |
+| Flutter static analysis, 85-test suite, and Web release compilation | `flutter analyze`, `flutter test`, `flutter build web --release` | Covered |
 | Android debug APK compilation | Local Windows Gradle build with Kotlin incremental cache disabled for the cross-drive workspace | Covered |
 | Pixel Android rendering inside Orca | `Pixel_10_Pro` attached through Orca, APK installed/launched, and login screen visually inspected | Covered |
 | API CORS accepts `X-Timezone` and rejects unlisted headers | Spring MVC integration test plus live preflight | Covered |

@@ -159,7 +159,11 @@ class _CalendarRangeBar extends StatelessWidget {
             padding: EdgeInsets.zero,
             minimumSize: const Size.square(NorthstarLayout.minimumTouchTarget),
             onPressed: busy ? null : viewModel.previousRange,
-            child: const Icon(CupertinoIcons.chevron_left),
+            child: Semantics(
+              label: 'Previous range',
+              excludeSemantics: true,
+              child: const Icon(CupertinoIcons.chevron_left),
+            ),
           ),
           Expanded(
             child: CupertinoButton(
@@ -177,7 +181,11 @@ class _CalendarRangeBar extends StatelessWidget {
             padding: EdgeInsets.zero,
             minimumSize: const Size.square(NorthstarLayout.minimumTouchTarget),
             onPressed: busy ? null : viewModel.nextRange,
-            child: const Icon(CupertinoIcons.chevron_right),
+            child: Semantics(
+              label: 'Next range',
+              excludeSemantics: true,
+              child: const Icon(CupertinoIcons.chevron_right),
+            ),
           ),
         ],
       ),

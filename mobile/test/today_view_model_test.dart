@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:northstar/data/repositories/today_repository.dart';
 import 'package:northstar/data/services/device_timezone.dart';
@@ -71,9 +73,38 @@ void main() {
     expect(viewModel.todayTasks.single.id, 'task-1');
     expect(viewModel.actionError, contains('Refresh failed'));
   });
+
+  test('failed task rollback preserves another completed task', () async {
+    final repository = _ConcurrentTodayRepository();
+    final viewModel = _viewModel(repository);
+    await viewModel.initialize();
+
+    final failed = viewModel.toggleTask('task-1');
+    await viewModel.toggleTask('task-2');
+    repository.taskFailure.completeError(Exception('Task update failed'));
+    await failed;
+
+    expect(_taskById(viewModel.todayTasks, 'task-1').isDone, isFalse);
+    expect(_taskById(viewModel.todayTasks, 'task-2').isDone, isTrue);
+    expect(_taskById(viewModel.upcomingTasks, 'task-2').isDone, isTrue);
+  });
+
+  test('failed habit rollback preserves another completed habit', () async {
+    final repository = _ConcurrentTodayRepository();
+    final viewModel = _viewModel(repository);
+    await viewModel.initialize();
+
+    final failed = viewModel.setHabitCheckIn('habit-1', TodayHabitCheckIn.done);
+    await viewModel.setHabitCheckIn('habit-2', TodayHabitCheckIn.done);
+    repository.habitFailure.completeError(Exception('Habit update failed'));
+    await failed;
+
+    expect(_habitById(viewModel.habits, 'habit-1').state, TodayHabitState.open);
+    expect(_habitById(viewModel.habits, 'habit-2').state, TodayHabitState.done);
+  });
 }
 
-TodayViewModel _viewModel(_TodayRepository repository) {
+TodayViewModel _viewModel(TodayRepository repository) {
   return TodayViewModel(
     repository: repository,
     timezoneProvider: _TimezoneProvider(),
@@ -159,16 +190,76 @@ class _TodayRepository implements TodayRepository {
   }) async => _habit();
 }
 
-TodayTask _task({bool done = false}) => TodayTask(
-  id: 'task-1',
+class _ConcurrentTodayRepository implements TodayRepository {
+  final taskFailure = Completer<TodayTask>();
+  final habitFailure = Completer<TodayHabit>();
+
+  @override
+  Future<TodaySnapshot> load({
+    required DateTime now,
+    required String timezone,
+  }) async {
+    return TodaySnapshot(
+      todayTasks: [
+        _task(id: 'task-1'),
+        _task(id: 'task-2'),
+      ],
+      upcomingTasks: [
+        _task(id: 'task-1'),
+        _task(id: 'task-2'),
+      ],
+      habits: [
+        _habit(id: 'habit-1'),
+        _habit(id: 'habit-2'),
+      ],
+      nextEvent: _event(),
+    );
+  }
+
+  @override
+  Future<TodayTask> setTaskDone({
+    required String id,
+    required bool done,
+    required String timezone,
+  }) {
+    return id == 'task-1'
+        ? taskFailure.future
+        : Future.value(_task(id: id, done: done));
+  }
+
+  @override
+  Future<TodayHabit> setHabitCheckIn({
+    required String id,
+    required String date,
+    required TodayHabitCheckIn status,
+    required String timezone,
+  }) {
+    return id == 'habit-1'
+        ? habitFailure.future
+        : Future.value(_habit(id: id, state: TodayHabitState.done));
+  }
+
+  @override
+  Future<TodayHabit> clearHabitCheckIn({
+    required String id,
+    required String date,
+    required String timezone,
+  }) async => _habit(id: id);
+}
+
+TodayTask _task({String id = 'task-1', bool done = false}) => TodayTask(
+  id: id,
   title: 'Review vocabulary',
   status: done ? TodayTaskStatus.done : TodayTaskStatus.open,
   createdAt: DateTime.utc(2026, 7, 12),
   dueDate: '2026-07-13',
 );
 
-TodayHabit _habit({TodayHabitState state = TodayHabitState.open}) => TodayHabit(
-  id: 'habit-1',
+TodayHabit _habit({
+  String id = 'habit-1',
+  TodayHabitState state = TodayHabitState.open,
+}) => TodayHabit(
+  id: id,
   title: 'Read 20 minutes',
   color: 'INDIGO',
   state: state,
@@ -190,3 +281,11 @@ TodayCalendarEvent _event() => TodayCalendarEvent(
   allDay: false,
   color: 'BLUE',
 );
+
+TodayTask _taskById(List<TodayTask> tasks, String id) {
+  return tasks.singleWhere((task) => task.id == id);
+}
+
+TodayHabit _habitById(List<TodayHabit> habits, String id) {
+  return habits.singleWhere((habit) => habit.id == id);
+}

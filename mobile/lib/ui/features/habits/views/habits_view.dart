@@ -219,19 +219,22 @@ class _Action extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return selected
-        ? CupertinoButton.filled(
-            minimumSize: const Size(0, NorthstarLayout.minimumTouchTarget),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            onPressed: onPressed,
-            child: Text(label),
-          )
-        : CupertinoButton.tinted(
-            minimumSize: const Size(0, NorthstarLayout.minimumTouchTarget),
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            onPressed: onPressed,
-            child: Text(label),
-          );
+    return Semantics(
+      selected: selected,
+      child: selected
+          ? CupertinoButton.filled(
+              minimumSize: const Size(0, NorthstarLayout.minimumTouchTarget),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              onPressed: onPressed,
+              child: Text(label),
+            )
+          : CupertinoButton.tinted(
+              minimumSize: const Size(0, NorthstarLayout.minimumTouchTarget),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              onPressed: onPressed,
+              child: Text(label),
+            ),
+    );
   }
 }
 

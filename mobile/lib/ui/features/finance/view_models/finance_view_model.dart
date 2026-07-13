@@ -27,7 +27,6 @@ class FinanceViewModel extends ChangeNotifier {
   FinancePhase _phase = FinancePhase.idle;
   FinanceGlance? _glance;
   String? _errorMessage;
-  String? _timezone;
 
   FinancePhase get phase => _phase;
   FinanceGlance? get glance => _glance;
@@ -43,8 +42,7 @@ class FinanceViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      final timezone = _timezone ??= await _timezoneProvider
-          .currentIdentifier();
+      final timezone = await _timezoneProvider.currentIdentifier();
       _glance = await _repository.glance(
         month: _month(_clock()),
         timezone: timezone,

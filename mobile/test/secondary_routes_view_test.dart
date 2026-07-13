@@ -17,6 +17,7 @@ void main() {
   testWidgets('renders a recurring Calendar agenda on a compact dark screen', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     _setWindowSize(tester, const Size(390, 844));
     final viewModel = CalendarViewModel(
       repository: _CalendarViewRepository(),
@@ -36,11 +37,21 @@ void main() {
     expect(find.text('IELTS class'), findsOneWidget);
     expect(find.byIcon(CupertinoIcons.repeat), findsOneWidget);
     expect(find.text('13 Jul – 26 Jul'), findsOneWidget);
+    expect(
+      find.semantics.byLabel('Previous range'),
+      isSemantics(label: 'Previous range'),
+    );
+    expect(
+      find.semantics.byLabel('Next range'),
+      isSemantics(label: 'Next range'),
+    );
+    semantics.dispose();
   });
 
   testWidgets('shows a Habits error, retries, and performs a quick check-in', (
     tester,
   ) async {
+    final semantics = tester.ensureSemantics();
     _setWindowSize(tester, const Size(390, 844));
     final repository = _HabitsViewRepository(loadFailures: 1);
     final viewModel = HabitsViewModel(
@@ -63,6 +74,11 @@ void main() {
     await _pumpAsync(tester);
     expect(repository.status, TodayHabitCheckIn.done);
     expect(find.byKey(const Key('habits-clear-habit-1')), findsOneWidget);
+    expect(
+      find.semantics.byLabel('Done'),
+      isSemantics(label: 'Done', isSelected: true, hasSelectedState: true),
+    );
+    semantics.dispose();
   });
 
   testWidgets(

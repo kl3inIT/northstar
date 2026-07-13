@@ -110,7 +110,7 @@ void main() {
             scoreMax: '',
             notes: 'Task 2',
             occurredOn: '2026-07-13',
-            disciplineName: '',
+            disciplineName: 'IELTS',
           ),
         ]),
       ),
@@ -127,6 +127,8 @@ void main() {
     expect((items.first as Map)['durationMinutes'], 25);
     expect((items.first as Map)['disciplineId'], 'discipline-1');
     expect((items.last as Map)['kind'], 'MOCK');
+    expect((items.last as Map)['disciplineId'], 'discipline-1');
+    expect(api.disciplineCalls, 1);
     expect(saved.ids, ['study-1', 'study-2']);
     expect(api.deletedPaths, [
       '/api/study/sessions/study-1',
@@ -163,6 +165,7 @@ void main() {
     final request = requestItems.single as Map;
     expect(request['language'], 'CHINESE');
     expect(request['disciplineId'], 'discipline-1');
+    expect(api.disciplineCalls, 1);
     expect(jsonDecode(request['metadata']! as String), {
       'reading': 'mócèng',
       'partOfSpeech': 'verb',
@@ -211,6 +214,7 @@ class _FakeCaptureDataSource implements CaptureDataSource {
 
   final CaptureDraftDto draft;
   int createCalls = 0;
+  int disciplineCalls = 0;
   Map<String, Object?>? createdTask;
   Map<String, Object?>? createdTransactions;
   Map<String, Object?>? createdStudySessions;
@@ -227,9 +231,12 @@ class _FakeCaptureDataSource implements CaptureDataSource {
   Future<CaptureDraftDto> draftReceipt(ReceiptUpload upload) async => draft;
 
   @override
-  Future<List<Map<String, Object?>>> listDisciplines() async => [
-    {'id': 'discipline-1', 'name': 'IELTS'},
-  ];
+  Future<List<Map<String, Object?>>> listDisciplines() async {
+    disciplineCalls += 1;
+    return [
+      {'id': 'discipline-1', 'name': 'IELTS'},
+    ];
+  }
 
   @override
   Future<Map<String, Object?>> createTask(Map<String, Object?> body) async {
