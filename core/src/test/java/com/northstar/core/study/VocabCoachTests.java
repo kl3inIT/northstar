@@ -104,8 +104,58 @@ class VocabCoachTests {
         String schema = new BeanOutputConverter<>(VocabCoach.GeneratedEnrichment.class)
                 .getJsonSchema();
 
+        assertThat(schema)
+                .contains("\"example\"")
+                .contains("\"wordFormation\"")
+                .contains("\"family\"")
+                .doesNotContain("\"EXAMPLE\"")
+                .doesNotContain("\"WORD_FORMATION\"")
+                .doesNotContain("\"family_words\"");
         assertThat(schema).containsPattern(
                 "\\\"enum\\\"\\s*:\\s*\\[\\s*\\\"prefix\\\"\\s*,\\s*\\\"root\\\""
                         + "\\s*,\\s*\\\"base\\\"\\s*,\\s*\\\"suffix\\\"\\s*]");
+    }
+
+    @Test
+    void compatibleGatewayAliasesMapTheCapturedProductionResponse() {
+        String response = """
+                {
+                  "EXAMPLE": "The company moved its headquarters to Singapore. — Công ty đã chuyển trụ sở chính tới Singapore.",
+                  "COLLOCATIONS": ["corporate headquarters", "company headquarters"],
+                  "SYNONYMS": ["head office", "main office"],
+                  "ANTONYMS": ["branch office", "satellite office"],
+                  "CONTRAST": "Headquarters is the main control center; a branch is a secondary location.",
+                  "MNEMONIC": "The head of the company works at its headquarters.",
+                  "WORD_FORMATION": {
+                    "parts": [
+                      {"form": "head", "kind": "base", "meaning": "main or leading"},
+                      {"form": "quarters", "kind": "base", "meaning": "lodging or premises"}
+                    ],
+                    "explanation": "The main premises from which an organization is directed.",
+                    "family_words": ["headquarter", "headquartered"]
+                  }
+                }
+                """;
+
+        VocabCoach.GeneratedEnrichment generated = json.readValue(
+                response, VocabCoach.GeneratedEnrichment.class);
+
+        assertThat(generated.example()).contains("headquarters to Singapore");
+        assertThat(generated.collocations()).containsExactly(
+                "corporate headquarters", "company headquarters");
+        assertThat(generated.synonyms()).containsExactly("head office", "main office");
+        assertThat(generated.antonyms()).containsExactly("branch office", "satellite office");
+        assertThat(generated.contrast()).startsWith("Headquarters is the main control center");
+        assertThat(generated.mnemonic()).contains("head of the company");
+        assertThat(generated.wordFormation().family())
+                .containsExactly("headquarter", "headquartered");
+        assertThat(VocabCoach.enrichmentProblem(generated, Set.of(
+                VocabEnrichmentField.EXAMPLE,
+                VocabEnrichmentField.COLLOCATIONS,
+                VocabEnrichmentField.SYNONYMS,
+                VocabEnrichmentField.ANTONYMS,
+                VocabEnrichmentField.CONTRAST,
+                VocabEnrichmentField.MNEMONIC,
+                VocabEnrichmentField.WORD_FORMATION))).isNull();
     }
 }

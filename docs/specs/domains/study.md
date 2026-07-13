@@ -68,10 +68,15 @@ enabled sibling until the next midnight in the browser's timezone.
   generates them. The learner selects fields and explicitly starts an expiring
   in-API background preview, then keeps reviewing until a toast offers Apply or
   Discard. The review header retains a running/ready action until that decision,
-  so preview access does not depend on a transient notification. Word formation
-  is omitted when decomposition is uncertain or malformed. Image bytes remain transient until Apply stores them through
-  Attachments and references them as `frontImageId`; unknown metadata keys and
-  existing user-authored values are preserved. Audio previews are likewise
+  so preview access does not depend on a transient notification. Enrichment
+  requests canonical lower-camel-case structured fields. Compatible gateways
+  that discard the provider schema may return uppercase or snake-case aliases;
+  the boundary normalizes those aliases, then applies the same requested-field
+  completeness validation and one corrective retry. It never treats genuinely
+  missing content as a successful enrichment. Word formation is omitted when
+  decomposition is uncertain or malformed. Image bytes remain transient until
+  Apply stores them through Attachments and references them as `frontImageId`;
+  unknown metadata keys and existing user-authored values are preserved. Audio previews are likewise
   transient until Apply stores them in the content-addressed speech cache.
   Applied audio is bound to its exact source text; editing the front or example
   makes the binding stale and Listen falls back to browser speech rather than
