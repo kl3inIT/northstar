@@ -80,6 +80,14 @@ medium-width large-text and sidebar semantics coverage.
 
 ## Block F — Runtime verification and consolidation
 
+**Status:** Complete locally — Flutter analysis and the 79-test suite passed;
+Web release and Android debug builds completed; the focused API/CORS integration
+gate passed; a real local API walkthrough covered compact and expanded layouts
+with no console/page errors; and `Pixel_10_Pro` rendered the installed APK in
+Orca. Published `main` Mobile CI run `29252163571` passed both the Linux/Android
+and macOS Sideloadly IPA jobs. This branch remains intentionally local, so its
+own hosted run and native iPhone/VoiceOver installation remain recorded gaps.
+
 - Run the terminating mobile and relevant backend gates.
 - Walk login, Assistant, Capture, Today, Study, Finance, Calendar, Habits, and
   More against a real local API at compact and expanded widths.
