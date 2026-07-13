@@ -11,10 +11,10 @@ enum NorthstarDestination {
     icon: CupertinoIcons.check_mark_circled,
     selectedIcon: CupertinoIcons.check_mark_circled_solid,
   ),
-  notes(
-    label: 'Notes',
-    icon: CupertinoIcons.doc_text,
-    selectedIcon: CupertinoIcons.doc_text_fill,
+  study(
+    label: 'Study',
+    icon: CupertinoIcons.book,
+    selectedIcon: CupertinoIcons.book_fill,
   ),
   finance(
     label: 'Finance',

@@ -6,20 +6,27 @@ import 'package:http/http.dart' as http;
 import 'package:northstar/data/repositories/assistant_repository.dart';
 import 'package:northstar/data/repositories/auth_repository.dart';
 import 'package:northstar/data/repositories/capture_repository.dart';
+import 'package:northstar/data/repositories/finance_repository.dart';
+import 'package:northstar/data/repositories/study_review_repository.dart';
 import 'package:northstar/data/repositories/today_repository.dart';
 import 'package:northstar/data/services/assistant_api.dart';
 import 'package:northstar/data/services/authenticated_api_client.dart';
+import 'package:northstar/data/services/authenticated_json_client.dart';
 import 'package:northstar/data/services/capture_api.dart';
 import 'package:northstar/data/services/device_timezone.dart';
+import 'package:northstar/data/services/finance_api.dart';
 import 'package:northstar/data/services/mobile_auth_api.dart';
 import 'package:northstar/data/services/receipt_picker.dart';
 import 'package:northstar/data/services/refresh_token_store.dart';
 import 'package:northstar/data/services/today_api.dart';
+import 'package:northstar/data/services/study_review_api.dart';
 import 'package:northstar/ui/core/design_system/northstar_theme.dart';
 import 'package:northstar/ui/core/navigation/northstar_router.dart';
 import 'package:northstar/ui/features/auth/view_models/auth_view_model.dart';
 import 'package:northstar/ui/features/assistant/view_models/assistant_view_model.dart';
 import 'package:northstar/ui/features/capture/view_models/capture_view_model.dart';
+import 'package:northstar/ui/features/finance/view_models/finance_view_model.dart';
+import 'package:northstar/ui/features/study/view_models/study_review_view_model.dart';
 import 'package:northstar/ui/features/today/view_models/today_view_model.dart';
 
 class NorthstarApp extends StatefulWidget {
@@ -31,6 +38,8 @@ class NorthstarApp extends StatefulWidget {
     this.receiptPicker,
     this.todayRepository,
     this.timezoneProvider,
+    this.studyReviewRepository,
+    this.financeRepository,
   });
 
   final AuthRepository? authRepository;
@@ -39,6 +48,8 @@ class NorthstarApp extends StatefulWidget {
   final ReceiptSourcePicker? receiptPicker;
   final TodayRepository? todayRepository;
   final DeviceTimezoneProvider? timezoneProvider;
+  final StudyReviewRepository? studyReviewRepository;
+  final FinanceRepository? financeRepository;
 
   @override
   State<NorthstarApp> createState() => _NorthstarAppState();
@@ -51,6 +62,8 @@ class _NorthstarAppState extends State<NorthstarApp> {
   late final AssistantViewModel _assistant;
   late final CaptureViewModel _capture;
   late final TodayViewModel _today;
+  late final StudyReviewViewModel _study;
+  late final FinanceViewModel _finance;
   late final GoRouter _router;
 
   @override
@@ -66,12 +79,28 @@ class _NorthstarAppState extends State<NorthstarApp> {
       repository: widget.captureRepository ?? _createCaptureRepository(),
       receiptPicker: widget.receiptPicker ?? ReceiptPicker(),
     );
+    final timezoneProvider =
+        widget.timezoneProvider ?? const PlatformDeviceTimezoneProvider();
     _today = TodayViewModel(
       repository: widget.todayRepository ?? _createTodayRepository(),
-      timezoneProvider:
-          widget.timezoneProvider ?? const PlatformDeviceTimezoneProvider(),
+      timezoneProvider: timezoneProvider,
     );
-    _router = createNorthstarRouter(_auth, _assistant, _capture, _today);
+    _study = StudyReviewViewModel(
+      repository: widget.studyReviewRepository ?? _createStudyRepository(),
+      timezoneProvider: timezoneProvider,
+    );
+    _finance = FinanceViewModel(
+      repository: widget.financeRepository ?? _createFinanceRepository(),
+      timezoneProvider: timezoneProvider,
+    );
+    _router = createNorthstarRouter(
+      _auth,
+      _assistant,
+      _capture,
+      _today,
+      _study,
+      _finance,
+    );
     unawaited(_auth.restore());
   }
 
@@ -130,12 +159,34 @@ class _NorthstarAppState extends State<NorthstarApp> {
     );
   }
 
+  StudyReviewRepository _createStudyRepository() {
+    return RemoteStudyReviewRepository(StudyReviewApi(_createJsonClient()));
+  }
+
+  FinanceRepository _createFinanceRepository() {
+    return RemoteFinanceRepository(FinanceApi(_createJsonClient()));
+  }
+
+  AuthenticatedJsonClient _createJsonClient() {
+    return AuthenticatedJsonClient(
+      authenticatedClient: AuthenticatedApiClient(
+        client: _client!,
+        accessToken: () => _authRepository.accessToken,
+        refreshAccessToken: _authRepository.refreshAccessToken,
+        onUnauthorized: _auth.expireSession,
+      ),
+      baseUrl: Uri.parse(_configuredBaseUrl),
+    );
+  }
+
   @override
   void dispose() {
     _router.dispose();
     _assistant.dispose();
     _capture.dispose();
     _today.dispose();
+    _study.dispose();
+    _finance.dispose();
     _auth.dispose();
     _client?.close();
     super.dispose();

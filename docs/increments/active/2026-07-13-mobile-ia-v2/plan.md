@@ -42,6 +42,10 @@ and the 55-test full Flutter suite passed; Dart analysis reported no errors.
 
 ## Block D — Focused Study review and Finance glance
 
+**Status:** Complete — 23 focused API/repository/ViewModel/widget/navigation
+tests and the 68-test full Flutter suite passed; Dart analysis reported no
+errors.
+
 - Add the due vocabulary queue, direction-aware card state, answer reveal, real
   interval previews, and learner-owned FSRS rating submission.
 - Preserve session progress across rebuilds and make completion/empty/error

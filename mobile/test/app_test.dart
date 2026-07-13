@@ -2,10 +2,14 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:northstar/data/repositories/assistant_repository.dart';
 import 'package:northstar/data/repositories/auth_repository.dart';
+import 'package:northstar/data/repositories/finance_repository.dart';
+import 'package:northstar/data/repositories/study_review_repository.dart';
 import 'package:northstar/data/repositories/today_repository.dart';
 import 'package:northstar/data/services/device_timezone.dart';
 import 'package:northstar/domain/models/assistant_models.dart';
 import 'package:northstar/domain/models/auth_session.dart';
+import 'package:northstar/domain/models/finance_models.dart';
+import 'package:northstar/domain/models/study_review_models.dart';
 import 'package:northstar/domain/models/today_models.dart';
 import 'package:northstar/ui/core/northstar_app.dart';
 
@@ -23,10 +27,11 @@ void main() {
     expect(find.byKey(const Key('northstar-sidebar')), findsNothing);
     expect(find.byKey(const Key('assistant-page')), findsOneWidget);
 
-    await tester.tap(find.byIcon(CupertinoIcons.doc_text));
-    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(CupertinoIcons.book));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
 
-    expect(find.byKey(const Key('notes-page')), findsOneWidget);
+    expect(find.byKey(const Key('study-page')), findsOneWidget);
   });
 
   testWidgets('opens focused Capture from the Assistant composer add menu', (
@@ -106,15 +111,16 @@ void main() {
     await tester.pumpWidget(_testApp(_signedInRepository()));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(CupertinoIcons.doc_text));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('notes-page')), findsOneWidget);
+    await tester.tap(find.byIcon(CupertinoIcons.book));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(find.byKey(const Key('study-page')), findsOneWidget);
 
     tester.view.physicalSize = const Size(1024, 768);
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('northstar-sidebar')), findsOneWidget);
-    expect(find.byKey(const Key('notes-page')), findsOneWidget);
+    expect(find.byKey(const Key('study-page')), findsOneWidget);
   });
 
   testWidgets('explains unfinished More destinations instead of dead-ending', (
@@ -196,6 +202,8 @@ NorthstarApp _testApp(AuthRepository authRepository) {
     assistantRepository: _FakeAssistantRepository(),
     todayRepository: _FakeTodayRepository(),
     timezoneProvider: _FakeTimezoneProvider(),
+    studyReviewRepository: _FakeStudyReviewRepository(),
+    financeRepository: _FakeFinanceRepository(),
   );
 }
 
@@ -292,6 +300,44 @@ class _FakeTodayRepository implements TodayRepository {
 class _FakeTimezoneProvider implements DeviceTimezoneProvider {
   @override
   Future<String> currentIdentifier() async => 'Asia/Bangkok';
+}
+
+class _FakeStudyReviewRepository implements StudyReviewRepository {
+  @override
+  Future<List<VocabReviewCard>> reviewQueue({
+    required VocabLanguage language,
+    String? deck,
+    int limit = 20,
+  }) async => const [];
+
+  @override
+  Future<void> recordReview({
+    required VocabReviewCard card,
+    required VocabRating rating,
+    required String timezone,
+  }) async {}
+}
+
+class _FakeFinanceRepository implements FinanceRepository {
+  @override
+  Future<FinanceGlance> glance({
+    required String month,
+    required String timezone,
+  }) async {
+    return FinanceGlance(
+      summary: FinanceMonthSummary(
+        month: month,
+        expenseTotal: 0,
+        incomeTotal: 0,
+        net: 0,
+        exceptionalTotal: 0,
+        exceptionalCount: 0,
+        previousMonthExpenseTotal: 0,
+        categories: const [],
+      ),
+      transactions: const [],
+    );
+  }
 }
 
 void _setWindowSize(WidgetTester tester, Size size) {
