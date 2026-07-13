@@ -81,6 +81,17 @@ disclosure and survive transcript rehydration. Tool workflow and Northstar's
 external-link confirmation remain application wrappers because they encode
 product behavior beyond a generic presentation component.
 
+Authenticated web routes outside `/assistant` expose the same Assistant
+workspace in a floating chat widget anchored above its bottom-right trigger.
+The non-modal panel is a layout entry point rather than a second chat client: it
+reuses the same conversation list, persisted history,
+AI SDK transport, model routing, attachments, sources, tool workflows, and TTS
+actions as the full page. Compact mode changes spacing, renders text inside
+shadcn Bubble surfaces, and moves history into its nested Sheet; it does not
+remove capabilities or introduce a separate backend endpoint. The widget closes
+when the full Assistant route opens and is available from the floating Assistant
+control or `Ctrl/Cmd+J`.
+
 Completed Assistant responses expose an explicit read-aloud action. It sends
 only the final visible message text, excluding tool rows, source metadata, and
 Markdown syntax, to a separate text-to-speech route and renders the result with
