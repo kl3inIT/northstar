@@ -4,6 +4,7 @@ import {
   EMPTY_TALLY,
   cardMatchesDeck,
   deckQuery,
+  directionIsDue,
   enrichmentFieldsForRequest,
   incrementRating,
   reviewIsComplete,
@@ -42,4 +43,11 @@ test('deck scopes never leak cards and All decks omits the deck query', () => {
   assert.equal(cardMatchesDeck('HSK4', 'ALL'), true)
   assert.equal(deckQuery('ALL'), undefined)
   assert.equal(deckQuery('HSK4'), 'HSK4')
+})
+
+test('due state excludes future and sibling-buried directions', () => {
+  const now = Date.parse('2026-07-12T10:00:00Z')
+  assert.equal(directionIsDue('2026-07-12T09:00:00Z', undefined, now), true)
+  assert.equal(directionIsDue('2026-07-12T11:00:00Z', undefined, now), false)
+  assert.equal(directionIsDue('2026-07-12T09:00:00Z', '2026-07-13T00:00:00Z', now), false)
 })

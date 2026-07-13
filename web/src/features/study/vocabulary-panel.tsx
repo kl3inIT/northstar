@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { BookOpenCheck, ChevronDown, Ellipsis, Flame, Mic, Pencil, PauseCircle, PlayCircle, Search, Sparkles, Trash2 } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import { VocabularyReviewer } from './vocabulary-reviewer'
-import { cardMatchesDeck, deckQuery } from './vocabulary-review-state'
+import { cardHasDueDirection, cardMatchesDeck, deckQuery } from './vocabulary-review-state'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -45,6 +45,12 @@ function recallTone(probability: number): string {
   return 'text-muted-foreground'
 }
 
+function scheduleLabel(state: VocabCard['schedulingState']): string {
+  if (state === 'RELEARNING') return 'Relearning'
+  if (state === 'LEARNING') return 'Learning'
+  return 'Review'
+}
+
 export function VocabularyPanel() {
   const [language, setLanguage] = useState<VocabLanguage>('ENGLISH')
   const [deck, setDeck] = useState('ALL')
@@ -66,8 +72,8 @@ export function VocabularyPanel() {
   ])].sort((a, b) => a.localeCompare(b)), [cards])
   const scopedCards = useMemo(() => cards.filter((card) => cardMatchesDeck(card.deck, deck)), [cards, deck])
   const active = useMemo(() => scopedCards.filter((c) => !c.suspended), [scopedCards])
-  const atRiskCount = useMemo(
-    () => active.filter((c) => c.recallProbability < 0.7).length,
+  const dueCount = useMemo(
+    () => active.filter((card) => cardHasDueDirection(card, Date.now())).length,
     [active],
   )
   const newThisWeek = useMemo(() => {
@@ -83,9 +89,13 @@ export function VocabularyPanel() {
           || c.back.toLocaleLowerCase().includes(query)
           || (parseVocabMetadata(c.metadata).reading ?? '').toLocaleLowerCase().includes(query))
       : scopedCards
-    // At-risk first, suspended last — the table doubles as the priority list.
+    // Due notes first, then weaker memories; suspended notes remain last.
     return [...filtered].sort((a, b) => {
       if (a.suspended !== b.suspended) return a.suspended ? 1 : -1
+      const now = Date.now()
+      const aDue = cardHasDueDirection(a, now)
+      const bDue = cardHasDueDirection(b, now)
+      if (aDue !== bDue) return aDue ? -1 : 1
       return a.recallProbability - b.recallProbability
     })
   }, [scopedCards, search])
@@ -158,7 +168,7 @@ export function VocabularyPanel() {
           )}
         </div>
       </div>
-      <VocabStats tracked={active.length} atRisk={atRiskCount} newThisWeek={newThisWeek} />
+      <VocabStats tracked={active.length} due={dueCount} newThisWeek={newThisWeek} />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1">
@@ -172,12 +182,12 @@ export function VocabularyPanel() {
           />
         </div>
         <div className="flex shrink-0 items-center">
-          <Button className="rounded-r-none" disabled={active.length === 0} onClick={() => setReviewLimit(20)}>
-            <PlayCircle /> Review {language === 'ENGLISH' ? 'English' : 'Chinese'} · {deck === 'ALL' ? 'All decks' : deck}
+          <Button className="rounded-r-none" disabled={dueCount === 0} onClick={() => setReviewLimit(20)}>
+            <PlayCircle /> Review due · {dueCount}
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="default" size="icon" className="rounded-l-none border-l border-primary-foreground/20" disabled={active.length === 0} aria-label="Choose review size">
+              <Button variant="default" size="icon" className="rounded-l-none border-l border-primary-foreground/20" disabled={dueCount === 0} aria-label="Choose review size">
                 <ChevronDown />
               </Button>
             </DropdownMenuTrigger>
@@ -210,16 +220,16 @@ export function VocabularyPanel() {
   )
 }
 
-function VocabStats({ tracked, atRisk, newThisWeek }: { tracked: number; atRisk: number; newThisWeek: number }) {
+function VocabStats({ tracked, due, newThisWeek }: { tracked: number; due: number; newThisWeek: number }) {
   const stats = [
     { label: 'Tracked words', value: String(tracked), icon: BookOpenCheck, tone: 'text-primary', bg: 'bg-primary/10' },
     {
-      label: 'At risk now',
-      value: String(atRisk),
-      caption: 'recall under 70%',
+      label: 'Due now',
+      value: String(due),
+      caption: 'FSRS · 90% retention',
       icon: Flame,
-      tone: atRisk > 0 ? 'text-warning' : 'text-muted-foreground',
-      bg: atRisk > 0 ? 'bg-warning/10' : 'bg-muted',
+      tone: due > 0 ? 'text-warning' : 'text-muted-foreground',
+      bg: due > 0 ? 'bg-warning/10' : 'bg-muted',
     },
     { label: 'New this week', value: String(newThisWeek), caption: 'pace ~10 a day', icon: Sparkles, tone: 'text-insight', bg: 'bg-insight/10' },
   ]
@@ -293,6 +303,8 @@ function CardsTable({ rows, isLoading, onEdit, onDelete, onPronounce, onToggleSu
                     {(meta.reading || meta.partOfSpeech) && <p className="text-xs text-muted-foreground">{[meta.reading, meta.partOfSpeech].filter(Boolean).join(' · ')}</p>}
                     <Badge variant="outline" className="mt-1 h-5 rounded px-1.5 text-[10px] font-normal">{card.deck ?? 'General'}</Badge>
                     {card.productionEnabled && <Badge variant="secondary" className="ml-1 mt-1 h-5 rounded px-1.5 text-[10px] font-normal">2 directions</Badge>}
+                    <Badge variant="outline" className="ml-1 mt-1 h-5 rounded px-1.5 text-[10px] font-normal">{scheduleLabel(card.schedulingState)}</Badge>
+                    {(card.leech || card.productionLeech) && <Badge variant="destructive" className="ml-1 mt-1 h-5 rounded px-1.5 text-[10px] font-normal">Leech</Badge>}
                   </div>
                 </TableCell>
                 <TableCell>
@@ -307,7 +319,7 @@ function CardsTable({ rows, isLoading, onEdit, onDelete, onPronounce, onToggleSu
                 <TableCell className="text-right">
                   <span className={cn('text-sm font-semibold tabular-nums', recallTone(card.recallProbability))}>
                     {Math.round(card.recallProbability * 100)}%
-                    {!card.suspended && card.recallProbability < 0.7 && ' 🔥'}
+                    {!card.suspended && cardHasDueDirection(card, Date.now()) && ' · due'}
                   </span>
                 </TableCell>
                 <TableCell className="hidden text-right sm:table-cell">

@@ -1,7 +1,6 @@
 package com.northstar.core.study;
 
 import java.text.Normalizer;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -13,46 +12,33 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Vocabulary memory — Anki's mechanics (per-card memory model, graded
- * reviews, an append-only revlog) rebuilt AI-native: cards arrive from
- * natural-language capture, reviews happen in the Study UI with optional
- * assistant grading for free-text answers, and scheduling is Ebisu recall
- * probability instead of due dates, so {@link #atRisk} answers "what should
- * we quiz right now" at any moment and a lapse never builds a backlog.
- */
+/** AI-native vocabulary content with independent FSRS recognition/production schedules. */
 @Service
 public class VocabService {
 
-    /** New cards start balanced (α=β=2) with a one-day half-life. */
-    static final double INITIAL_ALPHA_BETA = 2.0;
-    static final double INITIAL_HALFLIFE_HOURS = 24.0;
-    /** Introducing more than this per day dilutes retention — guidance, not a hard wall. */
     public static final int NEW_CARDS_PER_DAY_GUIDANCE = 10;
-
     private static final Pattern COMBINING_MARKS = Pattern.compile("\\p{M}+");
-    private static final double MIN_ELAPSED_HOURS = 0.01;
 
     private final VocabCardRepository cards;
+    private final VocabSchedulingCardRepository schedules;
     private final VocabReviewLogRepository reviews;
     private final VocabDeckService decks;
 
-    VocabService(VocabCardRepository cards, VocabReviewLogRepository reviews,
-            VocabDeckService decks) {
+    VocabService(VocabCardRepository cards, VocabSchedulingCardRepository schedules,
+            VocabReviewLogRepository reviews, VocabDeckService decks) {
         this.cards = cards;
+        this.schedules = schedules;
         this.reviews = reviews;
         this.decks = decks;
     }
 
-    /**
-     * Create a batch of cards. A front that already exists (accent- and
-     * case-insensitive) is NOT duplicated — the existing card is returned in
-     * place, so re-capturing a word is harmless.
-     */
     @Transactional
     public List<VocabCardSummary> createAll(List<NewVocabCard> items) {
         if (items == null || items.isEmpty()) {
@@ -61,9 +47,7 @@ public class VocabService {
         Instant now = Instant.now();
         List<VocabCard> existing = new ArrayList<>(cards.findByOrderByCreatedAtDesc());
         Map<String, VocabCard> byFront = new HashMap<>();
-        for (VocabCard card : existing) {
-            byFront.putIfAbsent(key(card.getLanguage(), card.getFront()), card);
-        }
+        existing.forEach(card -> byFront.putIfAbsent(key(card.getLanguage(), card.getFront()), card));
         List<VocabCard> result = new ArrayList<>();
         for (NewVocabCard item : items) {
             String front = requireText(item.front(), "front", 255);
@@ -76,34 +60,38 @@ public class VocabService {
                 continue;
             }
             VocabCard card = new VocabCard(UUID.randomUUID(), front,
-                    requireText(item.back(), "back", 1000),
-                    trimToNull(item.metadata(), 4000), language,
-                    canonicalDeck(item.deck(), language, existing), item.disciplineId(),
-                    INITIAL_ALPHA_BETA, INITIAL_ALPHA_BETA, INITIAL_HALFLIFE_HOURS, now);
+                    requireText(item.back(), "back", 1000), trimToNull(item.metadata(), 4000),
+                    language, canonicalDeck(item.deck(), language, existing), item.disciplineId());
             boolean productionEnabled = item.productionEnabled() != null
                     ? item.productionEnabled()
                     : decks.productionDefault(language, card.getDeck());
-            card.setProductionEnabled(productionEnabled, now);
+            card.setProductionEnabled(productionEnabled);
             cards.save(card);
+            schedules.save(new VocabSchedulingCard(UUID.randomUUID(), card.getId(),
+                    VocabReviewDirection.RECOGNITION, now));
+            if (productionEnabled) {
+                schedules.save(new VocabSchedulingCard(UUID.randomUUID(), card.getId(),
+                        VocabReviewDirection.PRODUCTION, now));
+            }
             existing.add(card);
             byFront.put(identity, card);
             result.add(card);
         }
+        // Fire auditing callbacks before building the required createdAt response field.
+        schedules.flush();
         return summarize(result, now);
     }
 
-    /** The N cards most likely forgotten right now — the quiz and brief read this. */
+    /** The N active notes with the weakest recognition retrievability. */
     @Transactional(readOnly = true)
     public List<VocabCardSummary> atRisk(int limit, Instant now) {
         Instant at = Objects.requireNonNullElseGet(now, Instant::now);
-        List<VocabCard> active = cards.findBySuspendedFalse();
-        return summarize(active, at).stream()
+        return summarize(cards.findBySuspendedFalse(), at).stream()
                 .sorted(Comparator.comparingDouble(VocabCardSummary::recallProbability))
                 .limit(Math.clamp(limit, 1, 50))
                 .toList();
     }
 
-    /** The independent review queue for one language and optional deck scope. */
     @Transactional(readOnly = true)
     public List<VocabCardSummary> atRisk(VocabLanguage language, String deck,
             int limit, Instant now) {
@@ -118,76 +106,95 @@ public class VocabService {
                 .toList();
     }
 
-    /** Weakest enabled direction per item; siblings never share one queue snapshot. */
+    /** Due-only queue with at most one enabled direction from each vocabulary item. */
     @Transactional(readOnly = true)
     public List<VocabReviewCardSummary> reviewQueue(VocabLanguage language, String deck,
             int limit, Instant now) {
         VocabLanguage requiredLanguage = Objects.requireNonNull(language, "language is required");
         String requestedDeck = normalizeDeckFilter(deck);
         Instant at = Objects.requireNonNullElseGet(now, Instant::now);
-        List<VocabCard> active = cards.findBySuspendedFalse();
-        Map<ReviewKey, Integer> counts = reviewCounts(active);
-        return active.stream()
+        List<VocabCard> scoped = cards.findBySuspendedFalse().stream()
                 .filter(card -> card.getLanguage() == requiredLanguage)
                 .filter(card -> deckMatches(card.getDeck(), requestedDeck))
-                .map(card -> weakestDirection(card, at, counts))
-                .sorted(Comparator.comparingDouble(VocabReviewCardSummary::recallProbability))
+                .toList();
+        Map<UUID, List<VocabSchedulingCard>> byCard = schedulesByCard(scoped);
+        Map<ReviewKey, Integer> counts = reviewCounts(scoped);
+        Comparator<VocabSchedulingCard> ordering = scheduleOrdering(at);
+        return scoped.stream()
+                .map(card -> byCard.getOrDefault(card.getId(), List.of()).stream()
+                        .filter(schedule -> enabled(card, schedule.getDirection()))
+                        .filter(schedule -> schedule.isDue(at))
+                        .min(ordering)
+                        .map(schedule -> reviewSummary(card, schedule, at, counts))
+                        .orElse(null))
+                .filter(Objects::nonNull)
+                .sorted(Comparator
+                        .comparingInt((VocabReviewCardSummary row) -> queuePriority(
+                                row.schedulingState(), row.lastReviewedAt()))
+                        .thenComparingDouble(VocabReviewCardSummary::recallProbability)
+                        .thenComparing(VocabReviewCardSummary::dueAt))
                 .limit(Math.clamp(limit, 1, 50))
                 .toList();
     }
 
-    /** Every card, most recently added first, with recall computed for now. */
     @Transactional(readOnly = true)
     public List<VocabCardSummary> cards() {
         return summarize(cards.findByOrderByCreatedAtDesc(), Instant.now());
     }
 
-    /** One language library; null retains the all-card internal/tool view. */
     @Transactional(readOnly = true)
     public List<VocabCardSummary> cards(VocabLanguage language) {
         return cards().stream().filter(card -> language == null || card.language() == language)
                 .toList();
     }
 
-    /**
-     * Fold one graded review into the card's memory. {@code success} is the
-     * grade in [0,1] (the model updates on >= 0.5); {@code rating} is the
-     * Anki-style label kept for the log and future algorithm migration.
-     */
+    /** Compatibility entry for chat/MCP, where there is no browser preview token. */
     @Transactional
     public VocabCardSummary recordReview(UUID cardId, double success,
             VocabReviewLog.Rating rating, VocabReviewLog.ReviewSource source) {
         return recordReview(cardId, VocabReviewDirection.RECOGNITION, success, rating, source);
     }
 
+    /** Compatibility entry for chat/MCP; rating is authoritative, not the legacy success value. */
     @Transactional
     public VocabCardSummary recordReview(UUID cardId, VocabReviewDirection direction, double success,
             VocabReviewLog.Rating rating, VocabReviewLog.ReviewSource source) {
         if (success < 0 || success > 1) {
             throw new IllegalArgumentException("success must be between 0 and 1");
         }
-        VocabCard card = get(cardId);
-        VocabReviewDirection requiredDirection = Objects.requireNonNull(direction, "direction is required");
-        requireEnabled(card, requiredDirection);
+        VocabSchedulingCard schedule = getSchedule(cardId, direction);
         Instant now = Instant.now();
-        double elapsedHours = Math.max(MIN_ELAPSED_HOURS,
-                Duration.between(lastReviewedAt(card, requiredDirection), now).toMillis() / 3_600_000.0);
-        Ebisu.Model before = model(card, requiredDirection);
-        Ebisu.Model after = Ebisu.updateRecall(before, success >= 0.5 ? 1 : 0, 1, elapsedHours);
-        double halflifeAfter = Ebisu.modelToPercentileDecay(after);
-        reviews.save(new VocabReviewLog(UUID.randomUUID(), card.getId(), now, success, rating,
-                elapsedHours, Objects.requireNonNull(source, "source is required"),
-                requiredDirection, before.alpha(), before.beta(), halflife(card, requiredDirection),
-                after.alpha(), after.beta(), halflifeAfter));
-        if (requiredDirection == VocabReviewDirection.PRODUCTION) {
-            card.productionReviewed(after.alpha(), after.beta(), halflifeAfter, now);
-        } else {
-            card.reviewed(after.alpha(), after.beta(), halflifeAfter, now);
-        }
-        return summarize(List.of(card), now).getFirst();
+        return recordReview(cardId, direction, rating, source, now, schedule.getVersion(),
+                ZoneId.systemDefault());
     }
 
-    /** Edit the content sides; the memory model only moves through reviews. */
+    /** Browser rating that must match the server preview's schedule version and timestamp. */
+    @Transactional
+    public VocabCardSummary recordReview(UUID cardId, VocabReviewDirection direction,
+            VocabReviewLog.Rating rating, VocabReviewLog.ReviewSource source,
+            Instant previewedAt, long expectedScheduleVersion, ZoneId zone) {
+        VocabCard card = get(cardId);
+        VocabReviewDirection requiredDirection = Objects.requireNonNull(direction,
+                "direction is required");
+        requireEnabled(card, requiredDirection);
+        VocabSchedulingCard schedule = getSchedule(cardId, requiredDirection);
+        if (schedule.getVersion() != expectedScheduleVersion) {
+            throw new OptimisticLockingFailureException("Vocabulary schedule " + schedule.getId()
+                    + " was modified concurrently");
+        }
+        Instant reviewedAt = Objects.requireNonNull(previewedAt, "previewedAt is required");
+        VocabReviewLog.Rating requiredRating = Objects.requireNonNull(rating, "rating is required");
+        boolean lapse = VocabScheduler.isLapse(schedule, requiredRating);
+        VocabScheduler.Outcome outcome = VocabScheduler.schedule(schedule, requiredRating, reviewedAt);
+        reviews.save(new VocabReviewLog(UUID.randomUUID(), schedule, reviewedAt, requiredRating,
+                Objects.requireNonNull(source, "source is required"),
+                VocabScheduler.elapsedDays(schedule, reviewedAt), lapse, outcome));
+        schedule.apply(outcome, lapse);
+        schedules.save(schedule);
+        burySibling(card, requiredDirection, reviewedAt, Objects.requireNonNull(zone, "zone is required"));
+        return summarize(List.of(card), reviewedAt).getFirst();
+    }
+
     @Transactional
     public VocabCardSummary update(UUID id, String front, String back, String metadata,
             VocabLanguage language, String deck, UUID disciplineId, boolean suspended) {
@@ -204,10 +211,16 @@ public class VocabService {
         String requiredFront = requireText(front, "front", 255);
         VocabLanguage requiredLanguage = Objects.requireNonNullElseGet(language,
                 () -> VocabLanguage.detect(requiredFront));
-        card.edit(requireText(front, "front", 255), requireText(back, "back", 1000),
-                trimToNull(metadata, 4000), requiredLanguage,
+        boolean enableNewProduction = productionEnabled && !card.isProductionEnabled();
+        card.edit(requiredFront, requireText(back, "back", 1000), trimToNull(metadata, 4000),
+                requiredLanguage,
                 canonicalDeck(deck, requiredLanguage, cards.findByOrderByCreatedAtDesc()),
                 disciplineId, suspended, productionEnabled);
+        if (enableNewProduction && schedules.findByVocabCardIdAndDirection(id,
+                VocabReviewDirection.PRODUCTION).isEmpty()) {
+            schedules.save(new VocabSchedulingCard(UUID.randomUUID(), id,
+                    VocabReviewDirection.PRODUCTION, Instant.now()));
+        }
         return summarize(List.of(card), Instant.now()).getFirst();
     }
 
@@ -221,26 +234,20 @@ public class VocabService {
         return summarize(List.of(get(id)), Instant.now()).getFirst();
     }
 
-    /** Cards whose front or back contains the query — resolving "cái từ 磨蹭 ấy". */
     @Transactional(readOnly = true)
     public List<VocabCardSummary> search(String query) {
         String needle = Objects.requireNonNull(query, "query is required").strip();
-        if (needle.isEmpty()) {
-            throw new IllegalArgumentException("query is required");
-        }
-        return summarize(cards
-                .findTop20ByFrontContainingIgnoreCaseOrBackContainingIgnoreCase(needle, needle),
-                Instant.now());
+        if (needle.isEmpty()) throw new IllegalArgumentException("query is required");
+        return summarize(cards.findTop20ByFrontContainingIgnoreCaseOrBackContainingIgnoreCase(
+                needle, needle), Instant.now());
     }
 
-    /** Cards introduced since the local day started — the new-cards/day guidance. */
     @Transactional(readOnly = true)
     public long newCardsToday(ZoneId zone) {
         Instant dayStart = LocalDate.now(zone).atStartOfDay(zone).toInstant();
         return cards.countByCreatedAtGreaterThanEqual(dayStart);
     }
 
-    /** Reviews recorded in the trailing window — the page's activity stat. */
     @Transactional(readOnly = true)
     public long reviewsSince(Instant since) {
         return reviews.countByReviewedAtGreaterThanEqual(
@@ -251,22 +258,62 @@ public class VocabService {
         return cards.findById(id).orElseThrow(() -> new VocabCardNotFoundException(id));
     }
 
+    private VocabSchedulingCard getSchedule(UUID cardId, VocabReviewDirection direction) {
+        return schedules.findByVocabCardIdAndDirection(cardId,
+                        Objects.requireNonNull(direction, "direction is required"))
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No " + direction + " schedule exists for " + cardId));
+    }
+
     private List<VocabCardSummary> summarize(List<VocabCard> list, Instant now) {
+        Map<UUID, List<VocabSchedulingCard>> byCard = schedulesByCard(list);
         Map<ReviewKey, Integer> counts = reviewCounts(list);
         return list.stream().map(card -> {
-            double elapsedHours = Math.max(MIN_ELAPSED_HOURS,
-                    Duration.between(card.getLastReviewedAt(), now).toMillis() / 3_600_000.0);
-            double recall = Ebisu.predictRecall(model(card), elapsedHours);
+            Map<VocabReviewDirection, VocabSchedulingCard> directions = byCard
+                    .getOrDefault(card.getId(), List.of()).stream()
+                    .collect(Collectors.toMap(VocabSchedulingCard::getDirection, Function.identity()));
+            VocabSchedulingCard recognition = requireSchedule(card, directions,
+                    VocabReviewDirection.RECOGNITION);
+            VocabSchedulingCard production = directions.get(VocabReviewDirection.PRODUCTION);
             return new VocabCardSummary(card.getId(), card.getFront(), card.getBack(),
-                    card.getMetadata(), card.getLanguage(), card.getDeck(),
-                    card.getDisciplineId(), recall, card.getHalflifeHours(),
-                    card.getLastReviewedAt(), counts.getOrDefault(
+                    card.getMetadata(), card.getLanguage(), card.getDeck(), card.getDisciplineId(),
+                    VocabScheduler.retrievability(recognition, now), recognition.getStabilityDays(),
+                    recognition.getDueAt(), recognition.getBuriedUntil(),
+                    recognition.getLastReviewedAt(), recognition.getState(),
+                    recognition.getLapseCount(), recognition.isLeech(), counts.getOrDefault(
                             new ReviewKey(card.getId(), VocabReviewDirection.RECOGNITION), 0),
                     card.isSuspended(), card.getCreatedAt(), card.getVersion(),
-                    card.isProductionEnabled(), productionRecall(card, now),
-                    card.isProductionEnabled() ? counts.getOrDefault(
-                            new ReviewKey(card.getId(), VocabReviewDirection.PRODUCTION), 0) : null);
+                    card.isProductionEnabled(),
+                    production == null ? null : VocabScheduler.retrievability(production, now),
+                    production == null ? null : production.getStabilityDays(),
+                    production == null ? null : production.getDueAt(),
+                    production == null ? null : production.getBuriedUntil(),
+                    production == null ? null : production.getState(),
+                    production == null ? null : production.getLapseCount(),
+                    production == null ? null : production.isLeech(),
+                    production == null ? null : counts.getOrDefault(
+                            new ReviewKey(card.getId(), VocabReviewDirection.PRODUCTION), 0));
         }).toList();
+    }
+
+    private VocabReviewCardSummary reviewSummary(VocabCard card, VocabSchedulingCard schedule,
+            Instant previewedAt, Map<ReviewKey, Integer> counts) {
+        return new VocabReviewCardSummary(card.getId(), schedule.getId(), schedule.getVersion(),
+                schedule.getDirection(), card.getFront(), card.getBack(), card.getMetadata(),
+                card.getLanguage(), card.getDeck(), card.getDisciplineId(),
+                VocabScheduler.retrievability(schedule, previewedAt), schedule.getStabilityDays(),
+                schedule.getDueAt(), schedule.getLastReviewedAt(), schedule.getState(),
+                schedule.getLearningStep(), schedule.getLapseCount(), schedule.isLeech(),
+                counts.getOrDefault(new ReviewKey(card.getId(), schedule.getDirection()), 0),
+                card.isSuspended(), card.getCreatedAt(), card.getVersion(), previewedAt,
+                VocabScheduler.previews(schedule, previewedAt));
+    }
+
+    private Map<UUID, List<VocabSchedulingCard>> schedulesByCard(List<VocabCard> list) {
+        List<UUID> ids = list.stream().map(VocabCard::getId).toList();
+        if (ids.isEmpty()) return Map.of();
+        return schedules.findByVocabCardIdIn(ids).stream()
+                .collect(Collectors.groupingBy(VocabSchedulingCard::getVocabCardId));
     }
 
     private Map<ReviewKey, Integer> reviewCounts(List<VocabCard> list) {
@@ -281,62 +328,52 @@ public class VocabService {
         return counts;
     }
 
-    private VocabReviewCardSummary weakestDirection(VocabCard card, Instant now,
-            Map<ReviewKey, Integer> counts) {
-        VocabReviewDirection direction = VocabReviewDirection.RECOGNITION;
-        double recognition = recall(card, VocabReviewDirection.RECOGNITION, now);
-        double selectedRecall = recognition;
-        if (card.isProductionEnabled()) {
-            double production = recall(card, VocabReviewDirection.PRODUCTION, now);
-            if (production < recognition) {
-                direction = VocabReviewDirection.PRODUCTION;
-                selectedRecall = production;
-            }
+    private Comparator<VocabSchedulingCard> scheduleOrdering(Instant now) {
+        return Comparator.comparingInt((VocabSchedulingCard schedule) -> queuePriority(
+                        schedule.getState(), schedule.getLastReviewedAt()))
+                .thenComparingDouble(schedule -> VocabScheduler.retrievability(schedule, now))
+                .thenComparing(VocabSchedulingCard::getDueAt)
+                .thenComparing(schedule -> schedule.getDirection().ordinal());
+    }
+
+    private static int queuePriority(VocabSchedulingState state, Instant lastReviewedAt) {
+        if (state == VocabSchedulingState.RELEARNING) return 0;
+        if (state == VocabSchedulingState.LEARNING && lastReviewedAt != null) return 0;
+        if (state == VocabSchedulingState.REVIEW) return 1;
+        return 2;
+    }
+
+    private void burySibling(VocabCard card, VocabReviewDirection reviewedDirection,
+            Instant reviewedAt, ZoneId zone) {
+        VocabReviewDirection siblingDirection = reviewedDirection == VocabReviewDirection.RECOGNITION
+                ? VocabReviewDirection.PRODUCTION : VocabReviewDirection.RECOGNITION;
+        if (!enabled(card, siblingDirection)) return;
+        schedules.findByVocabCardIdAndDirection(card.getId(), siblingDirection)
+                .ifPresent(sibling -> {
+                    Instant nextDay = reviewedAt.atZone(zone).toLocalDate().plusDays(1)
+                            .atStartOfDay(zone).toInstant();
+                    sibling.buryUntil(nextDay);
+                    schedules.save(sibling);
+                });
+    }
+
+    private static VocabSchedulingCard requireSchedule(VocabCard card,
+            Map<VocabReviewDirection, VocabSchedulingCard> directions,
+            VocabReviewDirection direction) {
+        VocabSchedulingCard schedule = directions.get(direction);
+        if (schedule == null) {
+            throw new IllegalStateException("Vocabulary card " + card.getId()
+                    + " has no " + direction + " schedule");
         }
-        return new VocabReviewCardSummary(card.getId(), direction, card.getFront(), card.getBack(),
-                card.getMetadata(), card.getLanguage(), card.getDeck(), card.getDisciplineId(),
-                selectedRecall, halflife(card, direction), lastReviewedAt(card, direction),
-                counts.getOrDefault(new ReviewKey(card.getId(), direction), 0), card.isSuspended(),
-                card.getCreatedAt(), card.getVersion());
+        return schedule;
     }
 
-    private static Double productionRecall(VocabCard card, Instant now) {
-        return card.isProductionEnabled() ? recall(card, VocabReviewDirection.PRODUCTION, now) : null;
-    }
-
-    private static double recall(VocabCard card, VocabReviewDirection direction, Instant now) {
-        double elapsedHours = Math.max(MIN_ELAPSED_HOURS,
-                Duration.between(lastReviewedAt(card, direction), now).toMillis() / 3_600_000.0);
-        return Ebisu.predictRecall(model(card, direction), elapsedHours);
-    }
-
-    private static Ebisu.Model model(VocabCard card) {
-        return new Ebisu.Model(card.getHalflifeHours(), card.getAlpha(), card.getBeta());
-    }
-
-    private static Ebisu.Model model(VocabCard card, VocabReviewDirection direction) {
-        if (direction == VocabReviewDirection.PRODUCTION) {
-            requireEnabled(card, direction);
-            return new Ebisu.Model(card.getProductionHalflifeHours(),
-                    card.getProductionAlpha(), card.getProductionBeta());
-        }
-        return model(card);
-    }
-
-    private static double halflife(VocabCard card, VocabReviewDirection direction) {
-        return direction == VocabReviewDirection.PRODUCTION
-                ? Objects.requireNonNull(card.getProductionHalflifeHours())
-                : card.getHalflifeHours();
-    }
-
-    private static Instant lastReviewedAt(VocabCard card, VocabReviewDirection direction) {
-        return direction == VocabReviewDirection.PRODUCTION
-                ? Objects.requireNonNull(card.getProductionLastReviewedAt())
-                : card.getLastReviewedAt();
+    private static boolean enabled(VocabCard card, VocabReviewDirection direction) {
+        return direction == VocabReviewDirection.RECOGNITION || card.isProductionEnabled();
     }
 
     private static void requireEnabled(VocabCard card, VocabReviewDirection direction) {
-        if (direction == VocabReviewDirection.PRODUCTION && !card.isProductionEnabled()) {
+        if (!enabled(card, direction)) {
             throw new IllegalArgumentException("Production review is not enabled for " + card.getId());
         }
     }
@@ -357,9 +394,7 @@ public class VocabService {
     }
 
     private static String trimToNull(String value, int maxLength) {
-        if (value == null || value.isBlank()) {
-            return null;
-        }
+        if (value == null || value.isBlank()) return null;
         String stripped = value.strip();
         if (stripped.codePointCount(0, stripped.length()) > maxLength) {
             throw new IllegalArgumentException("metadata must be at most " + maxLength

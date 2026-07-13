@@ -6,6 +6,8 @@ import com.northstar.core.discipline.DisciplineService;
 import com.northstar.core.study.NewVocabCard;
 import com.northstar.core.study.VocabCardSummary;
 import com.northstar.core.study.VocabLanguage;
+import com.northstar.core.study.VocabReviewCardSummary;
+import com.northstar.core.study.VocabReviewDirection;
 import com.northstar.core.study.VocabReviewLog;
 import com.northstar.core.study.VocabService;
 import java.util.List;
@@ -50,11 +52,12 @@ class VocabTools implements NorthstarTool {
             back in one line each.""";
 
     private static final String QUIZ = """
-            The N cards in ONE required language and optional deck most likely \
-            forgotten RIGHT NOW (lowest predicted \
-            recall first) — there are no due dates, so this is always callable \
-            and never backlogged. Each entry carries front, back, reading, \
-            example, and recallProbability. QUIZ PROTOCOL when the user wants \
+            The due FSRS cards in ONE required language and optional deck. \
+            Learning/relearning comes first, then review, then new cards; \
+            weaker retrievability wins ties. Each entry carries its direction, \
+            content, memory state, due time, and four server-computed rating \
+            previews. If the list is empty, say there is nothing due. QUIZ \
+            PROTOCOL when the user wants \
             to review ("ôn từ đi"): ask ONE front at a time and wait for the \
             answer; NEVER show the back before the user answers; grade \
             meaning-equivalence generously (paraphrases and synonyms count, \
@@ -69,9 +72,10 @@ class VocabTools implements NorthstarTool {
             Call once per card, right after grading the user's answer in a \
             quiz. Ratings (Anki convention): AGAIN = failed to recall, HARD = \
             recalled with real difficulty or only partially, GOOD = recalled \
-            correctly, EASY = instant and confident. AGAIN shrinks the card's \
-            half-life; the others grow it. Card ids come from quiz_vocab or \
-            find_vocab_cards.""";
+            correctly, EASY = instant and confident. AGAIN starts learning or \
+            relearning; HARD/GOOD/EASY create distinct FSRS intervals. HARD \
+            means recalled with difficulty, never forgotten. Card ids and \
+            direction come from quiz_vocab.""";
 
     private static final String FIND_CARDS = """
             Find cards whose front or back contains the query, \
@@ -128,7 +132,7 @@ class VocabTools implements NorthstarTool {
     @McpTool(name = "quiz_vocab", description = QUIZ,
             annotations = @McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false,
                     openWorldHint = false))
-    List<VocabCardSummary> quizVocab(
+    List<VocabReviewCardSummary> quizVocab(
             @ToolParam(description = "How many cards, 1-50; defaults to 5", required = false)
             @McpToolParam(description = "How many cards, 1-50; defaults to 5",
                     required = false) Integer count,
@@ -138,7 +142,7 @@ class VocabTools implements NorthstarTool {
             @ToolParam(description = "Deck name, General, or blank for all decks", required = false)
             @McpToolParam(description = "Deck name, General, or blank for all decks",
                     required = false) String deck) {
-        return vocab.atRisk(parseRequiredLanguage(language), deck,
+        return vocab.reviewQueue(parseRequiredLanguage(language), deck,
                 count == null ? 5 : count, null);
     }
 
@@ -150,10 +154,14 @@ class VocabTools implements NorthstarTool {
             @McpToolParam(description = "The card's UUID", required = true) String cardId,
             @ToolParam(description = "AGAIN, HARD, GOOD, or EASY")
             @McpToolParam(description = "AGAIN, HARD, GOOD, or EASY",
-                    required = true) String rating) {
+                    required = true) String rating,
+            @ToolParam(description = "RECOGNITION or PRODUCTION")
+            @McpToolParam(description = "RECOGNITION or PRODUCTION",
+                    required = true) String direction) {
         VocabReviewLog.Rating parsed = parseRating(rating);
-        return vocab.recordReview(UUID.fromString(cardId), parsed.success(), parsed,
-                VocabReviewLog.ReviewSource.CHAT);
+        return vocab.recordReview(UUID.fromString(cardId),
+                VocabReviewDirection.valueOf(direction.strip().toUpperCase(Locale.ROOT)),
+                parsed.success(), parsed, VocabReviewLog.ReviewSource.CHAT);
     }
 
     @Tool(name = "find_vocab_cards", description = FIND_CARDS)

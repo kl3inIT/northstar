@@ -22,6 +22,7 @@ import com.northstar.core.study.VocabCoach;
 import com.northstar.core.study.VocabEnrichmentField;
 import com.northstar.core.study.VocabEnrichmentPreview;
 import com.northstar.core.study.VocabLanguage;
+import com.northstar.core.study.VocabSchedulingState;
 import com.northstar.core.study.VocabService;
 import java.time.Instant;
 import java.util.List;
@@ -129,15 +130,24 @@ class VocabEnrichmentJobServiceTests {
     private static VocabCardSummary card() {
         Instant now = Instant.parse("2026-07-12T00:00:00Z");
         return new VocabCardSummary(UUID.randomUUID(), "reassign", "giao lại", "{}",
-                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24, now, 1, false, now, 7,
-                true, 0.3, 0);
+                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24.0, now, null, now,
+                VocabSchedulingState.REVIEW, 0, false, 1, false, now, 7,
+                true, 0.3, 20.0, now.plusSeconds(86_400), null,
+                VocabSchedulingState.REVIEW,
+                0, false, 0);
     }
 
     private static VocabCardSummary copy(VocabCardSummary source, String front, long version) {
         return new VocabCardSummary(source.id(), front, source.back(), source.metadata(),
                 source.language(), source.deck(), source.disciplineId(), source.recallProbability(),
-                source.halflifeHours(), source.lastReviewedAt(), source.reviewCount(),
+                source.stabilityDays(), source.dueAt(), source.buriedUntil(),
+                source.lastReviewedAt(),
+                source.schedulingState(), source.lapseCount(), source.leech(), source.reviewCount(),
                 source.suspended(), source.createdAt(), version, source.productionEnabled(),
-                source.productionRecallProbability(), source.productionReviewCount());
+                source.productionRecallProbability(), source.productionStabilityDays(),
+                source.productionDueAt(), source.productionBuriedUntil(),
+                source.productionSchedulingState(),
+                source.productionLapseCount(), source.productionLeech(),
+                source.productionReviewCount());
     }
 }

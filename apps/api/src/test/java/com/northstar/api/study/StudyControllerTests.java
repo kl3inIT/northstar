@@ -19,6 +19,7 @@ import com.northstar.core.study.VocabLanguage;
 import com.northstar.core.study.VocabReviewLog;
 import com.northstar.core.study.VocabReviewDirection;
 import com.northstar.core.study.VocabService;
+import com.northstar.core.study.VocabSchedulingState;
 import com.northstar.core.study.WritingService;
 import java.time.Instant;
 import java.util.List;
@@ -50,19 +51,20 @@ class StudyControllerTests {
     @Test
     void manualRatingIsTheOnlyReviewEndpointMemoryWrite() {
         UUID id = UUID.randomUUID();
+        Instant previewedAt = Instant.parse("2026-07-12T00:00:00Z");
         VocabCardSummary expected = card(id);
-        when(vocab.recordReview(id, VocabReviewDirection.RECOGNITION, 0.6,
-                VocabReviewLog.Rating.HARD,
-                VocabReviewLog.ReviewSource.MANUAL)).thenReturn(expected);
+        when(vocab.recordReview(id, VocabReviewDirection.RECOGNITION,
+                VocabReviewLog.Rating.HARD, VocabReviewLog.ReviewSource.MANUAL,
+                previewedAt, 3, java.time.ZoneId.of("Asia/Bangkok"))).thenReturn(expected);
 
         VocabCardSummary actual = controller.recordVocabReview(id,
                 new StudyRequest.VocabReviewRequest(VocabReviewLog.Rating.HARD,
-                        VocabReviewDirection.RECOGNITION));
+                        VocabReviewDirection.RECOGNITION, previewedAt, 3L), "Asia/Bangkok");
 
         assertThat(actual).isSameAs(expected);
-        verify(vocab).recordReview(id, VocabReviewDirection.RECOGNITION, 0.6,
-                VocabReviewLog.Rating.HARD,
-                VocabReviewLog.ReviewSource.MANUAL);
+        verify(vocab).recordReview(id, VocabReviewDirection.RECOGNITION,
+                VocabReviewLog.Rating.HARD, VocabReviewLog.ReviewSource.MANUAL,
+                previewedAt, 3, java.time.ZoneId.of("Asia/Bangkok"));
     }
 
     @Test
@@ -95,7 +97,8 @@ class StudyControllerTests {
         Instant now = Instant.parse("2026-07-12T00:00:00Z");
         return new VocabCardSummary(id, "meticulous", "tỉ mỉ",
                 "{\"reading\":\"/məˈtɪkjələs/\",\"partOfSpeech\":\"adjective\"}",
-                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24, now, 2, false, now, 1,
-                false, null, null);
+                VocabLanguage.ENGLISH, "IELTS", null, 0.4, 24.0, now, null, now,
+                VocabSchedulingState.REVIEW, 0, false, 2, false, now, 1,
+                false, null, null, null, null, null, null, null, null);
     }
 }

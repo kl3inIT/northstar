@@ -110,7 +110,7 @@ class AssistantController {
               one lexical item is clear; otherwise ask which word. Do not auto-save words
               merely present in prose, quoted passages, or general research. When they
               ask to review vocabulary ("ôn từ đi"), run the quiz via quiz_vocab and
-              record each answer with record_vocab_review so the cards' memory models move.
+              record each due answer with record_vocab_review so its FSRS schedule moves.
               When they ask to practice grammar ("luyện ngữ pháp"), call
               grammar_weaknesses and run its drill protocol on THEIR recurring errors —
               never drill generic textbook grammar while their own error corpus exists.

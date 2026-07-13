@@ -330,8 +330,17 @@ export function useVocabReviewCards(
 export function useRecordVocabReview() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, rating, direction }: { id: string; rating: VocabRating; direction: VocabReviewDirection }) =>
-      dataOrThrow(await recordVocabReview({ path: { id }, body: { rating, direction } })),
+    mutationFn: async ({ id, rating, direction, previewedAt, schedulingVersion }: {
+      id: string
+      rating: VocabRating
+      direction: VocabReviewDirection
+      previewedAt: string
+      schedulingVersion: number
+    }) => dataOrThrow(await recordVocabReview({
+      path: { id },
+      headers: tzHeaders,
+      body: { rating, direction, previewedAt, schedulingVersion },
+    })),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['study-vocab'] })
       void queryClient.invalidateQueries({ queryKey: ['study-vocab-review'] })

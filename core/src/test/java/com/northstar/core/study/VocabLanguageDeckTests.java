@@ -1,6 +1,7 @@
 package com.northstar.core.study;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -23,13 +24,22 @@ class VocabLanguageDeckTests {
     @Test
     void queueFiltersLanguageThenDeckWithoutMixing() {
         VocabCardRepository cards = mock(VocabCardRepository.class);
+        VocabSchedulingCardRepository schedules = mock(VocabSchedulingCardRepository.class);
         VocabReviewLogRepository reviews = mock(VocabReviewLogRepository.class);
-        VocabCard ielts = card("meticulous", VocabLanguage.ENGLISH, "IELTS", 0.8);
-        VocabCard daily = card("errand", VocabLanguage.ENGLISH, null, 0.3);
-        VocabCard hsk = card("磨蹭", VocabLanguage.CHINESE, "HSK4", 0.1);
+        VocabCard ielts = card("meticulous", VocabLanguage.ENGLISH, "IELTS");
+        VocabCard daily = card("errand", VocabLanguage.ENGLISH, null);
+        VocabCard hsk = card("磨蹭", VocabLanguage.CHINESE, "HSK4");
         when(cards.findBySuspendedFalse()).thenReturn(List.of(ielts, daily, hsk));
-        when(reviews.countByCard(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
-        VocabService service = new VocabService(cards, reviews, mock(VocabDeckService.class));
+        when(schedules.findByVocabCardIdIn(anyList())).thenAnswer(invocation -> {
+            List<UUID> ids = invocation.getArgument(0);
+            return List.of(ielts, daily, hsk).stream()
+                    .filter(card -> ids.contains(card.getId()))
+                    .map(VocabLanguageDeckTests::recognition)
+                    .toList();
+        });
+        when(reviews.countByCard(anyList())).thenReturn(List.of());
+        VocabService service = new VocabService(cards, schedules, reviews,
+                mock(VocabDeckService.class));
 
         assertThat(service.atRisk(VocabLanguage.ENGLISH, "IELTS", 20, NOW))
                 .extracting(VocabCardSummary::front).containsExactly("meticulous");
@@ -41,7 +51,7 @@ class VocabLanguageDeckTests {
 
     @Test
     void deckCanonicalizationReusesCasingAndGeneralIsStoredAsNull() {
-        VocabCard existing = card("precise", VocabLanguage.ENGLISH, "IELTS", 0.5);
+        VocabCard existing = card("precise", VocabLanguage.ENGLISH, "IELTS");
         assertThat(VocabService.canonicalDeck(" ielts ", VocabLanguage.ENGLISH,
                 List.of(existing))).isEqualTo("IELTS");
         assertThat(VocabService.canonicalDeck("General", VocabLanguage.ENGLISH,
@@ -49,41 +59,50 @@ class VocabLanguageDeckTests {
     }
 
     @Test
-    void classificationEditDoesNotResetMemory() {
-        VocabCard card = card("detail", VocabLanguage.ENGLISH, null, 0.5);
-        double alpha = card.getAlpha();
-        double beta = card.getBeta();
-        double halfLife = card.getHalflifeHours();
-        Instant reviewedAt = card.getLastReviewedAt();
+    void classificationEditDoesNotResetIndependentSchedule() {
+        VocabCard card = card("detail", VocabLanguage.ENGLISH, null);
+        VocabSchedulingCard schedule = recognition(card);
+        VocabScheduler.Outcome learned = VocabScheduler.schedule(schedule,
+                VocabReviewLog.Rating.EASY, NOW);
+        schedule.apply(learned, false);
 
         card.edit(card.getFront(), card.getBack(), card.getMetadata(),
                 VocabLanguage.ENGLISH, "IELTS", card.getDisciplineId(), false);
 
-        assertThat(card.getAlpha()).isEqualTo(alpha);
-        assertThat(card.getBeta()).isEqualTo(beta);
-        assertThat(card.getHalflifeHours()).isEqualTo(halfLife);
-        assertThat(card.getLastReviewedAt()).isEqualTo(reviewedAt);
+        assertThat(schedule.getState()).isEqualTo(learned.state());
+        assertThat(schedule.getStabilityDays()).isEqualTo(learned.stabilityDays());
+        assertThat(schedule.getDueAt()).isEqualTo(learned.dueAt());
     }
 
     @Test
-    void productionDirectionHasIndependentMemoryAndIsTheOnlySiblingQueued() {
+    void enabledDirectionsHaveIndependentSchedulesAndOnlyOneSiblingIsQueued() {
         VocabCardRepository cards = mock(VocabCardRepository.class);
+        VocabSchedulingCardRepository schedules = mock(VocabSchedulingCardRepository.class);
         VocabReviewLogRepository reviews = mock(VocabReviewLogRepository.class);
-        VocabCard card = card("serendipity", VocabLanguage.ENGLISH, "IELTS", 20);
-        card.setProductionEnabled(true, NOW);
+        VocabCard card = card("serendipity", VocabLanguage.ENGLISH, "IELTS");
+        card.setProductionEnabled(true);
+        VocabSchedulingCard recognition = recognition(card);
+        VocabSchedulingCard production = new VocabSchedulingCard(UUID.randomUUID(), card.getId(),
+                VocabReviewDirection.PRODUCTION, NOW);
         when(cards.findBySuspendedFalse()).thenReturn(List.of(card));
-        when(reviews.countByCard(org.mockito.ArgumentMatchers.anyList())).thenReturn(List.of());
-        VocabService service = new VocabService(cards, reviews, mock(VocabDeckService.class));
+        when(schedules.findByVocabCardIdIn(anyList())).thenReturn(List.of(recognition, production));
+        when(reviews.countByCard(anyList())).thenReturn(List.of());
+        VocabService service = new VocabService(cards, schedules, reviews,
+                mock(VocabDeckService.class));
 
         assertThat(service.reviewQueue(VocabLanguage.ENGLISH, "IELTS", 20, NOW))
                 .singleElement()
                 .extracting(VocabReviewCardSummary::direction)
-                .isEqualTo(VocabReviewDirection.PRODUCTION);
+                .isEqualTo(VocabReviewDirection.RECOGNITION);
+        assertThat(recognition.getId()).isNotEqualTo(production.getId());
     }
 
-    private static VocabCard card(String front, VocabLanguage language, String deck,
-            double alpha) {
-        return new VocabCard(UUID.randomUUID(), front, "meaning", null, language, deck,
-                null, alpha, 2, 24, NOW);
+    private static VocabCard card(String front, VocabLanguage language, String deck) {
+        return new VocabCard(UUID.randomUUID(), front, "meaning", null, language, deck, null);
+    }
+
+    private static VocabSchedulingCard recognition(VocabCard card) {
+        return new VocabSchedulingCard(UUID.randomUUID(), card.getId(),
+                VocabReviewDirection.RECOGNITION, NOW);
     }
 }
