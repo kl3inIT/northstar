@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.ai.converter.BeanOutputConverter;
 import tools.jackson.databind.ObjectMapper;
 
 class VocabCoachTests {
@@ -71,8 +72,8 @@ class VocabCoachTests {
     @Test
     void wordFormationIsStructuredAndMayBeOmittedWhenNotUseful() {
         VocabWordFormation formation = new VocabWordFormation(List.of(
-                new VocabWordPart("re-", "prefix", "again"),
-                new VocabWordPart("assign", "base", "give a task")),
+                new VocabWordPart("re-", VocabWordPartKind.prefix, "again"),
+                new VocabWordPart("assign", VocabWordPartKind.base, "give a task")),
                 "reassign means assign again", List.of("assign", "assignment", "reassignment"));
         var generated = new VocabCoach.GeneratedEnrichment(null, null, null, null,
                 null, null, formation);
@@ -90,11 +91,21 @@ class VocabCoachTests {
 
         var malformed = new VocabCoach.GeneratedEnrichment(null, null, null, null,
                 null, null, new VocabWordFormation(List.of(
-                        new VocabWordPart("serendipity", "history", "uncertain origin")),
+                        new VocabWordPart("serendipity", VocabWordPartKind.root, "uncertain origin")),
                         "Not a useful modern decomposition", List.of()));
         assertThat(VocabCoach.enrichmentProblem(malformed,
                 Set.of(VocabEnrichmentField.WORD_FORMATION))).isNull();
         assertThat(VocabCoach.preview("{}", malformed,
                 Set.of(VocabEnrichmentField.WORD_FORMATION), json).wordFormation()).isNull();
+    }
+
+    @Test
+    void providerSchemaRestrictsWordPartKinds() {
+        String schema = new BeanOutputConverter<>(VocabCoach.GeneratedEnrichment.class)
+                .getJsonSchema();
+
+        assertThat(schema).containsPattern(
+                "\\\"enum\\\"\\s*:\\s*\\[\\s*\\\"prefix\\\"\\s*,\\s*\\\"root\\\""
+                        + "\\s*,\\s*\\\"base\\\"\\s*,\\s*\\\"suffix\\\"\\s*]");
     }
 }

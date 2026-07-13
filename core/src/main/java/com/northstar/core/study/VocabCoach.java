@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.prompt.ChatOptions;
 import tools.jackson.databind.ObjectMapper;
 
 /** Explicit, non-persisting AI help for one vocabulary card. */
@@ -19,6 +18,8 @@ public class VocabCoach {
     private static final int MAX_ANSWER_CHARS = 1000;
     private static final int MAX_FEEDBACK_CHARS = 300;
     private static final int MAX_METADATA_CHARS = 4000;
+    private static final int ANSWER_MAX_TOKENS = 512;
+    private static final int ENRICHMENT_MAX_TOKENS = 2048;
 
     private static final String ANSWER_SYSTEM = """
             Judge whether a learner's answer is meaning-equivalent to the saved
@@ -106,7 +107,7 @@ public class VocabCoach {
                 + "\nLearner answer: " + answer
                 + (correction == null ? "" : "\n\nCorrect the previous output: " + correction);
         return ai.client(route).prompt()
-                .options(ChatOptions.builder().model(route.modelId()))
+                .options(ai.structuredOutputOptions(route, ANSWER_MAX_TOKENS))
                 .system(direction == VocabReviewDirection.PRODUCTION
                         ? PRODUCTION_ANSWER_SYSTEM : ANSWER_SYSTEM)
                 .user(user).call()
@@ -121,7 +122,7 @@ public class VocabCoach {
                 + "\nRequested fields: " + fields
                 + (correction == null ? "" : "\n\nCorrect the previous output: " + correction);
         return ai.client(route).prompt()
-                .options(ChatOptions.builder().model(route.modelId()))
+                .options(ai.structuredOutputOptions(route, ENRICHMENT_MAX_TOKENS))
                 .system(ENRICH_SYSTEM).user(user).call()
                 .entity(GeneratedEnrichment.class,
                         ChatClient.EntityParamSpec::useProviderStructuredOutput);
@@ -228,12 +229,11 @@ public class VocabCoach {
         if (value == null) return null;
         if (value.parts() == null || value.parts().size() < 2 || value.parts().size() > 4
                 || value.explanation() == null || value.explanation().isBlank()) return null;
-        Set<String> kinds = Set.of("prefix", "root", "base", "suffix");
         List<VocabWordPart> parts = value.parts().stream().map(part -> {
             if (part == null || part.form() == null || part.form().isBlank()
-                    || part.kind() == null || !kinds.contains(part.kind().strip().toLowerCase())
+                    || part.kind() == null
                     || part.meaning() == null || part.meaning().isBlank()) return null;
-            return new VocabWordPart(part.form().strip(), part.kind().strip().toLowerCase(),
+            return new VocabWordPart(part.form().strip(), part.kind(),
                     part.meaning().strip());
         }).toList();
         if (parts.contains(null)) return null;
