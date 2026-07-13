@@ -11,6 +11,7 @@ import com.northstar.core.study.VocabCardSummary;
 import com.northstar.core.study.VocabCoach;
 import com.northstar.core.study.VocabEnrichmentField;
 import com.northstar.core.study.VocabEnrichmentPreview;
+import com.northstar.core.study.VocabPracticeText;
 import com.northstar.core.study.VocabService;
 import java.time.Duration;
 import java.time.Instant;
@@ -192,7 +193,9 @@ class VocabEnrichmentJobService {
 
     private String example(String metadata) {
         Object value = metadata(metadata).get("example");
-        return value instanceof String text && !text.isBlank() ? text.strip() : null;
+        return value instanceof String text
+                ? VocabPracticeText.targetExample(text).orElse(null)
+                : null;
     }
 
     private void evictExpired() {

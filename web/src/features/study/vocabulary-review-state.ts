@@ -78,9 +78,27 @@ export function wordAudioAssetId(front: string, metadata: VocabMetadata): string
 
 /** Example audio is invalidated automatically when the example text changes. */
 export function exampleAudioAssetId(metadata: VocabMetadata): string | undefined {
-  return metadata.exampleAudioAssetId && metadata.exampleAudioText === metadata.example
+  return metadata.exampleAudioAssetId && metadata.exampleAudioText === examplePracticeText(metadata)
     ? metadata.exampleAudioAssetId
     : undefined
+}
+
+/** Audio practice uses only the target-language half of `example — translation`. */
+export function examplePracticeText(metadata: VocabMetadata): string | undefined {
+  const example = metadata.example?.trim()
+  if (!example) return undefined
+  const separator = example.indexOf(' — ')
+  const target = (separator < 0 ? example : example.slice(0, separator)).trim()
+  return target || undefined
+}
+
+/** Shadowing is connected-speech practice and must never degrade to one isolated word. */
+export function shadowingPracticeReference(metadata: VocabMetadata): string | undefined {
+  const example = examplePracticeText(metadata)
+  if (!example) return undefined
+  const hanCharacters = [...example].filter((character) => /\p{Script=Han}/u.test(character)).length
+  const lexicalWords = example.match(/\p{L}[-\p{L}\p{M}'’]*/gu) ?? []
+  return lexicalWords.length >= 4 || hanCharacters >= 6 ? example : undefined
 }
 
 export function audioPracticeReference(
@@ -88,7 +106,9 @@ export function audioPracticeReference(
   metadata: VocabMetadata,
   mode: 'WORD' | 'SHADOWING' | 'DICTATION',
 ): string {
-  return mode === 'WORD' ? front : metadata.example?.trim() || front
+  if (mode === 'WORD') return front
+  if (mode === 'SHADOWING') return shadowingPracticeReference(metadata) ?? ''
+  return examplePracticeText(metadata) ?? front
 }
 
 /** Trend values are comparable only inside one practice mode and one provider scale. */

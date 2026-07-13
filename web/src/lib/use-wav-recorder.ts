@@ -110,7 +110,13 @@ export function useWavRecorder(maximumSeconds = 60) {
     setSeconds(0)
     chunksRef.current = []
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
       const context = new AudioContext()
       streamRef.current = stream
       contextRef.current = context
@@ -135,10 +141,12 @@ export function useWavRecorder(maximumSeconds = 60) {
         setSeconds(elapsed)
         if (elapsed >= maximumSeconds) finish()
       }, 100)
+      return true
     } catch {
       release()
       setState('idle')
       setError('Microphone access failed. Check browser permission and try again.')
+      return false
     }
   }
 

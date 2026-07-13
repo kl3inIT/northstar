@@ -103,17 +103,25 @@ enabled sibling until the next midnight in the browser's timezone.
   deleted (cascades the review log).
 - Listen uses valid applied speech first and `window.speechSynthesis` as the
   free default/fallback. Production prompts cannot play the target before
-  reveal. Practice has three modes: Word assesses the current front;
-  Shadowing plays and assesses the current saved example (or front fallback);
-  Dictation hides the same reference and uses a deterministic case- and
-  punctuation-tolerant word diff. Word and Shadowing recordings are playable
-  before submit and persist only after a successful assessment as 16-kHz,
-  16-bit mono PCM WAV. Attempt facts remain; recording bytes expire after 180
-  days and are capped at 20 per card/mode while pinned, first, best, and latest
+  reveal. Practice has three modes. Word is isolated pronunciation: it plays
+  and assesses the current front. Shadowing requires connected target-language
+  speech from the saved example (at least four lexical words or six Han
+  characters), never falls back to the front, and strips the translated half
+  after ` — `. Starting it opens the mic, plays the model while capture remains
+  live, asks the learner to follow one beat behind, and stops capture shortly
+  after playback. Its Azure values assess the learner's scripted pronunciation,
+  not timing similarity to the TTS waveform. Dictation hides the target-language
+  example, falls back to the front when no example exists, and uses a
+  deterministic case- and punctuation-tolerant word diff. Word and Shadowing
+  recordings are playable before submit and persist only after a successful
+  assessment as 16-kHz, 16-bit mono PCM WAV. Attempt facts remain; recording
+  bytes expire after 180 days and are capped at 20 per card/mode while pinned,
+  first, best, and latest
   recordings are preserved. History is newest-first with pin/delete and
   provider-aware Accuracy/Fluency/Prosody trends. These provider-native 0-100
   values are never converted to IELTS, and none of the three modes changes
-  either FSRS schedule.
+  either FSRS schedule. See
+  [decision 0035](../../decisions/0035-vocabulary-shadowing-requires-connected-live-following.md).
 
 ### Writing tutor
 

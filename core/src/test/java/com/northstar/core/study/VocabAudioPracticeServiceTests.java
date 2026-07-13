@@ -1,6 +1,7 @@
 package com.northstar.core.study;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -26,7 +27,8 @@ class VocabAudioPracticeServiceTests {
         UUID cardId = UUID.randomUUID();
         VocabCardSummary card = mock(VocabCardSummary.class);
         when(card.front()).thenReturn("serendipity");
-        when(card.metadata()).thenReturn("{\"example\":\"We met by pure serendipity.\"}");
+        when(card.metadata()).thenReturn(
+                "{\"example\":\"We met by pure serendipity. — Chúng tôi tình cờ gặp nhau.\"}");
         when(vocab.find(cardId)).thenReturn(card);
 
         assertThat(service.referenceText(cardId, VocabAudioPracticeMode.WORD))
@@ -35,6 +37,28 @@ class VocabAudioPracticeServiceTests {
                 .isEqualTo("We met by pure serendipity.");
         assertThat(service.referenceText(cardId, VocabAudioPracticeMode.DICTATION))
                 .isEqualTo("We met by pure serendipity.");
+    }
+
+    @Test
+    void shadowingRejectsAnIsolatedWordInsteadOfFallingBackToTheFront() {
+        UUID cardId = UUID.randomUUID();
+        VocabCardSummary card = mock(VocabCardSummary.class);
+        when(card.front()).thenReturn("serendipity");
+        when(card.metadata()).thenReturn("{}");
+        when(vocab.find(cardId)).thenReturn(card);
+
+        assertThatThrownBy(() -> service.referenceText(cardId, VocabAudioPracticeMode.SHADOWING))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("connected example");
+        assertThat(service.referenceText(cardId, VocabAudioPracticeMode.DICTATION))
+                .isEqualTo("serendipity");
+    }
+
+    @Test
+    void connectedSpeechRulesSupportSpacedAndHanLanguageExamples() {
+        assertThat(VocabPracticeText.supportsShadowing("Take it. — Cầm lấy đi.")).isFalse();
+        assertThat(VocabPracticeText.supportsShadowing("Please take a seat. — Xin mời ngồi.")).isTrue();
+        assertThat(VocabPracticeText.supportsShadowing("我们明天一起去学校。 — Ngày mai chúng ta cùng đi học.")).isTrue();
     }
 
     @Test
