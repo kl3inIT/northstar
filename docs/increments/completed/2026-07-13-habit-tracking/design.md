@@ -66,10 +66,10 @@ misleading daily streak.
 ### D5 — One quiet work surface
 
 `/habits` has `Today`, `All habits` and `Insights` views. Desktop uses a dense
-row matrix; mobile keeps one dominant check action and horizontally scrollable
-history. Creation/editing uses a dialog on desktop and responsive full-width
-layout on small screens. Kibo's contribution-graph composition is used as the
-reference for the heatmap; data and domain calculations stay server-side.
+row matrix; mobile keeps one dominant check action and a full-width seven-day
+history. Creation/editing uses a responsive dialog. Kibo's contribution-graph
+composition provides the horizontally scrollable heatmap; data and domain
+calculations stay server-side.
 
 No nested dashboard cards, giant rings, guilt copy, confetti, automatic AI
 coaching or notification orchestration are included.
@@ -108,4 +108,3 @@ the caller omits it.
 5. Web typecheck/build and browser walkthroughs cover desktop, compact mobile,
    dark mode, keyboard focus, empty/loading/error states and responsive heatmap.
 6. Full Gradle tests, Modulith verification and production web build end green.
-

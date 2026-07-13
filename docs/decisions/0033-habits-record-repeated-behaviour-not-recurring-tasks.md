@@ -1,4 +1,4 @@
-# 0032 — Habits record repeated behaviour, not recurring tasks
+# 0033 — Habits record repeated behaviour, not recurring tasks
 
 Status: accepted
 
@@ -29,4 +29,3 @@ rows.
   counters.
 - Notification delivery, quantified habits, sensors and social mechanics remain
   later capabilities rather than fields forced into V1.
-

@@ -155,6 +155,11 @@ Current MCP tool areas:
   as the cycle identity; stale calls and retries are rejected before a second
   expense can be created. Payment dates cannot be in the future in the user's
   configured zone.
+- Habits: `list_habits`, `today_habits`, `create_habit`, `update_habit`,
+  `set_habit_check_in`, `clear_habit_check_in`, `pause_habit`, `resume_habit`,
+  and `set_habit_archived`. Habits represent repeated behaviour rather than
+  finite work; the tools preserve check-in and schedule history and archive
+  instead of destructively deleting it.
 - Review: `draft_review`.
 
 The in-app Assistant additionally owns API-only `search_web` and
@@ -168,8 +173,11 @@ citations as structured `source-document` parts rather than pretending they are
 external URLs.
 
 The weekly `draft_review` facts include ordinary spending, exceptional
-purchases, and the median of the prior four full weeks when finance data exists.
-The reference is descriptive; it is not a maintained budget.
+purchases, and the median of the prior four full weeks when finance data exists,
+plus descriptive study and habit consistency facts when those trackers contain
+data. Financial references are not maintained budgets; habit pauses and excused
+days are neutral, and the writer is explicitly forbidden from shaming misses or
+prescribing streak protection.
 
 The web transcript keeps a tool workflow expanded when it completes. The user
 may collapse it explicitly, but a state transition must not shrink the message

@@ -30,6 +30,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Speech assessment V1 | Done | Provider-neutral speech port with Azure Speech SDK delivery measurement, live card pronunciation, one-question Speaking practice, routed AI content coaching, shared grammar corpus, and four-tab Study UI. The UI keeps provider 0-100 measurements separate from a rubric-grounded, LOW-confidence unofficial one-answer IELTS-style range with criterion evidence and scorer version; no provider score is converted into a band. Live provider/grader and browser flows are verified. |
 | AI capability catalogs and on-demand text to speech | Done | Explicit Assistant read-aloud, isolated Chat/TTS/STT/Image/Embedding route catalogs, OpenAI/9Router discovery with manual fallback, TTS language/voice selection, persisted content-addressed MP3 reuse, and responsive AI Elements selectors/playback. No automatic generation or playback. |
 | Vocabulary audio practice | Done | Explicit word/example TTS enrichment, applied-audio-first browser fallback, retained pronunciation recordings/history, provider-aware delivery trends, Shadowing, and deterministic Dictation are complete with clean-schema, live 9Router/Azure, and clean-console Playwright verification. Provider-native scores remain separate from FSRS and are never presented as IELTS. |
+| Habit tracking V1 | Done | Repeated-behaviour definitions stay separate from Tasks, with selected-day or weekly-target schedules, local-date check-ins, neutral excuse/pause semantics, effective-dated history, consistency-first insights, responsive web workspace, Assistant/MCP tools, and weekly review facts. |
 | Today dashboard | Deferred | Assistant/chat is the daily cockpit for composing tasks, calendar, projects, finance, and review context. Revisit only if a zero-prompt glance surface becomes necessary. |
 | Repository documentation harness | Done | Thin agent map, architecture source of truth, domain specs/tests, decisions, increment history, and testing guidance are consolidated and maintained with code changes. |
 
@@ -44,7 +45,6 @@ This file tracks delivery status. Increment descriptions and rationale live in
 - LLM reranker as a `DocumentPostProcessor` for knowledge search (Spring AI
   core ships the hook but no implementation; issue #5903).
 - Scholarship/university research workflows.
-- Habit tracking and streaks.
 - Couple/shared workspace with privacy.
 - Remaining mobile product API integrations and production device flows.
 - Stronger automated/live UI coverage matrix.

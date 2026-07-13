@@ -99,11 +99,13 @@ Modulith modules. Current modules include:
 - `speech` - provider-neutral text-to-speech routing, immutable generated-audio
   metadata, and content-addressed reuse through the attachment module.
 - `assistant` - tool definitions shared by the in-app assistant and MCP.
+- `habit` - repeated-behaviour definitions, effective-dated schedules,
+  local-date evidence, neutral pause intervals, and derived consistency views.
 - `study` - practice/mock study log with a constrained skill vocabulary,
   vocabulary memory on an Ebisu recall-probability model (no due dates), and
   the LLM writing tutor with rubric resources, an evaluator-checked grader,
   and an append-only feedback history.
-- `alignment`, `habit`, `scholarship`, `shared` - current or reserved
+- `alignment`, `scholarship`, `shared` - current or reserved
   domain modules.
 
 Cross-module coupling must go through public APIs or events. Modulith
