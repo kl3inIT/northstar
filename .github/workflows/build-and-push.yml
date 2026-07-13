@@ -32,6 +32,7 @@ jobs:
   build:
     name: Build ${{ matrix.component }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Only build when CI passed (manual dispatch always proceeds).
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     strategy:
@@ -81,10 +82,11 @@ jobs:
           tags: |
             ghcr.io/${{ steps.meta.outputs.owner }}/northstar-${{ matrix.component }}:main
             ghcr.io/${{ steps.meta.outputs.owner }}/northstar-${{ matrix.component }}:${{ steps.meta.outputs.sha }}
-          # Per-component buildx cache (zero-mail pattern) — a web-only change
-          # never invalidates the api's gradle layers.
-          cache-from: type=gha,scope=northstar-${{ matrix.component }}
-          cache-to: type=gha,mode=max,scope=northstar-${{ matrix.component }}
+          # Keep large BuildKit layers in GHCR instead of competing with the
+          # repository's 10 GiB GitHub Actions cache budget used by Gradle,
+          # Flutter and pnpm. Each component owns one persistent cache tag.
+          cache-from: type=registry,ref=ghcr.io/${{ steps.meta.outputs.owner }}/northstar-${{ matrix.component }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ steps.meta.outputs.owner }}/northstar-${{ matrix.component }}:buildcache,mode=max
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ steps.meta.outputs.revision }}
