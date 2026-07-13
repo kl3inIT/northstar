@@ -1,6 +1,8 @@
 package com.northstar.api.study;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,6 +13,9 @@ import com.northstar.core.study.SpeakingService;
 import com.northstar.core.study.SpeechAssessor;
 import com.northstar.core.study.StudyService;
 import com.northstar.core.study.VocabCardSummary;
+import com.northstar.core.study.VocabAudioAttemptSummary;
+import com.northstar.core.study.VocabAudioPracticeMode;
+import com.northstar.core.study.VocabAudioPracticeService;
 import com.northstar.core.study.VocabCoach;
 import com.northstar.core.study.VocabEnrichmentField;
 import com.northstar.core.study.VocabEnrichmentPreview;
@@ -22,12 +27,16 @@ import com.northstar.core.study.VocabService;
 import com.northstar.core.study.VocabSchedulingState;
 import com.northstar.core.study.WritingService;
 import java.time.Instant;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.mock.web.MockMultipartFile;
 
 class StudyControllerTests {
 
@@ -36,15 +45,20 @@ class StudyControllerTests {
     private final VocabCoach coach = mock(VocabCoach.class);
     private final VocabDeckService decks = mock(VocabDeckService.class);
     private final VocabEnrichmentJobService enrichmentJobs = mock(VocabEnrichmentJobService.class);
+    private final VocabAudioPracticeService audioPractice = mock(VocabAudioPracticeService.class);
     private final WritingService writing = mock(WritingService.class);
     private final SpeakingService speaking = mock(SpeakingService.class);
+    private final SpeechAssessor assessor = mock(SpeechAssessor.class);
+    private ObjectProvider<SpeechAssessor> speechProvider;
     private StudyController controller;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
-        controller = new StudyController(study, vocab, coach, decks, enrichmentJobs, writing, speaking,
-                (ObjectProvider<SpeechAssessor>) mock(ObjectProvider.class),
+        speechProvider = (ObjectProvider<SpeechAssessor>) mock(ObjectProvider.class);
+        when(speechProvider.getIfAvailable()).thenReturn(assessor);
+        controller = new StudyController(study, vocab, coach, decks, enrichmentJobs, audioPractice,
+                writing, speaking, speechProvider,
                 (ObjectProvider<SpeakingCoach>) mock(ObjectProvider.class));
     }
 
@@ -91,6 +105,45 @@ class StudyControllerTests {
         assertThat(actual).isSameAs(expected);
         verify(vocab, never()).update(id, card.front(), card.back(), expected.metadata(),
                 card.language(), card.deck(), card.disciplineId(), card.suspended());
+    }
+
+    @Test
+    void successfulPronunciationAssessmentPersistsTheRecordingAndProviderFacts() {
+        UUID cardId = UUID.randomUUID();
+        byte[] wav = wav(3_200);
+        var result = new com.northstar.core.study.PronunciationResult(
+                91, 84, 80.0, "meticulous", List.of());
+        VocabAudioAttemptSummary saved = new VocabAudioAttemptSummary(UUID.randomUUID(), cardId,
+                VocabAudioPracticeMode.WORD, "meticulous", "meticulous", 91.0, 84.0, 80.0,
+                "[]", "azure", "speech-sdk-1.50.0", null, null, 0.1, true,
+                Instant.now().plusSeconds(86_400), false, Instant.now());
+        when(audioPractice.referenceText(cardId, VocabAudioPracticeMode.WORD))
+                .thenReturn("meticulous");
+        when(assessor.assessReading(any(), any(), any())).thenReturn(result);
+        when(assessor.providerId()).thenReturn("azure");
+        when(assessor.providerRevision()).thenReturn("speech-sdk-1.50.0");
+        when(audioPractice.recordSpeech(any(), any(), any(), any(), any(), any(), any(),
+                anyDouble())).thenReturn(saved);
+
+        VocabAudioAttemptView response = controller.assessVocabPronunciation(cardId,
+                VocabAudioPracticeMode.WORD,
+                new MockMultipartFile("audio", "attempt.wav", "audio/wav", wav));
+
+        assertThat(response.id()).isEqualTo(saved.id());
+        assertThat(response.recordingUrl()).contains(saved.id().toString());
+        verify(audioPractice).recordSpeech(cardId, VocabAudioPracticeMode.WORD, "meticulous",
+                result, "azure", "speech-sdk-1.50.0", wav, 0.1);
+    }
+
+    private static byte[] wav(int pcmBytes) {
+        ByteBuffer result = ByteBuffer.allocate(44 + pcmBytes).order(ByteOrder.LITTLE_ENDIAN);
+        result.put("RIFF".getBytes(StandardCharsets.US_ASCII)).putInt(36 + pcmBytes);
+        result.put("WAVEfmt ".getBytes(StandardCharsets.US_ASCII)).putInt(16);
+        result.putShort((short) 1).putShort((short) 1).putInt(16_000).putInt(32_000);
+        result.putShort((short) 2).putShort((short) 16);
+        result.put("data".getBytes(StandardCharsets.US_ASCII)).putInt(pcmBytes);
+        result.put(new byte[pcmBytes]);
+        return result.array();
     }
 
     private static VocabCardSummary card(UUID id) {

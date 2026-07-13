@@ -3,12 +3,17 @@ import test from 'node:test'
 import {
   EMPTY_TALLY,
   cardMatchesDeck,
+  comparableAudioTrendAttempts,
   deckQuery,
   directionIsDue,
+  audioPracticeReference,
+  exampleAudioAssetId,
   enrichmentFieldsForRequest,
   incrementRating,
+  parseDictationDiff,
   reviewIsComplete,
   reviewKeyboardAction,
+  wordAudioAssetId,
 } from '../src/features/study/vocabulary-review-state.ts'
 
 test('review stays on the front until reveal and completes after the last rating', () => {
@@ -50,4 +55,44 @@ test('due state excludes future and sibling-buried directions', () => {
   assert.equal(directionIsDue('2026-07-12T09:00:00Z', undefined, now), true)
   assert.equal(directionIsDue('2026-07-12T11:00:00Z', undefined, now), false)
   assert.equal(directionIsDue('2026-07-12T09:00:00Z', '2026-07-13T00:00:00Z', now), false)
+})
+
+test('applied audio is reused only while its bound text is unchanged', () => {
+  const metadata = {
+    example: 'We met by chance.',
+    frontAudioAssetId: 'word-audio',
+    frontAudioText: 'serendipity',
+    exampleAudioAssetId: 'example-audio',
+    exampleAudioText: 'We met by chance.',
+  }
+  assert.equal(wordAudioAssetId('serendipity', metadata), 'word-audio')
+  assert.equal(wordAudioAssetId('fortuity', metadata), undefined)
+  assert.equal(exampleAudioAssetId(metadata), 'example-audio')
+  assert.equal(exampleAudioAssetId({ ...metadata, example: 'Changed.' }), undefined)
+})
+
+test('shadowing and dictation use the saved example then fall back to the card front', () => {
+  assert.equal(audioPracticeReference('serendipity', { example: 'We met by chance.' }, 'WORD'), 'serendipity')
+  assert.equal(audioPracticeReference('serendipity', { example: 'We met by chance.' }, 'SHADOWING'), 'We met by chance.')
+  assert.equal(audioPracticeReference('serendipity', {}, 'DICTATION'), 'serendipity')
+})
+
+test('audio trends never mix practice modes or provider scales', () => {
+  const attempts = [
+    { id: '1', mode: 'WORD', providerId: 'azure', accuracy: 90 },
+    { id: '2', mode: 'SHADOWING', providerId: 'azure', accuracy: 80 },
+    { id: '3', mode: 'WORD', providerId: 'other', accuracy: 70 },
+    { id: '4', mode: 'WORD', providerId: 'azure', accuracy: 60 },
+  ]
+  assert.deepEqual(comparableAudioTrendAttempts(attempts, 'WORD').map((attempt) => attempt.id), ['1', '4'])
+  assert.deepEqual(comparableAudioTrendAttempts(attempts, 'SHADOWING').map((attempt) => attempt.id), ['2'])
+})
+
+test('dictation diff parsing is lenient and never exposes malformed JSON to the UI', () => {
+  assert.deepEqual(parseDictationDiff('[{"kind":"MATCH","expected":"we","actual":"we"},{"kind":"MISSING","expected":"met","actual":null},{"kind":"SUBSTITUTION","expected":"pure","actual":"extra"}]'), [
+    { kind: 'MATCH', expected: 'we', actual: 'we' },
+    { kind: 'MISSING', expected: 'met', actual: undefined },
+    { kind: 'SUBSTITUTION', expected: 'pure', actual: 'extra' },
+  ])
+  assert.deepEqual(parseDictationDiff('not-json'), [])
 })

@@ -17,6 +17,10 @@ import com.northstar.core.ai.GeneratedImage;
 import com.northstar.core.ai.ImageGenerationGateway;
 import com.northstar.core.attachment.AttachmentService;
 import com.northstar.core.attachment.AttachmentView;
+import com.northstar.core.speech.SpeechAssetResult;
+import com.northstar.core.speech.SpeechAssetService;
+import com.northstar.core.speech.SpeechAssetView;
+import com.northstar.core.speech.SpeechAudio;
 import com.northstar.core.study.VocabCardSummary;
 import com.northstar.core.study.VocabCoach;
 import com.northstar.core.study.VocabEnrichmentField;
@@ -40,6 +44,7 @@ class VocabEnrichmentJobServiceTests {
     private final AiClientRouter ai = mock(AiClientRouter.class);
     private final ImageGenerationGateway images = mock(ImageGenerationGateway.class);
     private final AttachmentService attachments = mock(AttachmentService.class);
+    private final SpeechAssetService speech = mock(SpeechAssetService.class);
     private final AsyncTaskExecutor executor = mock(AsyncTaskExecutor.class);
     private VocabEnrichmentJobService jobs;
     private VocabCardSummary card;
@@ -49,11 +54,12 @@ class VocabEnrichmentJobServiceTests {
         card = card();
         when(vocab.find(card.id())).thenReturn(card);
         when(ai.route(AiTask.IMAGE_GENERATION)).thenReturn(new AiRoute("nine-router", "auto:image"));
+        when(ai.route(AiTask.TEXT_TO_SPEECH)).thenReturn(new AiRoute("nine-router", "edge-tts/en-US-Aria"));
         doAnswer(invocation -> {
             invocation.<Runnable>getArgument(0).run();
             return null;
         }).when(executor).execute(any(Runnable.class));
-        jobs = new VocabEnrichmentJobService(vocab, coach, ai, images, attachments,
+        jobs = new VocabEnrichmentJobService(vocab, coach, ai, images, attachments, speech,
                 executor, new ObjectMapper());
     }
 
@@ -125,6 +131,34 @@ class VocabEnrichmentJobServiceTests {
                 .hasMessageContaining("Card content changed");
         verify(vocab, never()).update(any(), anyString(), anyString(), anyString(), any(), any(),
                 any(), any(Boolean.class), any(Boolean.class));
+    }
+
+    @Test
+    void audioPreviewIsTransientAndApplyBindsThePersistedSpeechAsset() {
+        byte[] mp3 = {0x49, 0x44, 0x33, 1};
+        SpeechAudio audio = new SpeechAudio(mp3, "audio/mpeg", "mp3");
+        when(speech.preview(any(), anyString(), anyString())).thenReturn(audio);
+
+        VocabEnrichmentJobView ready = jobs.start(card.id(), Set.of(VocabEnrichmentField.AUDIO));
+
+        assertThat(ready.wordAudioBase64()).isNotBlank();
+        assertThat(ready.audioTargetId()).isEqualTo("edge-tts/en-US-Aria");
+        verify(speech, never()).store(any(), anyString(), anyString(), any());
+
+        UUID assetId = UUID.randomUUID();
+        SpeechAssetView asset = new SpeechAssetView(assetId, UUID.randomUUID(), "nine-router",
+                "edge-tts/en-US-Aria", "en-us", "mp3", "audio/mpeg", card.front().length(),
+                Instant.now());
+        when(speech.store(any(), anyString(), anyString(), any()))
+                .thenReturn(new SpeechAssetResult(asset, false));
+        when(vocab.update(any(), anyString(), anyString(), anyString(), any(), any(), any(),
+                any(Boolean.class), any(Boolean.class))).thenReturn(card);
+
+        jobs.apply(ready.id());
+
+        verify(vocab).update(any(), anyString(), anyString(),
+                org.mockito.ArgumentMatchers.contains(assetId.toString()), any(), any(), any(),
+                any(Boolean.class), any(Boolean.class));
     }
 
     private static VocabCardSummary card() {

@@ -62,7 +62,8 @@ enabled sibling until the next midnight in the browser's timezone.
   cards are backfilled deterministically (Han front → Chinese, otherwise
   English), without an AI call.
 - Examples, collocations, synonyms, antonyms, easily-confused-word contrast,
-  mnemonics, defensible word formation, and a text-free mnemonic illustration
+  mnemonics, defensible word formation, a text-free mnemonic illustration, and
+  provider-routed word/example audio
   are optional enrichment. Creating, loading, or revealing a card never
   generates them. The learner selects fields and explicitly starts an expiring
   in-API background preview, then keeps reviewing until a toast offers Apply or
@@ -70,7 +71,11 @@ enabled sibling until the next midnight in the browser's timezone.
   so preview access does not depend on a transient notification. Word formation
   is omitted when decomposition is uncertain or malformed. Image bytes remain transient until Apply stores them through
   Attachments and references them as `frontImageId`; unknown metadata keys and
-  existing user-authored values are preserved.
+  existing user-authored values are preserved. Audio previews are likewise
+  transient until Apply stores them in the content-addressed speech cache.
+  Applied audio is bound to its exact source text; editing the front or example
+  makes the binding stale and Listen falls back to browser speech rather than
+  playing the wrong recording.
 - Re-capturing an existing front (accent- and case-insensitive) returns the
   existing card instead of duplicating it.
 - Focused reviews happen on the Vocabulary page; chat may still conduct a
@@ -91,12 +96,19 @@ enabled sibling until the next midnight in the browser's timezone.
   lapses the direction is visibly marked as a leech but is not silently hidden.
 - Cards can be suspended (kept with history, excluded from at-risk) and
   deleted (cascades the review log).
-- A card can be read aloud from its row. The browser records raw mic samples,
-  downsamples to 16-kHz mono PCM, wraps a WAV in memory, and sends it with the
-  card id. The server uses the card front as the immutable reference text and
-  chooses `zh-CN` when it contains a Han ideograph, otherwise `en-US`.
-  Provider-measured 0-100 accuracy/fluency/prosody and word/phoneme detail are
-  shown live and are not persisted as card history. Audio is never persisted.
+- Listen uses valid applied speech first and `window.speechSynthesis` as the
+  free default/fallback. Production prompts cannot play the target before
+  reveal. Practice has three modes: Word assesses the current front;
+  Shadowing plays and assesses the current saved example (or front fallback);
+  Dictation hides the same reference and uses a deterministic case- and
+  punctuation-tolerant word diff. Word and Shadowing recordings are playable
+  before submit and persist only after a successful assessment as 16-kHz,
+  16-bit mono PCM WAV. Attempt facts remain; recording bytes expire after 180
+  days and are capped at 20 per card/mode while pinned, first, best, and latest
+  recordings are preserved. History is newest-first with pin/delete and
+  provider-aware Accuracy/Fluency/Prosody trends. These provider-native 0-100
+  values are never converted to IELTS, and none of the three modes changes
+  either FSRS schedule.
 
 ### Writing tutor
 
@@ -212,7 +224,8 @@ skipped, never fatal.
   reading, and part of speech. Each table row shows its deck and the table is
   sorted due-first then by retrievability, with suspended cards last. It provides
   pause/resume/edit/delete, language/deck correction, live
-  pronunciation assessment, and a keyboard-first weak-card reviewer. The
+  Word/Shadowing/Dictation audio practice with persistent attempt history, and
+  a keyboard-first weak-card reviewer. The
   reviewer supports recognition and optional production, typed or dictated
   answers, click-anywhere-on-the-non-interactive-card or Space flipping,
   explicit semantic checking, and a compact answer face. Answer, reading, part
@@ -221,8 +234,9 @@ skipped, never fatal.
   scroll inside the card while the rating footer remains visible,
   Space to flip between question and answer, 1-4 to rate with the real next
   interval, R to listen, Escape to exit, a completion
-  tally, deck/per-card two-direction controls, and an opt-in background
-  enrichment Sheet whose ready preview replaces the field picker instead of
+  tally, deck/per-card two-direction controls, applied-audio-first Listen with
+  browser fallback, and an opt-in background
+  enrichment Sheet whose ready preview (including audio players) replaces the field picker instead of
   forcing a scroll. Applied mnemonic images appear only on the question/front
   face; word-formation parts appear on the answer face. Writing:
   essays graded, latest estimate,
@@ -241,7 +255,9 @@ skipped, never fatal.
   `/vocab/decks/settings`, `/vocab/{id}/reviews`,
   `/vocab/{id}/answer-check`,
   `/vocab/{id}/enrichment`, `/vocab/{id}/enrichment-jobs` plus job
-  status/apply/discard, `/vocab/{id}/pronunciation`, `/writing`
+  status/apply/discard, `/vocab/{id}/pronunciation`,
+  `/vocab/{id}/dictation-attempts`, `/vocab/{id}/audio-attempts`, and
+  recording serve/pin/delete under `/vocab/audio-attempts/{attemptId}`, `/writing`
   (GET/DELETE), and `/speaking`
   history plus `/speaking/question` and `/speaking/attempts`. Week boundaries
   respect the `X-Timezone` header.

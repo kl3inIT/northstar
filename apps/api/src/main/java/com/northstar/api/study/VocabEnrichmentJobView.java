@@ -13,6 +13,11 @@ record VocabEnrichmentJobView(
         String imageBase64,
         String imageMediaType,
         String imageAlt,
+        String wordAudioBase64,
+        String wordAudioMediaType,
+        String exampleAudioBase64,
+        String exampleAudioMediaType,
+        String audioTargetId,
+        String audioLocale,
         String error) {
 }
-

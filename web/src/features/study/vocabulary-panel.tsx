@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { BookOpenCheck, ChevronDown, Ellipsis, Flame, Mic, Pencil, PauseCircle, PlayCircle, Search, Sparkles, Trash2 } from 'lucide-react'
+import { BookOpenCheck, ChevronDown, Ellipsis, Flame, Headphones, Mic, Pencil, Pin, PinOff, PauseCircle, PlayCircle, Search, Sparkles, Trash2, Volume2 } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import { VocabularyReviewer } from './vocabulary-reviewer'
 import { cardHasDueDirection, cardMatchesDeck, deckQuery } from './vocabulary-review-state'
@@ -20,21 +20,28 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import {
   parseVocabMetadata,
   mergeVocabMetadata,
   useAssessVocabPronunciation,
+  useDeleteVocabAudioAttempt,
   useDeleteVocabCard,
+  usePinVocabAttempt,
+  useRecordVocabDictation,
   useUpdateVocabCard,
   useUpdateVocabDeckSettings,
   useVocabCards,
   useVocabDeckSettings,
+  useVocabAudioAttempts,
+  type VocabAudioAttempt,
   type VocabCard,
   type VocabLanguage,
   type PronunciationAssessment,
 } from '@/lib/study-api'
 import { useWavRecorder } from '@/lib/use-wav-recorder'
+import { audioPracticeReference, comparableAudioTrendAttempts, exampleAudioAssetId, parseDictationDiff, wordAudioAssetId } from './vocabulary-review-state'
 
 const EMPTY_CARDS: VocabCard[] = []
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -479,32 +486,100 @@ function DeleteCardDialog({ card, onClose }: { card: VocabCard | null; onClose: 
   )
 }
 
+type AudioPracticeMode = 'WORD' | 'SHADOWING' | 'DICTATION'
+
 function PronunciationDialog({ card, onClose }: { card: VocabCard | null; onClose: () => void }) {
+  const [mode, setMode] = useState<AudioPracticeMode>('WORD')
+  const [dictationAnswer, setDictationAnswer] = useState('')
   const recorder = useWavRecorder(30)
   const assessment = useAssessVocabPronunciation()
+  const dictation = useRecordVocabDictation()
+  const history = useVocabAudioAttempts(card?.id, Boolean(card))
   const metadata = card ? parseVocabMetadata(card.metadata) : {}
+  const reference = card ? audioPracticeReference(card.front, metadata, mode) : ''
 
-  function submit() {
-    if (!card || !recorder.audio) return
-    assessment.mutate({ id: card.id, audio: recorder.audio }, {
+  useEffect(() => {
+    recorder.reset()
+    assessment.reset()
+    dictation.reset()
+    setDictationAnswer('')
+    // Each practice mode intentionally starts with a clean attempt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode])
+
+  function listen() {
+    if (!card) return
+    const assetId = mode === 'WORD'
+      ? wordAudioAssetId(card.front, metadata)
+      : exampleAudioAssetId(metadata) || wordAudioAssetId(card.front, metadata)
+    playPracticeSpeech(reference, assetId, metadata.frontAudioLocale)
+  }
+
+  function submitSpeech() {
+    if (!card || !recorder.audio || mode === 'DICTATION') return
+    assessment.mutate({ id: card.id, audio: recorder.audio, mode }, {
+      onError: (error) => toast.error(error.message),
+    })
+  }
+
+  function submitDictation() {
+    if (!card || !dictationAnswer.trim()) return
+    dictation.mutate({ id: card.id, answer: dictationAnswer.trim() }, {
       onError: (error) => toast.error(error.message),
     })
   }
 
   return (
     <Dialog open={Boolean(card)} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         {card && (
           <>
-            <DialogHeader><DialogTitle>Pronounce “{card.front}”</DialogTitle></DialogHeader>
-            <div className="flex flex-col gap-4">
-              {metadata.reading && <p className="text-sm text-muted-foreground">{metadata.reading}</p>}
-              <AudioRecorder recorder={recorder} maximumSeconds={30} />
-              <Button onClick={submit} disabled={!recorder.audio || assessment.isPending}>
-                {assessment.isPending ? 'Assessing…' : 'Assess pronunciation'}
-              </Button>
-              {assessment.data && <PronunciationResultView result={assessment.data} />}
+            <DialogHeader>
+              <DialogTitle>Audio practice · {card.front}</DialogTitle>
+              <p className="text-sm text-muted-foreground">Practice results are separate from FSRS review ratings.</p>
+            </DialogHeader>
+            <Tabs value={mode} onValueChange={(value) => setMode(value as AudioPracticeMode)}>
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="WORD">Word</TabsTrigger>
+                <TabsTrigger value="SHADOWING">Shadowing</TabsTrigger>
+                <TabsTrigger value="DICTATION">Dictation</TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            <div className="flex flex-col gap-4 rounded-lg border bg-muted/20 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    {mode === 'WORD' ? 'Say this word' : mode === 'SHADOWING' ? 'Listen, then repeat' : 'Listen, then type'}
+                  </p>
+                  {mode !== 'DICTATION' && <p className="mt-2 text-lg font-medium leading-relaxed">{reference}</p>}
+                  {mode === 'WORD' && metadata.reading && <p className="text-sm text-muted-foreground">{metadata.reading}</p>}
+                </div>
+                <Button variant="outline" onClick={listen}><Volume2 /> Listen</Button>
+              </div>
+
+              {mode === 'DICTATION' ? (
+                <>
+                  <Textarea value={dictationAnswer} onChange={(event) => setDictationAnswer(event.target.value)}
+                    placeholder="Type exactly what you heard" aria-label="Dictation answer" />
+                  <Button onClick={submitDictation} disabled={!dictationAnswer.trim() || dictation.isPending}>
+                    {dictation.isPending ? 'Checking…' : 'Check dictation'}
+                  </Button>
+                  {dictation.data && <DictationResultView result={dictation.data} />}
+                </>
+              ) : (
+                <>
+                  <AudioRecorder recorder={recorder} maximumSeconds={30} />
+                  {recorder.audio && <BlobAudio blob={recorder.audio} label="Replay this recording before saving" />}
+                  <Button onClick={submitSpeech} disabled={!recorder.audio || assessment.isPending}>
+                    {assessment.isPending ? 'Assessing…' : 'Save and assess'}
+                  </Button>
+                  {assessment.data && <PronunciationResultView result={assessment.data} />}
+                </>
+              )}
             </div>
+
+            <AttemptHistory cardId={card.id} attempts={history.data ?? []} loading={history.isLoading} mode={mode} />
           </>
         )}
       </DialogContent>
@@ -512,32 +587,59 @@ function PronunciationDialog({ card, onClose }: { card: VocabCard | null; onClos
   )
 }
 
-function PronunciationResultView({ result }: { result: PronunciationAssessment }) {
+function playPracticeSpeech(text: string, assetId?: string, locale?: string) {
+  const fallback = () => {
+    if (!('speechSynthesis' in window)) {
+      toast.error('Text-to-speech is not available in this browser')
+      return
+    }
+    window.speechSynthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = locale || (/\p{Script=Han}/u.test(text) ? 'zh-CN' : 'en-US')
+    window.speechSynthesis.speak(utterance)
+  }
+  if (!assetId) {
+    fallback()
+    return
+  }
+  const audio = new Audio(`/api/speech/assets/${encodeURIComponent(assetId)}/audio`)
+  audio.addEventListener('error', fallback, { once: true })
+  void audio.play().catch(fallback)
+}
+
+function BlobAudio({ blob, label }: { blob: Blob; label: string }) {
+  const [url, setUrl] = useState('')
+  useEffect(() => {
+    const next = URL.createObjectURL(blob)
+    setUrl(next)
+    return () => URL.revokeObjectURL(next)
+  }, [blob])
   return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Azure delivery · unofficial</p>
-      <div className="grid grid-cols-2 gap-2">
-        <PronunciationScore label="Accuracy" value={result.accuracy} />
-        <PronunciationScore label="Fluency" value={result.fluency} />
-      </div>
-      {result.recognizedText && <p className="text-xs text-muted-foreground">Heard: “{result.recognizedText}”</p>}
-      {result.words && result.words.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {result.words.map((word, index) => (
-            <details key={`${word.word}-${index}`}>
-              <summary className={cn('cursor-pointer list-none rounded-md border px-2 py-1 text-xs', pronunciationTone(word.accuracy))}>
-                {word.word} {typeof word.accuracy === 'number' ? Math.round(word.accuracy) : '—'}
-              </summary>
-              {word.phonemes && word.phonemes.length > 0 && (
-                <div className="mt-1 rounded-md border bg-popover p-2 text-xs shadow-sm">
-                  {word.phonemes.map((phoneme, phonemeIndex) => (
-                    <p key={`${phoneme.phoneme}-${phonemeIndex}`} className="tabular-nums">
-                      {phoneme.phoneme}: {typeof phoneme.accuracy === 'number' ? Math.round(phoneme.accuracy) : '—'}
-                    </p>
-                  ))}
-                </div>
-              )}
-            </details>
+    <div>
+      <p className="mb-1 text-xs text-muted-foreground">{label}</p>
+      {url ? <audio controls src={url} className="w-full" /> : <Skeleton className="h-10 w-full" />}
+    </div>
+  )
+}
+
+function DictationResultView({ result }: { result: VocabAudioAttempt }) {
+  const diff = parseDictationDiff(result.dictationDiff)
+  return (
+    <div className="rounded-lg border bg-card p-3" aria-live="polite">
+      <p className="text-sm font-medium">{result.accuracy === 100 ? 'Exact match' : `${Math.round(result.accuracy ?? 0)}% text match`}</p>
+      <p className="mt-1 text-sm">Answer: {result.referenceText}</p>
+      {(result.accuracy ?? 0) < 100 && diff.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Dictation differences">
+          {diff.map((token, index) => token.kind === 'MATCH' ? (
+            <span key={`${token.kind}-${index}`} className="text-sm">{token.actual}</span>
+          ) : token.kind === 'MISSING' ? (
+            <Badge key={`${token.kind}-${index}`} variant="destructive">Missing: {token.expected}</Badge>
+          ) : token.kind === 'EXTRA' ? (
+            <Badge key={`${token.kind}-${index}`} variant="outline" className="border-warning/40 text-warning">Extra: {token.actual}</Badge>
+          ) : (
+            <Badge key={`${token.kind}-${index}`} variant="outline" className="border-warning/40 text-warning">
+              {token.expected} → {token.actual}
+            </Badge>
           ))}
         </div>
       )}
@@ -545,13 +647,107 @@ function PronunciationResultView({ result }: { result: PronunciationAssessment }
   )
 }
 
-function PronunciationScore({ label, value }: { label: string; value: number | undefined }) {
-  return <div className="rounded-lg bg-card p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-semibold tabular-nums">{typeof value === 'number' ? Math.round(value) : '—'}<span className="text-xs font-normal text-muted-foreground"> / 100</span></p></div>
+function AttemptHistory({ cardId, attempts, loading, mode }: {
+  cardId: string
+  attempts: VocabAudioAttempt[]
+  loading: boolean
+  mode: AudioPracticeMode
+}) {
+  const pin = usePinVocabAttempt()
+  const remove = useDeleteVocabAudioAttempt()
+  const scored = comparableAudioTrendAttempts(attempts, mode)
+  const newest = scored[0]
+  const oldest = scored.at(-1)
+  const trend = (key: 'accuracy' | 'fluency' | 'prosody') => {
+    const latestValue = newest?.[key]
+    const oldestValue = oldest?.[key]
+    return typeof latestValue === 'number' && typeof oldestValue === 'number' ? Math.round(latestValue - oldestValue) : null
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 text-sm font-semibold"><Headphones className="size-4" /> Practice history</h3>
+        <span className="text-xs text-muted-foreground">Recordings expire after 180 days unless pinned</span>
+      </div>
+      {scored.length > 1 && (mode === 'DICTATION' ? (
+        <div className="rounded-lg border bg-card p-2">
+          <p className="text-xs text-muted-foreground">Text match trend</p>
+          <p className="text-sm font-semibold tabular-nums">
+            {trend('accuracy') === null ? '—' : `${trend('accuracy')! >= 0 ? '+' : ''}${trend('accuracy')}`}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-2">
+          {(['accuracy', 'fluency', 'prosody'] as const).map((key) => (
+            <div key={key} className="rounded-lg border bg-card p-2">
+              <p className="text-xs capitalize text-muted-foreground">{key}</p>
+              <p className="text-sm font-semibold tabular-nums">{trend(key) === null ? '—' : `${trend(key)! >= 0 ? '+' : ''}${trend(key)}`}</p>
+            </div>
+          ))}
+        </div>
+      ))}
+      {loading ? <Skeleton className="h-20 w-full" /> : attempts.length === 0 ? (
+        <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">No saved attempts yet.</p>
+      ) : (
+        <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+          {attempts.map((attempt) => (
+            <article key={attempt.id} className="rounded-lg border bg-card p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">{attempt.mode?.toLowerCase()}</Badge>
+                  {attempt.providerId && <span className="text-xs text-muted-foreground">{attempt.providerId}</span>}
+                  <span className="text-xs text-muted-foreground">{attempt.createdAt ? new Date(attempt.createdAt).toLocaleString() : ''}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {attempt.recordingAvailable && attempt.id && (
+                    <Button size="icon-sm" variant="ghost" aria-label={attempt.recordingPinned ? 'Unpin recording' : 'Pin recording'}
+                      onClick={() => pin.mutate({ attemptId: attempt.id!, pinned: !attempt.recordingPinned }, { onError: (error) => toast.error(error.message) })}>
+                      {attempt.recordingPinned ? <PinOff /> : <Pin />}
+                    </Button>
+                  )}
+                  {attempt.id && (
+                    <Button size="icon-sm" variant="ghost" aria-label="Delete attempt"
+                      onClick={() => remove.mutate({ attemptId: attempt.id!, cardId }, { onError: (error) => toast.error(error.message) })}>
+                      <Trash2 />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {attempt.mode === 'DICTATION' ? (
+                <p className="mt-2 text-xs text-muted-foreground">Text match {Math.round(attempt.accuracy ?? 0)}%</p>
+              ) : (
+                <div className="mt-2 flex gap-3 text-xs tabular-nums text-muted-foreground">
+                  <span>Accuracy {score(attempt.accuracy)}</span><span>Fluency {score(attempt.fluency)}</span><span>Prosody {score(attempt.prosody)}</span>
+                </div>
+              )}
+              {attempt.recordingAvailable && attempt.recordingUrl && <audio controls preload="none" src={attempt.recordingUrl} className="mt-2 h-9 w-full" />}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
 }
 
-function pronunciationTone(value: number | undefined): string {
-  if (value === undefined) return 'text-muted-foreground'
-  if (value >= 80) return 'border-success/40 text-success'
-  if (value >= 60) return 'border-warning/40 text-warning'
-  return 'border-destructive/40 text-destructive'
+function score(value: number | undefined) {
+  return typeof value === 'number' ? `${Math.round(value)}/100` : '—'
+}
+
+function PronunciationResultView({ result }: { result: PronunciationAssessment }) {
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Azure delivery · unofficial</p>
+      <div className="grid grid-cols-3 gap-2">
+        <PronunciationScore label="Accuracy" value={result.accuracy} />
+        <PronunciationScore label="Fluency" value={result.fluency} />
+        <PronunciationScore label="Prosody" value={result.prosody} />
+      </div>
+      {result.recognizedText && <p className="text-xs text-muted-foreground">Heard: “{result.recognizedText}”</p>}
+    </div>
+  )
+}
+
+function PronunciationScore({ label, value }: { label: string; value: number | undefined }) {
+  return <div className="rounded-lg bg-card p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-semibold tabular-nums">{typeof value === 'number' ? Math.round(value) : '—'}<span className="text-xs font-normal text-muted-foreground"> / 100</span></p></div>
 }

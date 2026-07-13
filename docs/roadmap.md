@@ -29,6 +29,7 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | Vocabulary production and rich enrichment | Done | Optional independent meaning→target FSRS schedule with deck defaults and per-card overrides, next-day sibling burying, leech detection, best-effort word formation, provider-routed mnemonic images, and in-API background preview/apply jobs that never persist discarded image data. |
 | Speech assessment V1 | Done | Provider-neutral speech port with Azure Speech SDK delivery measurement, live card pronunciation, one-question Speaking practice, routed AI content coaching, shared grammar corpus, and four-tab Study UI. The UI keeps provider 0-100 measurements separate from a rubric-grounded, LOW-confidence unofficial one-answer IELTS-style range with criterion evidence and scorer version; no provider score is converted into a band. Live provider/grader and browser flows are verified. |
 | AI capability catalogs and on-demand text to speech | Done | Explicit Assistant read-aloud, isolated Chat/TTS/STT/Image/Embedding route catalogs, OpenAI/9Router discovery with manual fallback, TTS language/voice selection, persisted content-addressed MP3 reuse, and responsive AI Elements selectors/playback. No automatic generation or playback. |
+| Vocabulary audio practice | Done | Explicit word/example TTS enrichment, applied-audio-first browser fallback, retained pronunciation recordings/history, provider-aware delivery trends, Shadowing, and deterministic Dictation are complete with clean-schema, live 9Router/Azure, and clean-console Playwright verification. Provider-native scores remain separate from FSRS and are never presented as IELTS. |
 | Today dashboard | Deferred | Assistant/chat is the daily cockpit for composing tasks, calendar, projects, finance, and review context. Revisit only if a zero-prompt glance surface becomes necessary. |
 | Repository documentation harness | Done | Thin agent map, architecture source of truth, domain specs/tests, decisions, increment history, and testing guidance are consolidated and maintained with code changes. |
 
@@ -37,13 +38,9 @@ This file tracks delivery status. Increment descriptions and rationale live in
 - Study V1.5: brief study section (after automation/brief), scored Task 1
   anchors, LanguageTool sidecar, bulk HSK/Tatoeba imports, embedding-based
   new-card dispersion.
-- Shadowing and dictation: reuse persisted speech assets for explicit per-card
-  generation, at-risk vocabulary sentences, typed recall, and diff grading.
 - Speaking debrief capture: practice conversation in ChatGPT voice, paste
   the takeaways back — capture/assistant classify into a Speaking session +
   errors into the grammar corpus.
-- Per-card pronunciation history (extends the speech-assessment increment's
-  live-only card scoring with a persisted trend).
 - LLM reranker as a `DocumentPostProcessor` for knowledge search (Spring AI
   core ships the hook but no implementation; issue #5903).
 - Scholarship/university research workflows.

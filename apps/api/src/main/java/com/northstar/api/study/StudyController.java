@@ -15,6 +15,9 @@ import com.northstar.core.study.StudySessionSummary;
 import com.northstar.core.study.StudySource;
 import com.northstar.core.study.StudySummary;
 import com.northstar.core.study.VocabAnswerAssessment;
+import com.northstar.core.study.VocabAudioPracticeMode;
+import com.northstar.core.study.VocabAudioPracticeService;
+import com.northstar.core.study.VocabAudioRecording;
 import com.northstar.core.study.VocabCardSummary;
 import com.northstar.core.study.VocabCoach;
 import com.northstar.core.study.VocabDeckService;
@@ -37,6 +40,9 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -71,6 +77,7 @@ class StudyController {
     private final VocabCoach vocabCoach;
     private final VocabDeckService vocabDecks;
     private final VocabEnrichmentJobService enrichmentJobs;
+    private final VocabAudioPracticeService audioPractice;
     private final WritingService writing;
     private final SpeakingService speaking;
     private final ObjectProvider<SpeechAssessor> speechProvider;
@@ -78,6 +85,7 @@ class StudyController {
 
     StudyController(StudyService study, VocabService vocab, VocabCoach vocabCoach,
             VocabDeckService vocabDecks, VocabEnrichmentJobService enrichmentJobs,
+            VocabAudioPracticeService audioPractice,
             WritingService writing,
             SpeakingService speaking, ObjectProvider<SpeechAssessor> speechProvider,
             ObjectProvider<SpeakingCoach> coachProvider) {
@@ -86,6 +94,7 @@ class StudyController {
         this.vocabCoach = vocabCoach;
         this.vocabDecks = vocabDecks;
         this.enrichmentJobs = enrichmentJobs;
+        this.audioPractice = audioPractice;
         this.writing = writing;
         this.speaking = speaking;
         this.speechProvider = speechProvider;
@@ -269,11 +278,62 @@ class StudyController {
 
     @PostMapping(value = "/vocab/{id}/pronunciation", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(operationId = "assessVocabPronunciation")
-    PronunciationResult assessVocabPronunciation(@PathVariable("id") UUID id,
+    VocabAudioAttemptView assessVocabPronunciation(@PathVariable("id") UUID id,
+            @RequestParam(name = "mode", defaultValue = "WORD") VocabAudioPracticeMode mode,
             @RequestPart("audio") MultipartFile audio) {
-        VocabCardSummary card = vocab.find(id);
-        byte[] wav = readWav(audio, 30);
-        return speech().assessReading(wav, card.front(), SpeechLocales.forReference(card.front()));
+        if (mode == VocabAudioPracticeMode.DICTATION) {
+            throw new IllegalArgumentException("Dictation does not accept microphone audio");
+        }
+        UploadedWav wav = readWav(audio, 30);
+        String reference = audioPractice.referenceText(id, mode);
+        SpeechAssessor assessor = speech();
+        PronunciationResult result = assessor.assessReading(wav.bytes(), reference,
+                SpeechLocales.forReference(reference));
+        return VocabAudioAttemptView.from(audioPractice.recordSpeech(id, mode, reference, result,
+                assessor.providerId(), assessor.providerRevision(), wav.bytes(), wav.durationSeconds()));
+    }
+
+    @GetMapping("/vocab/{id}/audio-attempts")
+    @Operation(operationId = "listVocabAudioAttempts")
+    List<VocabAudioAttemptView> vocabAudioAttempts(@PathVariable("id") UUID id) {
+        return audioPractice.list(id).stream().map(VocabAudioAttemptView::from).toList();
+    }
+
+    @PostMapping("/vocab/{id}/dictation-attempts")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(operationId = "recordVocabDictationAttempt")
+    VocabAudioAttemptView recordVocabDictationAttempt(@PathVariable("id") UUID id,
+            @Valid @RequestBody StudyRequest.DictationAttemptRequest request) {
+        return VocabAudioAttemptView.from(audioPractice.recordDictation(id, request.answer()));
+    }
+
+    @GetMapping("/vocab/audio-attempts/{attemptId}/recording")
+    @Operation(operationId = "serveVocabAttemptRecording")
+    ResponseEntity<byte[]> vocabAttemptRecording(@PathVariable("attemptId") UUID attemptId) {
+        VocabAudioRecording recording = audioPractice.recording(attemptId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "This attempt no longer has a retained recording"));
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline")
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.parseMediaType(recording.mimeType()))
+                .contentLength(recording.data().length)
+                .body(recording.data());
+    }
+
+    @PutMapping("/vocab/audio-attempts/{attemptId}/pin")
+    @Operation(operationId = "pinVocabAttemptRecording")
+    VocabAudioAttemptView pinVocabAttemptRecording(@PathVariable("attemptId") UUID attemptId,
+            @Valid @RequestBody StudyRequest.RecordingPinRequest request) {
+        return VocabAudioAttemptView.from(audioPractice.pin(attemptId, request.pinned()));
+    }
+
+    @DeleteMapping("/vocab/audio-attempts/{attemptId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(operationId = "deleteVocabAudioAttempt")
+    void deleteVocabAudioAttempt(@PathVariable("attemptId") UUID attemptId) {
+        audioPractice.delete(attemptId);
     }
 
     @PostMapping("/speaking/question")
@@ -287,7 +347,7 @@ class StudyController {
     @Operation(operationId = "assessSpeakingAttempt")
     SpeakingAttemptResult assessSpeakingAttempt(@RequestPart("audio") MultipartFile audio,
             @RequestPart("question") String question) {
-        return coach().assess(question, readWav(audio, 75));
+        return coach().assess(question, readWav(audio, 75).bytes());
     }
 
     @GetMapping("/speaking")
@@ -363,17 +423,29 @@ class StudyController {
         return coach;
     }
 
-    private static byte[] readWav(MultipartFile audio, double maximumSeconds) {
+    private static UploadedWav readWav(MultipartFile audio, double maximumSeconds) {
         if (audio.isEmpty()) throw new IllegalArgumentException("A WAV recording is required");
         if (audio.getSize() > MAX_WAV_BYTES) {
             throw new IllegalArgumentException("Audio exceeds the 2.5 MB upload limit");
         }
         try {
             byte[] bytes = audio.getBytes();
-            WavAudio.parse(bytes, maximumSeconds);
-            return bytes;
+            WavAudio parsed = WavAudio.parse(bytes, maximumSeconds);
+            return new UploadedWav(bytes, parsed.durationSeconds());
         } catch (IOException e) {
             throw new IllegalArgumentException("Could not read the uploaded audio", e);
+        }
+    }
+
+    private record UploadedWav(byte[] bytes, double durationSeconds) {
+
+        private UploadedWav {
+            bytes = bytes.clone();
+        }
+
+        @Override
+        public byte[] bytes() {
+            return bytes.clone();
         }
     }
 }

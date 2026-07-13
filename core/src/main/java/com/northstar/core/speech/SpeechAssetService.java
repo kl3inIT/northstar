@@ -31,27 +31,45 @@ public class SpeechAssetService {
     public SpeechAssetResult synthesize(AiRoute route, String text, String locale) {
         String normalizedText = normalizeText(text);
         String normalizedLocale = normalizeLocale(locale);
-        String textHash = Hashing.sha256Hex(normalizedText);
-        String cacheKey = Hashing.sha256Hex("speech-v1\n" + textHash + "\n"
-                + route.gatewayId() + "\n" + route.modelId() + "\n"
-                + normalizedLocale + "\n" + FORMAT);
-        Optional<SpeechAsset> existing = assets.findByCacheKey(cacheKey);
+        Optional<SpeechAsset> existing = assets.findByCacheKey(
+                cacheKey(route, normalizedText, normalizedLocale));
         if (existing.isPresent()) {
             return new SpeechAssetResult(view(existing.orElseThrow()), true);
+        }
+        return store(route, text, locale, preview(route, text, locale));
+    }
+
+    /** Generate or load bytes for an explicit preview without creating a new asset row. */
+    public SpeechAudio preview(AiRoute route, String text, String locale) {
+        String normalizedText = normalizeText(text);
+        String normalizedLocale = normalizeLocale(locale);
+        String cacheKey = cacheKey(route, normalizedText, normalizedLocale);
+        Optional<SpeechAsset> existing = assets.findByCacheKey(cacheKey);
+        if (existing.isPresent()) {
+            SpeechAsset asset = existing.orElseThrow();
+            AttachmentContent content = attachments.load(asset.attachmentId())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Speech attachment is missing: " + asset.attachmentId()));
+            return new SpeechAudio(content.data(), asset.mimeType(), asset.format());
         }
 
         gateway.validate(route);
         SpeechAudio audio = gateway.synthesize(route, normalizedText, normalizedLocale);
-        if (!FORMAT.equalsIgnoreCase(audio.format())) {
-            throw new SpeechSynthesisException("TTS provider returned unsupported format: " + audio.format());
-        }
-        if (audio.data().length == 0) {
-            throw new SpeechSynthesisException("TTS provider returned empty audio");
-        }
-        if (audio.data().length > AttachmentService.MAX_BYTES) {
-            throw new SpeechSynthesisException("TTS provider returned audio larger than 25MB");
-        }
+        validateAudio(audio);
+        return audio;
+    }
 
+    /** Persist already-generated preview bytes, reusing an equivalent immutable asset when present. */
+    public SpeechAssetResult store(AiRoute route, String text, String locale, SpeechAudio audio) {
+        String normalizedText = normalizeText(text);
+        String normalizedLocale = normalizeLocale(locale);
+        String textHash = Hashing.sha256Hex(normalizedText);
+        String cacheKey = cacheKey(route, normalizedText, normalizedLocale);
+        Optional<SpeechAsset> existing = assets.findByCacheKey(cacheKey);
+        if (existing.isPresent()) {
+            return new SpeechAssetResult(view(existing.orElseThrow()), true);
+        }
+        validateAudio(audio);
         AttachmentView attachment = attachments.store("speech-" + cacheKey.substring(0, 12) + ".mp3",
                 MIME_TYPE, audio.data());
         SpeechAsset asset = new SpeechAsset(UUID.randomUUID(), cacheKey, textHash,
@@ -63,6 +81,19 @@ public class SpeechAssetService {
             return assets.findByCacheKey(cacheKey)
                     .map(value -> new SpeechAssetResult(view(value), true))
                     .orElseThrow(() -> duplicate);
+        }
+    }
+
+    private static void validateAudio(SpeechAudio audio) {
+        if (audio == null) throw new SpeechSynthesisException("TTS provider returned no audio");
+        if (!FORMAT.equalsIgnoreCase(audio.format())) {
+            throw new SpeechSynthesisException("TTS provider returned unsupported format: " + audio.format());
+        }
+        if (audio.data().length == 0) {
+            throw new SpeechSynthesisException("TTS provider returned empty audio");
+        }
+        if (audio.data().length > AttachmentService.MAX_BYTES) {
+            throw new SpeechSynthesisException("TTS provider returned audio larger than 25MB");
         }
     }
 
@@ -102,5 +133,12 @@ public class SpeechAssetService {
             throw new IllegalArgumentException("locale is invalid");
         }
         return normalized.toLowerCase(Locale.ROOT);
+    }
+
+    private static String cacheKey(AiRoute route, String normalizedText, String normalizedLocale) {
+        String textHash = Hashing.sha256Hex(normalizedText);
+        return Hashing.sha256Hex("speech-v1\n" + textHash + "\n"
+                + route.gatewayId() + "\n" + route.modelId() + "\n"
+                + normalizedLocale + "\n" + FORMAT);
     }
 }
