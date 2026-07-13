@@ -26,20 +26,41 @@ void main() {
     expect(find.byKey(const Key('notes-page')), findsOneWidget);
   });
 
-  testWidgets('opens focused Capture from the Assistant navigation bar', (
+  testWidgets('opens focused Capture from the Assistant composer add menu', (
     tester,
   ) async {
     _setWindowSize(tester, const Size(390, 844));
     await tester.pumpWidget(_testApp(_signedInRepository()));
     await tester.pumpAndSettle();
 
-    expect(find.bySemanticsLabel('Capture'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('assistant-capture-button')));
+    expect(find.bySemanticsLabel('Add to Northstar'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('assistant-add-button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CupertinoActionSheet), findsOneWidget);
+    await tester.tap(find.byKey(const Key('assistant-add-quick-capture')));
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('capture-page')), findsOneWidget);
     expect(find.text('Capture it now'), findsOneWidget);
     expect(find.byType(CupertinoTabBar), findsNothing);
+  });
+
+  testWidgets('opens the receipt source picker from the Assistant add menu', (
+    tester,
+  ) async {
+    _setWindowSize(tester, const Size(390, 844));
+    await tester.pumpWidget(_testApp(_signedInRepository()));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('assistant-add-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('assistant-add-receipt')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('capture-page')), findsOneWidget);
+    expect(find.text('Scan receipt'), findsOneWidget);
+    expect(find.byKey(const Key('capture-receipt-library')), findsOneWidget);
   });
 
   testWidgets('uses the Cupertino sidebar on an expanded window', (

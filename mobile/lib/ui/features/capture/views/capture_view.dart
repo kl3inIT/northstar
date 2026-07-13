@@ -6,9 +6,14 @@ import 'package:northstar/ui/core/design_system/northstar_tokens.dart';
 import 'package:northstar/ui/features/capture/view_models/capture_view_model.dart';
 
 class CaptureView extends StatefulWidget {
-  const CaptureView({super.key, required this.viewModel});
+  const CaptureView({
+    super.key,
+    required this.viewModel,
+    this.promptForReceiptSource = false,
+  });
 
   final CaptureViewModel viewModel;
+  final bool promptForReceiptSource;
 
   @override
   State<CaptureView> createState() => _CaptureViewState();
@@ -25,6 +30,49 @@ class _CaptureViewState extends State<CaptureView> {
     super.initState();
     _viewModel.addListener(_handleChange);
     _textController.text = _viewModel.text;
+    if (widget.promptForReceiptSource) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _showReceiptSourcePicker();
+        }
+      });
+    }
+  }
+
+  Future<void> _showReceiptSourcePicker() async {
+    final source = await showCupertinoModalPopup<ReceiptSource>(
+      context: context,
+      builder: (sheetContext) => CupertinoActionSheet(
+        title: const Text('Scan receipt'),
+        message: const Text(
+          'Choose a clear image. You will review the extracted transaction '
+          'before it is saved.',
+        ),
+        actions: [
+          if (!kIsWeb)
+            CupertinoActionSheetAction(
+              key: const Key('capture-receipt-camera'),
+              onPressed: () =>
+                  Navigator.of(sheetContext).pop(ReceiptSource.camera),
+              child: const Text('Take photo'),
+            ),
+          CupertinoActionSheetAction(
+            key: const Key('capture-receipt-library'),
+            onPressed: () =>
+                Navigator.of(sheetContext).pop(ReceiptSource.photoLibrary),
+            child: const Text('Choose from Photos'),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          key: const Key('capture-receipt-cancel'),
+          onPressed: () => Navigator.of(sheetContext).pop(),
+          child: const Text('Cancel'),
+        ),
+      ),
+    );
+    if (source != null && mounted) {
+      await _viewModel.draftReceipt(source);
+    }
   }
 
   @override
@@ -362,12 +410,14 @@ class _DraftEditor extends StatelessWidget {
         viewModel: viewModel,
         draft: draft as ExpenseCaptureDraft,
       ),
-      StudyCaptureDraft() => _StudyDraftSummary(
+      StudyCaptureDraft() => _StudyDraftEditor(
         key: ValueKey('study-${viewModel.draftVersion}'),
+        viewModel: viewModel,
         draft: draft as StudyCaptureDraft,
       ),
-      VocabCaptureDraft() => _VocabDraftSummary(
+      VocabCaptureDraft() => _VocabDraftEditor(
         key: ValueKey('vocab-${viewModel.draftVersion}'),
+        viewModel: viewModel,
         draft: draft as VocabCaptureDraft,
       ),
     };
@@ -604,9 +654,14 @@ class _ExpenseItemEditor extends StatelessWidget {
   }
 }
 
-class _StudyDraftSummary extends StatelessWidget {
-  const _StudyDraftSummary({super.key, required this.draft});
+class _StudyDraftEditor extends StatelessWidget {
+  const _StudyDraftEditor({
+    super.key,
+    required this.viewModel,
+    required this.draft,
+  });
 
+  final CaptureViewModel viewModel;
   final StudyCaptureDraft draft;
 
   @override
@@ -614,39 +669,176 @@ class _StudyDraftSummary extends StatelessWidget {
     return Column(
       children: [
         for (var index = 0; index < draft.items.length; index += 1)
-          CupertinoFormSection.insetGrouped(
+          _StudyItemEditor(
             key: Key('capture-study-item-$index'),
-            header: Text('ACTIVITY ${index + 1}'),
-            children: [
-              CupertinoFormRow(
-                prefix: const Text('Skill'),
-                child: Text(draft.items[index].skill),
-              ),
-              CupertinoFormRow(
-                prefix: const Text('Date'),
-                child: Text(draft.items[index].occurredOn),
-              ),
-              if (draft.items[index].durationMinutes case final minutes?)
-                CupertinoFormRow(
-                  prefix: const Text('Duration'),
-                  child: Text('$minutes minutes'),
-                ),
-              if (draft.items[index].scoreRaw case final raw?)
-                if (draft.items[index].scoreMax case final max?)
-                  CupertinoFormRow(
-                    prefix: const Text('Score'),
-                    child: Text('$raw/$max'),
-                  ),
-            ],
+            index: index,
+            item: draft.items[index],
+            onChanged: (item) => viewModel.updateStudyItem(index, item),
           ),
       ],
     );
   }
 }
 
-class _VocabDraftSummary extends StatelessWidget {
-  const _VocabDraftSummary({super.key, required this.draft});
+class _StudyItemEditor extends StatelessWidget {
+  const _StudyItemEditor({
+    super.key,
+    required this.index,
+    required this.item,
+    required this.onChanged,
+  });
 
+  final int index;
+  final StudyCaptureItem item;
+  final ValueChanged<StudyCaptureItem> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    StudyCaptureItem update({
+      String? skill,
+      StudyCaptureKind? kind,
+      String? occurredOn,
+      String? notes,
+      int? durationMinutes,
+      int? scoreRaw,
+      int? scoreMax,
+    }) {
+      return StudyCaptureItem(
+        skill: skill ?? item.skill,
+        kind: kind ?? item.kind,
+        occurredOn: occurredOn ?? item.occurredOn,
+        notes: notes ?? item.notes,
+        durationMinutes: durationMinutes,
+        scoreRaw: scoreRaw,
+        scoreMax: scoreMax,
+        disciplineName: item.disciplineName,
+      );
+    }
+
+    return CupertinoFormSection.insetGrouped(
+      header: Text('ACTIVITY ${index + 1}'),
+      children: [
+        CupertinoTextFormFieldRow(
+          key: Key('capture-study-skill-$index'),
+          prefix: const Text('Skill'),
+          initialValue: item.skill,
+          onChanged: (value) => onChanged(
+            update(
+              skill: value,
+              durationMinutes: item.durationMinutes,
+              scoreRaw: item.scoreRaw,
+              scoreMax: item.scoreMax,
+            ),
+          ),
+        ),
+        CupertinoFormRow(
+          prefix: const Text('Kind'),
+          child: CupertinoSlidingSegmentedControl<StudyCaptureKind>(
+            groupValue: item.kind,
+            children: const {
+              StudyCaptureKind.practice: Text('Practice'),
+              StudyCaptureKind.mock: Text('Mock'),
+            },
+            onValueChanged: (value) {
+              if (value != null) {
+                onChanged(
+                  update(
+                    kind: value,
+                    durationMinutes: item.durationMinutes,
+                    scoreRaw: item.scoreRaw,
+                    scoreMax: item.scoreMax,
+                  ),
+                );
+              }
+            },
+          ),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-study-date-$index'),
+          prefix: const Text('Date'),
+          initialValue: item.occurredOn,
+          keyboardType: TextInputType.datetime,
+          onChanged: (value) => onChanged(
+            update(
+              occurredOn: value,
+              durationMinutes: item.durationMinutes,
+              scoreRaw: item.scoreRaw,
+              scoreMax: item.scoreMax,
+            ),
+          ),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-study-duration-$index'),
+          prefix: const Text('Minutes'),
+          initialValue: item.durationMinutes?.toString() ?? '',
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (value) => onChanged(
+            update(
+              durationMinutes: int.tryParse(value),
+              scoreRaw: item.scoreRaw,
+              scoreMax: item.scoreMax,
+            ),
+          ),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-study-score-raw-$index'),
+          prefix: const Text('Score'),
+          initialValue: item.scoreRaw?.toString() ?? '',
+          placeholder: 'Raw',
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (value) => onChanged(
+            update(
+              durationMinutes: item.durationMinutes,
+              scoreRaw: int.tryParse(value),
+              scoreMax: item.scoreMax,
+            ),
+          ),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-study-score-max-$index'),
+          prefix: const Text('Out of'),
+          initialValue: item.scoreMax?.toString() ?? '',
+          placeholder: 'Maximum',
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          onChanged: (value) => onChanged(
+            update(
+              durationMinutes: item.durationMinutes,
+              scoreRaw: item.scoreRaw,
+              scoreMax: int.tryParse(value),
+            ),
+          ),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-study-notes-$index'),
+          prefix: const Text('Notes'),
+          initialValue: item.notes,
+          minLines: 2,
+          maxLines: 5,
+          onChanged: (value) => onChanged(
+            update(
+              notes: value,
+              durationMinutes: item.durationMinutes,
+              scoreRaw: item.scoreRaw,
+              scoreMax: item.scoreMax,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VocabDraftEditor extends StatelessWidget {
+  const _VocabDraftEditor({
+    super.key,
+    required this.viewModel,
+    required this.draft,
+  });
+
+  final CaptureViewModel viewModel;
   final VocabCaptureDraft draft;
 
   @override
@@ -654,25 +846,90 @@ class _VocabDraftSummary extends StatelessWidget {
     return Column(
       children: [
         for (var index = 0; index < draft.items.length; index += 1)
-          CupertinoFormSection.insetGrouped(
+          _VocabItemEditor(
             key: Key('capture-vocab-item-$index'),
-            header: Text('CARD ${index + 1}'),
-            children: [
-              CupertinoFormRow(
-                prefix: const Text('Word'),
-                child: Text(draft.items[index].front),
-              ),
-              CupertinoFormRow(
-                prefix: const Text('Meaning'),
-                child: Text(draft.items[index].back),
-              ),
-              if (draft.items[index].reading.isNotEmpty)
-                CupertinoFormRow(
-                  prefix: const Text('Reading'),
-                  child: Text(draft.items[index].reading),
-                ),
-            ],
+            index: index,
+            item: draft.items[index],
+            onChanged: (item) => viewModel.updateVocabItem(index, item),
           ),
+      ],
+    );
+  }
+}
+
+class _VocabItemEditor extends StatelessWidget {
+  const _VocabItemEditor({
+    super.key,
+    required this.index,
+    required this.item,
+    required this.onChanged,
+  });
+
+  final int index;
+  final VocabCaptureItem item;
+  final ValueChanged<VocabCaptureItem> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoFormSection.insetGrouped(
+      header: Text('CARD ${index + 1}'),
+      children: [
+        CupertinoTextFormFieldRow(
+          key: Key('capture-vocab-front-$index'),
+          prefix: const Text('Word'),
+          initialValue: item.front,
+          onChanged: (value) => onChanged(item.copyWith(front: value)),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-vocab-back-$index'),
+          prefix: const Text('Meaning'),
+          initialValue: item.back,
+          minLines: 2,
+          maxLines: 4,
+          onChanged: (value) => onChanged(item.copyWith(back: value)),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-vocab-reading-$index'),
+          prefix: const Text('Reading'),
+          initialValue: item.reading,
+          onChanged: (value) => onChanged(item.copyWith(reading: value)),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-vocab-pos-$index'),
+          prefix: const Text('Part of speech'),
+          initialValue: item.partOfSpeech,
+          onChanged: (value) => onChanged(item.copyWith(partOfSpeech: value)),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-vocab-example-$index'),
+          prefix: const Text('Example'),
+          initialValue: item.example,
+          minLines: 2,
+          maxLines: 4,
+          onChanged: (value) => onChanged(item.copyWith(example: value)),
+        ),
+        CupertinoFormRow(
+          prefix: const Text('Language'),
+          child: CupertinoSlidingSegmentedControl<VocabCaptureLanguage>(
+            groupValue: item.language,
+            children: const {
+              VocabCaptureLanguage.english: Text('English'),
+              VocabCaptureLanguage.chinese: Text('Chinese'),
+            },
+            onValueChanged: (value) {
+              if (value != null) {
+                onChanged(item.copyWith(language: value));
+              }
+            },
+          ),
+        ),
+        CupertinoTextFormFieldRow(
+          key: Key('capture-vocab-deck-$index'),
+          prefix: const Text('Deck'),
+          initialValue: item.deck,
+          placeholder: 'Default',
+          onChanged: (value) => onChanged(item.copyWith(deck: value)),
+        ),
       ],
     );
   }

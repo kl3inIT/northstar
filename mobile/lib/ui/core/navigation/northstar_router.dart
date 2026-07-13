@@ -75,7 +75,11 @@ GoRouter createNorthstarRouter(
         path: NorthstarRoutes.capture,
         pageBuilder: (context, state) => CupertinoPage<void>(
           key: state.pageKey,
-          child: CaptureView(viewModel: capture),
+          child: CaptureView(
+            viewModel: capture,
+            promptForReceiptSource:
+                state.uri.queryParameters['intent'] == 'receipt',
+          ),
         ),
       ),
       StatefulShellRoute.indexedStack(
@@ -90,6 +94,12 @@ GoRouter createNorthstarRouter(
                 builder: (context, state) => AssistantLandingView(
                   viewModel: assistant,
                   onOpenCapture: () => context.push(NorthstarRoutes.capture),
+                  onOpenReceiptCapture: () => context.push(
+                    Uri(
+                      path: NorthstarRoutes.capture,
+                      queryParameters: const {'intent': 'receipt'},
+                    ).toString(),
+                  ),
                 ),
               ),
             ],

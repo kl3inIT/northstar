@@ -99,6 +99,101 @@ void main() {
       );
     },
   );
+
+  testWidgets('edits a reviewed study draft before saving', (tester) async {
+    _setWindowSize(tester, const Size(390, 844));
+    final repository = _CaptureViewRepository(
+      textDraft: const StudyCaptureDraft([
+        StudyCaptureItem(
+          skill: 'Reading',
+          kind: StudyCaptureKind.practice,
+          occurredOn: '2026-07-13',
+          notes: '',
+          durationMinutes: 30,
+        ),
+      ]),
+    );
+    final viewModel = CaptureViewModel(
+      repository: repository,
+      receiptPicker: _CaptureViewReceiptPicker(),
+    );
+
+    await tester.pumpWidget(_app(viewModel));
+    await tester.enterText(
+      find.byKey(const Key('capture-text-field')),
+      'IELTS reading practice',
+    );
+    await tester.tap(find.byKey(const Key('capture-draft-button')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('capture-study-skill-0')),
+      'IELTS Reading',
+    );
+    await tester.enterText(
+      find.byKey(const Key('capture-study-score-raw-0')),
+      '34',
+    );
+    await tester.enterText(
+      find.byKey(const Key('capture-study-score-max-0')),
+      '40',
+    );
+    await tester.ensureVisible(find.byKey(const Key('capture-save-button')));
+    await tester.tap(find.byKey(const Key('capture-save-button')));
+    await tester.pumpAndSettle();
+
+    final saved = repository.savedDraft! as StudyCaptureDraft;
+    expect(saved.items.single.skill, 'IELTS Reading');
+    expect(saved.items.single.scoreRaw, 34);
+    expect(saved.items.single.scoreMax, 40);
+  });
+
+  testWidgets('edits a reviewed vocabulary draft before saving', (
+    tester,
+  ) async {
+    _setWindowSize(tester, const Size(390, 844));
+    final repository = _CaptureViewRepository(
+      textDraft: const VocabCaptureDraft([
+        VocabCaptureItem(
+          front: 'resilient',
+          back: 'able to recover',
+          reading: '',
+          partOfSpeech: 'adjective',
+          example: '',
+          language: VocabCaptureLanguage.english,
+          deck: 'IELTS',
+        ),
+      ]),
+    );
+    final viewModel = CaptureViewModel(
+      repository: repository,
+      receiptPicker: _CaptureViewReceiptPicker(),
+    );
+
+    await tester.pumpWidget(_app(viewModel));
+    await tester.enterText(
+      find.byKey(const Key('capture-text-field')),
+      'Add resilient to vocabulary',
+    );
+    await tester.tap(find.byKey(const Key('capture-draft-button')));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const Key('capture-vocab-back-0')),
+      'có khả năng phục hồi',
+    );
+    await tester.enterText(
+      find.byKey(const Key('capture-vocab-example-0')),
+      'A resilient system recovers quickly.',
+    );
+    await tester.ensureVisible(find.byKey(const Key('capture-save-button')));
+    await tester.tap(find.byKey(const Key('capture-save-button')));
+    await tester.pumpAndSettle();
+
+    final saved = repository.savedDraft! as VocabCaptureDraft;
+    expect(saved.items.single.back, 'có khả năng phục hồi');
+    expect(saved.items.single.example, contains('recovers quickly'));
+  });
 }
 
 Widget _app(CaptureViewModel viewModel) {

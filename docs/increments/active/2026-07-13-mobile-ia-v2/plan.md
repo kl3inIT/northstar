@@ -2,6 +2,9 @@
 
 ## Block A — Contract alignment and increment harness
 
+**Status:** Complete — 11 focused Capture tests and the 36-test full suite
+passed before commit `b4fb146`.
+
 - Add the design and ordered plan.
 - Inventory current mobile/backend contract drift.
 - Add `STUDY` and `VOCAB` Capture DTO/domain/repository mappings with an explicit
@@ -11,6 +14,9 @@
 - Commit: `fix(mobile): align Capture with current backend kinds`.
 
 ## Block B — Reviewed Capture entry from Assistant
+
+**Status:** Complete — Dart analysis reported no errors; 19 focused tests and
+the 42-test full suite passed.
 
 - Replace the ambiguous navigation-bar Capture shortcut with a labelled add
   affordance in the Assistant composer.
