@@ -72,7 +72,9 @@ overwrite one another.
 `Northstar Brief` is the user's durable, scheduled brief. Both use a dense
 editorial structure: filters, a TL;DR area, day-grouped ranked rows, and one
 inline-expanded story at a time. Provider content is not copied into Northstar
-notes merely because it was viewed.
+notes merely because it was viewed. Opening a HuggingNews story keeps its trigger
+row at the same viewport position while the lazy detail changes from loading to
+ready or error content; remote-content height changes must not move the reader.
 
 The HuggingNews adapter reads only public SvelteKit page-data routes, normalizes
 them behind `core.brief.BriefFeedProvider`, bounds response sizes, caches the

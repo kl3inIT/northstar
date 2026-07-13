@@ -9,7 +9,7 @@ import {
   Sparkles,
   TrendingUp,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -136,10 +136,41 @@ export function HuggingNewsTab() {
 }
 
 function StoryRow({ story, open, onOpen }: { story: BriefStory; open: boolean; onOpen: () => void }) {
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const anchorRef = useRef<{ top: number; scroller: HTMLElement | null } | undefined>(undefined)
+  // Lazy detail replaces a short skeleton with remote content. Preserve the
+  // clicked row across both layouts instead of letting scroll anchoring jump.
+  const preserveTriggerPosition = useCallback((release = false) => {
+    const trigger = triggerRef.current
+    const anchor = anchorRef.current
+    if (!trigger || !anchor) return
+    const delta = trigger.getBoundingClientRect().top - anchor.top
+    if (Math.abs(delta) >= 0.5) {
+      if (anchor.scroller) anchor.scroller.scrollTop += delta
+      else window.scrollBy({ top: delta })
+    }
+    if (release) anchorRef.current = undefined
+  }, [])
+
+  useLayoutEffect(() => {
+    if (open) preserveTriggerPosition()
+    else anchorRef.current = undefined
+  }, [open, preserveTriggerPosition])
+
+  function handleOpenChange() {
+    if (!open && triggerRef.current) {
+      anchorRef.current = {
+        top: triggerRef.current.getBoundingClientRect().top,
+        scroller: scrollContainer(triggerRef.current),
+      }
+    }
+    onOpen()
+  }
+
   return (
-    <Collapsible open={open} onOpenChange={onOpen} className="border-b">
+    <Collapsible open={open} onOpenChange={handleOpenChange} className="border-b">
       <CollapsibleTrigger asChild>
-        <button className={cn('group grid w-full grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-l-2 border-l-transparent px-1 py-3 text-left transition-colors hover:bg-muted/35 sm:grid-cols-[2.5rem_minmax(0,1fr)_7rem_8rem_4.5rem]', open && 'border-l-info bg-info/5')}>
+        <button ref={triggerRef} className={cn('group grid w-full grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 border-l-2 border-l-transparent px-1 py-3 text-left transition-colors hover:bg-muted/35 sm:grid-cols-[2.5rem_minmax(0,1fr)_7rem_8rem_4.5rem]', open && 'border-l-info bg-info/5')}>
           <span className="text-right font-mono text-xs text-muted-foreground">{story.rank || '—'}</span>
           <span className="min-w-0 text-sm font-semibold leading-5 sm:text-[15px]">
             <span className="mr-2 inline-flex items-center gap-1">
@@ -156,15 +187,19 @@ function StoryRow({ story, open, onOpen }: { story: BriefStory; open: boolean; o
           </span>
         </button>
       </CollapsibleTrigger>
-      <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
-        {open && <StoryDetail story={story} />}
+      <CollapsibleContent className="overflow-hidden" style={{ overflowAnchor: 'none' }}>
+        {open && <StoryDetail story={story} onLayoutChange={preserveTriggerPosition} />}
       </CollapsibleContent>
     </Collapsible>
   )
 }
 
-function StoryDetail({ story }: { story: BriefStory }) {
+function StoryDetail({ story, onLayoutChange }: { story: BriefStory; onLayoutChange: (release?: boolean) => void }) {
   const detail = useHuggingNewsStory(story.topic, story.slug, true)
+  const settled = !detail.isLoading
+  useLayoutEffect(() => {
+    onLayoutChange(settled)
+  }, [onLayoutChange, settled])
   if (detail.isLoading) return <DetailSkeleton />
   if (detail.isError || !detail.data) {
     return (
@@ -215,6 +250,16 @@ function StoryDetail({ story }: { story: BriefStory }) {
       </div>
     </div>
   )
+}
+
+function scrollContainer(element: HTMLElement) {
+  let parent = element.parentElement
+  while (parent) {
+    const overflowY = window.getComputedStyle(parent).overflowY
+    if (overflowY === 'auto' || overflowY === 'scroll') return parent
+    parent = parent.parentElement
+  }
+  return null
 }
 
 function MetaLine({ label, values, accent = false }: { label: string; values: string[]; accent?: boolean }) {
