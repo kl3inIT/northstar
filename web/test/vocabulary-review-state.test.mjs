@@ -8,12 +8,14 @@ import {
   directionIsDue,
   audioPracticeReference,
   exampleAudioAssetId,
+  examplePracticeText,
   enrichmentFieldsForRequest,
   incrementRating,
   parseDictationDiff,
   reviewIsComplete,
   reviewKeyboardAction,
   wordAudioAssetId,
+  shadowingPracticeReference,
 } from '../src/features/study/vocabulary-review-state.ts'
 
 test('review stays on the front until reveal and completes after the last rating', () => {
@@ -72,9 +74,28 @@ test('applied audio is reused only while its bound text is unchanged', () => {
 })
 
 test('shadowing and dictation use the saved example then fall back to the card front', () => {
-  assert.equal(audioPracticeReference('serendipity', { example: 'We met by chance.' }, 'WORD'), 'serendipity')
-  assert.equal(audioPracticeReference('serendipity', { example: 'We met by chance.' }, 'SHADOWING'), 'We met by chance.')
+  const metadata = { example: 'We met by pure chance. — Chúng tôi tình cờ gặp nhau.' }
+  assert.equal(examplePracticeText(metadata), 'We met by pure chance.')
+  assert.equal(audioPracticeReference('serendipity', metadata, 'WORD'), 'serendipity')
+  assert.equal(audioPracticeReference('serendipity', metadata, 'SHADOWING'), 'We met by pure chance.')
+  assert.equal(audioPracticeReference('serendipity', metadata, 'DICTATION'), 'We met by pure chance.')
+  assert.equal(audioPracticeReference('serendipity', {}, 'SHADOWING'), '')
   assert.equal(audioPracticeReference('serendipity', {}, 'DICTATION'), 'serendipity')
+})
+
+test('shadowing requires connected speech in spaced or Han-script examples', () => {
+  assert.equal(shadowingPracticeReference({ example: 'Take it.' }), undefined)
+  assert.equal(shadowingPracticeReference({ example: 'Please take a seat.' }), 'Please take a seat.')
+  assert.equal(shadowingPracticeReference({ example: '我们明天一起去学校。 — Ngày mai chúng ta cùng đi học.' }), '我们明天一起去学校。')
+})
+
+test('example audio binding follows the target sentence rather than its translation', () => {
+  const metadata = {
+    example: 'We met by chance. — Chúng tôi tình cờ gặp nhau.',
+    exampleAudioAssetId: 'example-audio',
+    exampleAudioText: 'We met by chance.',
+  }
+  assert.equal(exampleAudioAssetId(metadata), 'example-audio')
 })
 
 test('audio trends never mix practice modes or provider scales', () => {

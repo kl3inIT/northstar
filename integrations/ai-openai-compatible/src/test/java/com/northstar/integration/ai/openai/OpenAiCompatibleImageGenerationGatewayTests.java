@@ -50,9 +50,11 @@ class OpenAiCompatibleImageGenerationGatewayTests {
     void nineRouterRequestsBinaryFromSelectedTarget() throws Exception {
         AtomicReference<String> query = new AtomicReference<>();
         AtomicReference<String> body = new AtomicReference<>();
+        AtomicReference<String> protocol = new AtomicReference<>();
         try (TestServer server = TestServer.start("/v1/images/generations", exchange -> {
             query.set(exchange.getRequestURI().getQuery());
             body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            protocol.set(exchange.getProtocol());
             respond(exchange, "image/png", PNG);
         })) {
             var gateway = gateway(server, AiGatewayType.NINE_ROUTER);
@@ -61,6 +63,7 @@ class OpenAiCompatibleImageGenerationGatewayTests {
 
             assertEquals("response_format=binary", query.get());
             assertTrue(body.get().contains("\"model\":\"auto:image\""));
+            assertEquals("HTTP/1.1", protocol.get());
         }
     }
 
@@ -73,6 +76,14 @@ class OpenAiCompatibleImageGenerationGatewayTests {
             assertThrows(ImageGenerationException.class,
                     () -> gateway.generate(new AiRoute("nine-router", "auto:image"), "cue"));
         }
+    }
+
+    @Test
+    void allowsSlowImageInferenceWithoutChangingLongerConfiguredTimeouts() {
+        assertEquals(Duration.ofMinutes(5),
+                OpenAiCompatibleImageGenerationGateway.imageRequestTimeout(Duration.ofSeconds(60)));
+        assertEquals(Duration.ofMinutes(10),
+                OpenAiCompatibleImageGenerationGateway.imageRequestTimeout(Duration.ofMinutes(10)));
     }
 
     private static OpenAiCompatibleImageGenerationGateway gateway(TestServer server,

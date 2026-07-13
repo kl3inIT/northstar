@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -161,6 +162,21 @@ class VocabEnrichmentJobServiceTests {
                 any(Boolean.class), any(Boolean.class));
     }
 
+    @Test
+    void exampleAudioContainsOnlyTheTargetLanguageSentence() {
+        card = withMetadata(card,
+                "{\"example\":\"We assign each request once. — Chúng tôi chỉ xử lý mỗi yêu cầu một lần.\"}");
+        when(vocab.find(card.id())).thenReturn(card);
+        byte[] mp3 = {0x49, 0x44, 0x33, 1};
+        when(speech.preview(any(), anyString(), anyString()))
+                .thenReturn(new SpeechAudio(mp3, "audio/mpeg", "mp3"));
+
+        VocabEnrichmentJobView ready = jobs.start(card.id(), Set.of(VocabEnrichmentField.AUDIO));
+
+        assertThat(ready.exampleAudioBase64()).isNotBlank();
+        verify(speech).preview(any(), eq("We assign each request once."), anyString());
+    }
+
     private static VocabCardSummary card() {
         Instant now = Instant.parse("2026-07-12T00:00:00Z");
         return new VocabCardSummary(UUID.randomUUID(), "reassign", "giao lại", "{}",
@@ -183,5 +199,18 @@ class VocabEnrichmentJobServiceTests {
                 source.productionSchedulingState(),
                 source.productionLapseCount(), source.productionLeech(),
                 source.productionReviewCount());
+    }
+
+    private static VocabCardSummary withMetadata(VocabCardSummary source, String metadata) {
+        return new VocabCardSummary(source.id(), source.front(), source.back(), metadata,
+                source.language(), source.deck(), source.disciplineId(), source.recallProbability(),
+                source.stabilityDays(), source.dueAt(), source.buriedUntil(),
+                source.lastReviewedAt(), source.schedulingState(), source.lapseCount(),
+                source.leech(), source.reviewCount(), source.suspended(), source.createdAt(),
+                source.version(), source.productionEnabled(),
+                source.productionRecallProbability(), source.productionStabilityDays(),
+                source.productionDueAt(), source.productionBuriedUntil(),
+                source.productionSchedulingState(), source.productionLapseCount(),
+                source.productionLeech(), source.productionReviewCount());
     }
 }

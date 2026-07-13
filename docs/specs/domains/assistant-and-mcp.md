@@ -94,7 +94,10 @@ external-link confirmation remain application wrappers because they encode
 product behavior beyond a generic presentation component.
 
 Authenticated web routes outside `/assistant` expose the same Assistant
-workspace in a floating chat widget anchored above its bottom-right trigger.
+workspace in a floating chat widget anchored to its trigger. The trigger starts
+at the bottom-right, can be dragged or moved with Alt+Arrow, stays inside the
+viewport, and remembers its browser-local position without turning a drag into
+an accidental open action.
 The non-modal panel is a layout entry point rather than a second chat client: it
 reuses the same conversation list, persisted history,
 AI SDK transport, model routing, attachments, sources, tool workflows, and TTS

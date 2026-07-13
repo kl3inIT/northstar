@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { BookOpenCheck, ChevronDown, Ellipsis, Flame, Headphones, Mic, Pencil, Pin, PinOff, PauseCircle, PlayCircle, Search, Sparkles, Trash2, Volume2 } from 'lucide-react'
+import { BookOpenCheck, ChevronDown, CircleStop, Ellipsis, Flame, Headphones, Loader2, Mic, Pencil, Pin, PinOff, PauseCircle, PlayCircle, Search, Sparkles, Trash2, Volume2 } from 'lucide-react'
 import { AudioRecorder } from './audio-recorder'
 import { VocabularyReviewer } from './vocabulary-reviewer'
 import { cardHasDueDirection, cardMatchesDeck, deckQuery } from './vocabulary-review-state'
@@ -41,7 +41,7 @@ import {
   type PronunciationAssessment,
 } from '@/lib/study-api'
 import { useWavRecorder } from '@/lib/use-wav-recorder'
-import { audioPracticeReference, comparableAudioTrendAttempts, exampleAudioAssetId, parseDictationDiff, wordAudioAssetId } from './vocabulary-review-state'
+import { audioPracticeReference, comparableAudioTrendAttempts, exampleAudioAssetId, parseDictationDiff, shadowingPracticeReference, wordAudioAssetId } from './vocabulary-review-state'
 
 const EMPTY_CARDS: VocabCard[] = []
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -487,32 +487,105 @@ function DeleteCardDialog({ card, onClose }: { card: VocabCard | null; onClose: 
 }
 
 type AudioPracticeMode = 'WORD' | 'SHADOWING' | 'DICTATION'
+type ShadowingStage = 'idle' | 'preparing' | 'following' | 'finishing' | 'ready'
 
 function PronunciationDialog({ card, onClose }: { card: VocabCard | null; onClose: () => void }) {
   const [mode, setMode] = useState<AudioPracticeMode>('WORD')
   const [dictationAnswer, setDictationAnswer] = useState('')
+  const [shadowingStage, setShadowingStage] = useState<ShadowingStage>('idle')
+  const playbackRef = useRef<PracticeSpeechPlayback | null>(null)
+  const shadowingSessionRef = useRef(0)
+  const shadowingTailRef = useRef<number | null>(null)
   const recorder = useWavRecorder(30)
   const assessment = useAssessVocabPronunciation()
   const dictation = useRecordVocabDictation()
   const history = useVocabAudioAttempts(card?.id, Boolean(card))
   const metadata = card ? parseVocabMetadata(card.metadata) : {}
   const reference = card ? audioPracticeReference(card.front, metadata, mode) : ''
+  const shadowingReference = shadowingPracticeReference(metadata)
+  const shadowingActive = shadowingStage === 'preparing'
+    || shadowingStage === 'following'
+    || shadowingStage === 'finishing'
+
+  function stopPlayback() {
+    playbackRef.current?.stop()
+    playbackRef.current = null
+    if (shadowingTailRef.current !== null) window.clearTimeout(shadowingTailRef.current)
+    shadowingTailRef.current = null
+  }
+
+  function playReference(): PracticeSpeechPlayback | null {
+    if (!card || !reference) return null
+    stopPlayback()
+    const assetId = mode === 'WORD'
+      ? wordAudioAssetId(card.front, metadata)
+      : exampleAudioAssetId(metadata) || (mode === 'DICTATION' ? wordAudioAssetId(card.front, metadata) : undefined)
+    const playback = playPracticeSpeech(reference, assetId, metadata.frontAudioLocale)
+    playbackRef.current = playback
+    void playback.finished.then(() => {
+      if (playbackRef.current === playback) playbackRef.current = null
+    })
+    return playback
+  }
 
   useEffect(() => {
+    shadowingSessionRef.current += 1
+    stopPlayback()
     recorder.reset()
     assessment.reset()
     dictation.reset()
     setDictationAnswer('')
+    setShadowingStage('idle')
     // Each practice mode intentionally starts with a clean attempt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode])
 
+  useEffect(() => () => {
+    shadowingSessionRef.current += 1
+    playbackRef.current?.stop()
+    if (shadowingTailRef.current !== null) window.clearTimeout(shadowingTailRef.current)
+  }, [])
+
   function listen() {
-    if (!card) return
-    const assetId = mode === 'WORD'
-      ? wordAudioAssetId(card.front, metadata)
-      : exampleAudioAssetId(metadata) || wordAudioAssetId(card.front, metadata)
-    playPracticeSpeech(reference, assetId, metadata.frontAudioLocale)
+    playReference()
+  }
+
+  async function startShadowing() {
+    if (!card || !shadowingReference || shadowingActive) return
+    const session = ++shadowingSessionRef.current
+    stopPlayback()
+    setShadowingStage('preparing')
+    const microphoneReady = await recorder.start()
+    if (!microphoneReady || shadowingSessionRef.current !== session) {
+      if (microphoneReady) recorder.reset()
+      if (shadowingSessionRef.current === session) setShadowingStage('idle')
+      return
+    }
+
+    setShadowingStage('following')
+    const playback = playReference()
+    if (!playback) {
+      recorder.reset()
+      setShadowingStage('idle')
+      return
+    }
+    await playback.finished
+    if (shadowingSessionRef.current !== session) return
+    setShadowingStage('finishing')
+    shadowingTailRef.current = window.setTimeout(() => {
+      if (shadowingSessionRef.current !== session) return
+      recorder.stop()
+      setShadowingStage('ready')
+      shadowingTailRef.current = null
+    }, 1_200)
+  }
+
+  function stopShadowing() {
+    shadowingSessionRef.current += 1
+    stopPlayback()
+    if (recorder.state === 'recording') recorder.stop()
+    else recorder.reset()
+    setShadowingStage(recorder.state === 'recording' ? 'ready' : 'idle')
   }
 
   function submitSpeech() {
@@ -550,12 +623,14 @@ function PronunciationDialog({ card, onClose }: { card: VocabCard | null; onClos
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    {mode === 'WORD' ? 'Say this word' : mode === 'SHADOWING' ? 'Listen, then repeat' : 'Listen, then type'}
+                    {mode === 'WORD' ? 'Listen, then say the word' : mode === 'SHADOWING' ? 'Follow connected speech' : 'Listen, then type'}
                   </p>
-                  {mode !== 'DICTATION' && <p className="mt-2 text-lg font-medium leading-relaxed">{reference}</p>}
+                  {mode !== 'DICTATION' && reference && <p className="mt-2 text-lg font-medium leading-relaxed">{reference}</p>}
                   {mode === 'WORD' && metadata.reading && <p className="text-sm text-muted-foreground">{metadata.reading}</p>}
                 </div>
-                <Button variant="outline" onClick={listen}><Volume2 /> Listen</Button>
+                <Button variant="outline" onClick={listen} disabled={!reference || shadowingActive}>
+                  <Volume2 /> {mode === 'SHADOWING' ? 'Preview' : 'Listen'}
+                </Button>
               </div>
 
               {mode === 'DICTATION' ? (
@@ -567,6 +642,53 @@ function PronunciationDialog({ card, onClose }: { card: VocabCard | null; onClos
                   </Button>
                   {dictation.data && <DictationResultView result={dictation.data} />}
                 </>
+              ) : mode === 'SHADOWING' ? (
+                shadowingReference ? (
+                  <>
+                    <div className="flex items-start gap-3 rounded-lg border border-primary/20 bg-primary/5 p-3">
+                      <Headphones className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Speak one beat behind the model</p>
+                        <p className="text-xs leading-relaxed text-muted-foreground">
+                          Keep talking while the model is playing. Headphones prevent the reference audio from leaking into your recording.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-3" aria-live="polite">
+                      <div className="min-w-0">
+                        {shadowingStage === 'preparing' && <p className="flex items-center gap-2 text-sm font-medium"><Loader2 className="size-4 animate-spin" /> Opening microphone…</p>}
+                        {shadowingStage === 'following' && <p className="flex items-center gap-2 text-sm font-medium text-primary"><span className="size-2 animate-pulse rounded-full bg-primary" /> Follow now · {recorder.seconds.toFixed(1)}s</p>}
+                        {shadowingStage === 'finishing' && <p className="flex items-center gap-2 text-sm font-medium"><span className="size-2 animate-pulse rounded-full bg-primary" /> Finish the last phrase…</p>}
+                        {(shadowingStage === 'idle' || shadowingStage === 'ready') && <p className="text-sm font-medium">Mic and model start together</p>}
+                        <p className="mt-1 text-xs text-muted-foreground">The recording stops automatically after the model.</p>
+                      </div>
+                      {shadowingActive ? (
+                        <Button type="button" variant="destructive" onClick={stopShadowing}>
+                          <CircleStop className="size-4" /> Stop
+                        </Button>
+                      ) : (
+                        <Button type="button" onClick={() => void startShadowing()}>
+                          <Mic className="size-4" /> {recorder.audio ? 'Try again' : 'Start shadowing'}
+                        </Button>
+                      )}
+                    </div>
+
+                    {recorder.audio && <BlobAudio blob={recorder.audio} label="Replay your shadowing attempt" />}
+                    <Button onClick={submitSpeech} disabled={!recorder.audio || assessment.isPending || shadowingActive}>
+                      {assessment.isPending ? 'Assessing…' : 'Save and assess pronunciation'}
+                    </Button>
+                    {assessment.data && <PronunciationResultView result={assessment.data} />}
+                  </>
+                ) : (
+                  <div className="rounded-lg border border-dashed bg-card p-5 text-center">
+                    <p className="text-sm font-medium">Add a connected example to unlock shadowing</p>
+                    <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-muted-foreground">
+                      Shadowing needs a phrase or sentence of at least four words. It never falls back to the isolated vocabulary item.
+                    </p>
+                    <Button type="button" variant="outline" className="mt-4" onClick={onClose}>Back to card</Button>
+                  </div>
+                )
               ) : (
                 <>
                   <AudioRecorder recorder={recorder} maximumSeconds={30} />
@@ -587,24 +709,67 @@ function PronunciationDialog({ card, onClose }: { card: VocabCard | null; onClos
   )
 }
 
-function playPracticeSpeech(text: string, assetId?: string, locale?: string) {
+interface PracticeSpeechPlayback {
+  finished: Promise<void>
+  stop: () => void
+}
+
+function playPracticeSpeech(text: string, assetId?: string, locale?: string): PracticeSpeechPlayback {
+  let resolveFinished: () => void = () => {}
+  let settled = false
+  let stopCurrent: () => void = () => {}
+  const finished = new Promise<void>((resolve) => { resolveFinished = resolve })
+  const settle = () => {
+    if (settled) return
+    settled = true
+    resolveFinished()
+  }
   const fallback = () => {
     if (!('speechSynthesis' in window)) {
       toast.error('Text-to-speech is not available in this browser')
+      settle()
       return
     }
     window.speechSynthesis.cancel()
     const utterance = new SpeechSynthesisUtterance(text)
     utterance.lang = locale || (/\p{Script=Han}/u.test(text) ? 'zh-CN' : 'en-US')
+    utterance.onend = settle
+    utterance.onerror = settle
+    stopCurrent = () => {
+      window.speechSynthesis.cancel()
+      settle()
+    }
     window.speechSynthesis.speak(utterance)
   }
   if (!assetId) {
     fallback()
-    return
+  } else {
+    const audio = new Audio(`/api/speech/assets/${encodeURIComponent(assetId)}/audio`)
+    let fallbackStarted = false
+    const useFallback = () => {
+      if (fallbackStarted || settled) return
+      fallbackStarted = true
+      audio.pause()
+      audio.removeEventListener('error', useFallback)
+      audio.removeAttribute('src')
+      fallback()
+    }
+    audio.addEventListener('ended', settle, { once: true })
+    audio.addEventListener('error', useFallback, { once: true })
+    stopCurrent = () => {
+      audio.pause()
+      audio.removeAttribute('src')
+      settle()
+    }
+    void audio.play().catch(useFallback)
   }
-  const audio = new Audio(`/api/speech/assets/${encodeURIComponent(assetId)}/audio`)
-  audio.addEventListener('error', fallback, { once: true })
-  void audio.play().catch(fallback)
+  return {
+    finished,
+    stop: () => {
+      stopCurrent()
+      settle()
+    },
+  }
 }
 
 function BlobAudio({ blob, label }: { blob: Blob; label: string }) {

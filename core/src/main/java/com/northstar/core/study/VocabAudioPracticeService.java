@@ -43,7 +43,11 @@ public class VocabAudioPracticeService {
         VocabCardSummary card = vocab.find(cardId);
         return switch (Objects.requireNonNull(mode, "mode is required")) {
             case WORD -> card.front();
-            case SHADOWING, DICTATION -> example(card).orElse(card.front());
+            case SHADOWING -> example(card)
+                    .filter(VocabPracticeText::supportsShadowing)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Shadowing requires a connected example with at least four words"));
+            case DICTATION -> example(card).orElse(card.front());
         };
     }
 
@@ -156,7 +160,7 @@ public class VocabAudioPracticeService {
         Object parsed = json.readValue(card.metadata(), Object.class);
         if (parsed instanceof Map<?, ?> map && map.get("example") instanceof String value
                 && !value.isBlank()) {
-            return Optional.of(value.strip());
+            return VocabPracticeText.targetExample(value);
         }
         return Optional.empty();
     }

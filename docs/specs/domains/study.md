@@ -65,7 +65,8 @@ enabled sibling until the next midnight in the browser's timezone.
   mnemonics, defensible word formation, a text-free mnemonic illustration, and
   provider-routed word/example audio
   are optional enrichment. Creating, loading, or revealing a card never
-  generates them. The learner selects fields and explicitly starts an expiring
+  generates them. The learner can select fields individually or use the
+  reversible Select all/Clear all action, then explicitly starts an expiring
   in-API background preview, then keeps reviewing until a toast offers Apply or
   Discard. The review header retains a running/ready action until that decision,
   so preview access does not depend on a transient notification. Enrichment
@@ -78,6 +79,10 @@ enabled sibling until the next midnight in the browser's timezone.
   Apply stores them through Attachments and references them as `frontImageId`;
   unknown metadata keys and existing user-authored values are preserved. Audio previews are likewise
   transient until Apply stores them in the content-addressed speech cache.
+  Image inference keeps the configured connection deadline but allows a
+  five-minute response window because provider-routed image generation may
+  legitimately exceed the shared 60-second gateway timeout. Northstar does not
+  automatically retry the potentially non-idempotent generation POST.
   Applied audio is bound to its exact source text; editing the front or example
   makes the binding stale and Listen falls back to browser speech rather than
   playing the wrong recording.
@@ -103,17 +108,25 @@ enabled sibling until the next midnight in the browser's timezone.
   deleted (cascades the review log).
 - Listen uses valid applied speech first and `window.speechSynthesis` as the
   free default/fallback. Production prompts cannot play the target before
-  reveal. Practice has three modes: Word assesses the current front;
-  Shadowing plays and assesses the current saved example (or front fallback);
-  Dictation hides the same reference and uses a deterministic case- and
-  punctuation-tolerant word diff. Word and Shadowing recordings are playable
-  before submit and persist only after a successful assessment as 16-kHz,
-  16-bit mono PCM WAV. Attempt facts remain; recording bytes expire after 180
-  days and are capped at 20 per card/mode while pinned, first, best, and latest
+  reveal. Practice has three modes. Word is isolated pronunciation: it plays
+  and assesses the current front. Shadowing requires connected target-language
+  speech from the saved example (at least four lexical words or six Han
+  characters), never falls back to the front, and strips the translated half
+  after ` — `. Starting it opens the mic, plays the model while capture remains
+  live, asks the learner to follow one beat behind, and stops capture shortly
+  after playback. Its Azure values assess the learner's scripted pronunciation,
+  not timing similarity to the TTS waveform. Dictation hides the target-language
+  example, falls back to the front when no example exists, and uses a
+  deterministic case- and punctuation-tolerant word diff. Word and Shadowing
+  recordings are playable before submit and persist only after a successful
+  assessment as 16-kHz, 16-bit mono PCM WAV. Attempt facts remain; recording
+  bytes expire after 180 days and are capped at 20 per card/mode while pinned,
+  first, best, and latest
   recordings are preserved. History is newest-first with pin/delete and
   provider-aware Accuracy/Fluency/Prosody trends. These provider-native 0-100
   values are never converted to IELTS, and none of the three modes changes
-  either FSRS schedule.
+  either FSRS schedule. See
+  [decision 0035](../../decisions/0035-vocabulary-shadowing-requires-connected-live-following.md).
 
 ### Writing tutor
 
@@ -246,7 +259,7 @@ skipped, never fatal.
   interval, R to listen, Escape to exit, a completion
   tally, deck/per-card two-direction controls, applied-audio-first Listen with
   browser fallback, and an opt-in background
-  enrichment Sheet whose ready preview (including audio players) replaces the field picker instead of
+  enrichment Sheet with Select all/Clear all whose ready preview (including audio players) replaces the field picker instead of
   forcing a scroll. Applied mnemonic images appear only on the question/front
   face; word-formation parts appear on the answer face. Writing:
   essays graded, latest estimate,

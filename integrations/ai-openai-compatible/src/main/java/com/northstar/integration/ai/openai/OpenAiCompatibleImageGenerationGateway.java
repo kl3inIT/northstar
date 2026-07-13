@@ -28,6 +28,7 @@ import org.springframework.web.client.RestClientException;
 public class OpenAiCompatibleImageGenerationGateway implements ImageGenerationGateway {
 
     private static final int MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+    private static final Duration MIN_IMAGE_REQUEST_TIMEOUT = Duration.ofMinutes(5);
 
     private final AiGatewayConnectionResolver gateways;
     private final RestClient.Builder restClient;
@@ -135,13 +136,23 @@ public class OpenAiCompatibleImageGenerationGateway implements ImageGenerationGa
     }
 
     private RestClient client(AiGatewayConnection gateway) {
-        HttpClient http = HttpClient.newBuilder().connectTimeout(gateway.timeout())
-                .followRedirects(HttpClient.Redirect.NEVER).build();
-        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http);
-        requests.setReadTimeout(gateway.timeout());
+        HttpClient.Builder http = HttpClient.newBuilder().connectTimeout(gateway.timeout())
+                .followRedirects(HttpClient.Redirect.NEVER);
+        if (gateway.baseUrl().regionMatches(true, 0, "http://", 0, 7)) {
+            // Internal gateways such as 9Router are clear-text HTTP/1.1 services.
+            // Avoid an HTTP/2 preference/fallback handshake on long binary responses.
+            http.version(HttpClient.Version.HTTP_1_1);
+        }
+        JdkClientHttpRequestFactory requests = new JdkClientHttpRequestFactory(http.build());
+        requests.setReadTimeout(imageRequestTimeout(gateway.timeout()));
         return restClient.clone().baseUrl(gateway.baseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + gateway.apiKey())
                 .requestFactory(requests).build();
+    }
+
+    static Duration imageRequestTimeout(Duration configuredTimeout) {
+        return configuredTimeout.compareTo(MIN_IMAGE_REQUEST_TIMEOUT) >= 0
+                ? configuredTimeout : MIN_IMAGE_REQUEST_TIMEOUT;
     }
 
     private record ImageResponse(List<ImageData> data) {
