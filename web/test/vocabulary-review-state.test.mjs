@@ -5,10 +5,13 @@ import {
   cardMatchesDeck,
   deckQuery,
   directionIsDue,
+  audioPracticeReference,
+  exampleAudioAssetId,
   enrichmentFieldsForRequest,
   incrementRating,
   reviewIsComplete,
   reviewKeyboardAction,
+  wordAudioAssetId,
 } from '../src/features/study/vocabulary-review-state.ts'
 
 test('review stays on the front until reveal and completes after the last rating', () => {
@@ -50,4 +53,24 @@ test('due state excludes future and sibling-buried directions', () => {
   assert.equal(directionIsDue('2026-07-12T09:00:00Z', undefined, now), true)
   assert.equal(directionIsDue('2026-07-12T11:00:00Z', undefined, now), false)
   assert.equal(directionIsDue('2026-07-12T09:00:00Z', '2026-07-13T00:00:00Z', now), false)
+})
+
+test('applied audio is reused only while its bound text is unchanged', () => {
+  const metadata = {
+    example: 'We met by chance.',
+    frontAudioAssetId: 'word-audio',
+    frontAudioText: 'serendipity',
+    exampleAudioAssetId: 'example-audio',
+    exampleAudioText: 'We met by chance.',
+  }
+  assert.equal(wordAudioAssetId('serendipity', metadata), 'word-audio')
+  assert.equal(wordAudioAssetId('fortuity', metadata), undefined)
+  assert.equal(exampleAudioAssetId(metadata), 'example-audio')
+  assert.equal(exampleAudioAssetId({ ...metadata, example: 'Changed.' }), undefined)
+})
+
+test('shadowing and dictation use the saved example then fall back to the card front', () => {
+  assert.equal(audioPracticeReference('serendipity', { example: 'We met by chance.' }, 'WORD'), 'serendipity')
+  assert.equal(audioPracticeReference('serendipity', { example: 'We met by chance.' }, 'SHADOWING'), 'We met by chance.')
+  assert.equal(audioPracticeReference('serendipity', {}, 'DICTATION'), 'serendipity')
 })

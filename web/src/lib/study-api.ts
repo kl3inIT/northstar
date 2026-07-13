@@ -5,6 +5,7 @@ import {
   applyVocabEnrichmentJob,
   checkVocabAnswer,
   discardVocabEnrichmentJob,
+  deleteVocabAudioAttempt,
   deleteSpeakingFeedback,
   deleteStudySession,
   deleteVocabCard,
@@ -18,18 +19,20 @@ import {
   listStudySessions,
   listStudySkills,
   listVocabCards,
+  listVocabAudioAttempts,
   listVocabReviewCards,
   listWritingFeedback,
   recordVocabReview,
+  recordVocabDictationAttempt,
   recordStudySessions,
   startVocabEnrichmentJob,
+  pinVocabAttemptRecording,
   updateStudySession,
   updateVocabCard,
   updateVocabDeckSettings,
 } from './hey-api'
 import { dataOrThrow, voidOrThrow } from './hey-api-result'
 import type {
-  PronunciationResult,
   SpeakingAttemptResult,
   SpeakingFeedbackSummary,
   StudyItemRequest,
@@ -37,6 +40,7 @@ import type {
   StudySummary,
   UpdateVocabCardRequest,
   VocabAnswerAssessment,
+  VocabAudioAttemptView,
   VocabCardSummary,
   VocabDeckSettings,
   VocabEnrichmentJobView,
@@ -57,7 +61,8 @@ export type VocabLanguage = VocabCardSummary['language']
 export type WritingFeedback = WritingFeedbackSummary
 export type SpeakingFeedback = SpeakingFeedbackSummary
 export type SpeakingAttempt = SpeakingAttemptResult
-export type PronunciationAssessment = PronunciationResult
+export type PronunciationAssessment = VocabAudioAttemptView
+export type VocabAudioAttempt = VocabAudioAttemptView
 export type VocabAnswerCheck = VocabAnswerAssessment
 export type VocabEnrichment = VocabEnrichmentPreview
 export type VocabEnrichmentJob = VocabEnrichmentJobView
@@ -199,6 +204,12 @@ export interface VocabMetadata {
   wordFormation?: VocabWordFormation
   frontImageId?: string
   frontImageAlt?: string
+  frontAudioAssetId?: string
+  frontAudioText?: string
+  frontAudioTargetId?: string
+  frontAudioLocale?: string
+  exampleAudioAssetId?: string
+  exampleAudioText?: string
 }
 
 function stringList(value: unknown): string[] | undefined {
@@ -224,6 +235,12 @@ export function parseVocabMetadata(metadata: string | undefined | null): VocabMe
       wordFormation: parseWordFormation(parsed.wordFormation),
       frontImageId: typeof parsed.frontImageId === 'string' ? parsed.frontImageId : undefined,
       frontImageAlt: typeof parsed.frontImageAlt === 'string' ? parsed.frontImageAlt : undefined,
+      frontAudioAssetId: typeof parsed.frontAudioAssetId === 'string' ? parsed.frontAudioAssetId : undefined,
+      frontAudioText: typeof parsed.frontAudioText === 'string' ? parsed.frontAudioText : undefined,
+      frontAudioTargetId: typeof parsed.frontAudioTargetId === 'string' ? parsed.frontAudioTargetId : undefined,
+      frontAudioLocale: typeof parsed.frontAudioLocale === 'string' ? parsed.frontAudioLocale : undefined,
+      exampleAudioAssetId: typeof parsed.exampleAudioAssetId === 'string' ? parsed.exampleAudioAssetId : undefined,
+      exampleAudioText: typeof parsed.exampleAudioText === 'string' ? parsed.exampleAudioText : undefined,
     }
   } catch {
     return {}
@@ -433,9 +450,54 @@ export function useDeleteVocabCard() {
 }
 
 export function useAssessVocabPronunciation() {
+  const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, audio }: { id: string; audio: Blob }) =>
-      dataOrThrow(await assessVocabPronunciation({ path: { id }, body: { audio } })),
+    mutationFn: async ({ id, audio, mode }: { id: string; audio: Blob; mode: 'WORD' | 'SHADOWING' }) =>
+      dataOrThrow(await assessVocabPronunciation({ path: { id }, query: { mode }, body: { audio } })),
+    onSuccess: (attempt) => {
+      if (attempt.cardId) void queryClient.invalidateQueries({ queryKey: ['study-vocab-audio-attempts', attempt.cardId] })
+    },
+  })
+}
+
+export function useVocabAudioAttempts(cardId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['study-vocab-audio-attempts', cardId],
+    enabled: enabled && Boolean(cardId),
+    queryFn: async () => dataOrThrow(await listVocabAudioAttempts({ path: { id: cardId! } })),
+  })
+}
+
+export function useRecordVocabDictation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, answer }: { id: string; answer: string }) =>
+      dataOrThrow(await recordVocabDictationAttempt({ path: { id }, body: { answer } })),
+    onSuccess: (attempt) => {
+      if (attempt.cardId) void queryClient.invalidateQueries({ queryKey: ['study-vocab-audio-attempts', attempt.cardId] })
+    },
+  })
+}
+
+export function usePinVocabAttempt() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ attemptId, pinned }: { attemptId: string; pinned: boolean }) =>
+      dataOrThrow(await pinVocabAttemptRecording({ path: { attemptId }, body: { pinned } })),
+    onSuccess: (attempt) => {
+      if (attempt.cardId) void queryClient.invalidateQueries({ queryKey: ['study-vocab-audio-attempts', attempt.cardId] })
+    },
+  })
+}
+
+export function useDeleteVocabAudioAttempt() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ attemptId, cardId }: { attemptId: string; cardId: string }) => {
+      voidOrThrow(await deleteVocabAudioAttempt({ path: { attemptId } }))
+      return cardId
+    },
+    onSuccess: (cardId) => void queryClient.invalidateQueries({ queryKey: ['study-vocab-audio-attempts', cardId] }),
   })
 }
 

@@ -1,4 +1,4 @@
-import type { VocabCard, VocabEnrichmentField, VocabRating } from '@/lib/study-api'
+import type { VocabCard, VocabEnrichmentField, VocabMetadata, VocabRating } from '@/lib/study-api'
 
 export type RatingTally = Record<VocabRating, number>
 
@@ -67,4 +67,26 @@ export function enrichmentFieldsForRequest(
   explicitlyRequested: boolean,
 ): VocabEnrichmentField[] | null {
   return explicitlyRequested && selected.size > 0 ? [...selected] : null
+}
+
+/** Generated audio is valid only for the exact text that was explicitly applied. */
+export function wordAudioAssetId(front: string, metadata: VocabMetadata): string | undefined {
+  return metadata.frontAudioAssetId && metadata.frontAudioText === front
+    ? metadata.frontAudioAssetId
+    : undefined
+}
+
+/** Example audio is invalidated automatically when the example text changes. */
+export function exampleAudioAssetId(metadata: VocabMetadata): string | undefined {
+  return metadata.exampleAudioAssetId && metadata.exampleAudioText === metadata.example
+    ? metadata.exampleAudioAssetId
+    : undefined
+}
+
+export function audioPracticeReference(
+  front: string,
+  metadata: VocabMetadata,
+  mode: 'WORD' | 'SHADOWING' | 'DICTATION',
+): string {
+  return mode === 'WORD' ? front : metadata.example?.trim() || front
 }

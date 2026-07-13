@@ -58,10 +58,12 @@ import { cn } from '@/lib/utils'
 import {
   EMPTY_TALLY,
   enrichmentFieldsForRequest,
+  exampleAudioAssetId,
   incrementRating,
   reviewIsComplete,
   reviewKeyboardAction,
   type RatingTally,
+  wordAudioAssetId,
 } from './vocabulary-review-state'
 
 const RATINGS: Array<{ rating: VocabRating; label: string; hint: string; icon: typeof RotateCcw }> = [
@@ -80,7 +82,34 @@ const ENRICHMENT_OPTIONS: Array<{ field: VocabEnrichmentField; label: string; de
   { field: 'MNEMONIC', label: 'Mnemonic', description: 'A truthful memory hook' },
   { field: 'WORD_FORMATION', label: 'Word parts & family', description: 'Prefix, base/root, suffix, and related words when useful' },
   { field: 'IMAGE', label: 'Illustration', description: 'A text-free visual cue shown on the card front' },
+  { field: 'AUDIO', label: 'Audio', description: 'Reusable word and example audio from your configured TTS route' },
 ]
+
+let activeSpeechAudio: HTMLAudioElement | null = null
+
+function browserSpeak(text: string, locale?: string) {
+  if (!('speechSynthesis' in window)) {
+    toast.error('Text-to-speech is not available in this browser')
+    return
+  }
+  window.speechSynthesis.cancel()
+  const utterance = new SpeechSynthesisUtterance(text)
+  utterance.lang = locale || (/\p{Script=Han}/u.test(text) ? 'zh-CN' : 'en-US')
+  window.speechSynthesis.speak(utterance)
+}
+
+function playSpeech(text: string, assetId?: string, locale?: string) {
+  activeSpeechAudio?.pause()
+  window.speechSynthesis?.cancel()
+  if (!assetId) {
+    browserSpeak(text, locale)
+    return
+  }
+  const audio = new Audio(`/api/speech/assets/${encodeURIComponent(assetId)}/audio`)
+  activeSpeechAudio = audio
+  audio.addEventListener('error', () => browserSpeak(text, locale), { once: true })
+  void audio.play().catch(() => browserSpeak(text, locale))
+}
 
 export function VocabularyReviewer({
   limit,
@@ -168,15 +197,9 @@ export function VocabularyReviewer({
   }
 
   function listen() {
-    if (!card || !('speechSynthesis' in window)) {
-      toast.error('Text-to-speech is not available in this browser')
-      return
-    }
-    window.speechSynthesis.cancel()
+    if (!card) return
     if (card.direction === 'PRODUCTION' && !revealed) return
-    const utterance = new SpeechSynthesisUtterance(card.front)
-    utterance.lang = /[\u3400-\u9fff]/u.test(card.front) ? 'zh-CN' : 'en-US'
-    window.speechSynthesis.speak(utterance)
+    playSpeech(card.front, wordAudioAssetId(card.front, metadata), metadata.frontAudioLocale)
   }
 
   function submitAnswer() {
@@ -429,7 +452,17 @@ export function VocabularyReviewer({
                           </div>
                           <p className={cn('mt-3 font-medium leading-relaxed', production ? 'text-3xl' : 'text-xl')}>{expectedAnswer}</p>
                         </div>
-                        {metadata.example && <MetadataSection title="Example"><p>{metadata.example}</p></MetadataSection>}
+                        {metadata.example && (
+                          <MetadataSection title="Example">
+                            <div className="flex items-start justify-between gap-3">
+                              <p>{metadata.example}</p>
+                              <Button variant="ghost" size="icon-sm" aria-label="Listen to example"
+                                onClick={() => playSpeech(metadata.example!, exampleAudioAssetId(metadata), metadata.frontAudioLocale)}>
+                                <Volume2 />
+                              </Button>
+                            </div>
+                          </MetadataSection>
+                        )}
                       </div>
                       <div className="flex flex-row gap-2 md:flex-col">
                         <Button variant="outline" onClick={() => openEnrichment(card)}><Sparkles /> Enrich card</Button>
@@ -631,11 +664,12 @@ function EnrichmentSheet({
     if (field === 'CONTRAST') return Boolean(existing.contrast)
     if (field === 'MNEMONIC') return Boolean(existing.mnemonic)
     if (field === 'WORD_FORMATION') return Boolean(existing.wordFormation)
-    return Boolean(existing.frontImageId)
+    if (field === 'IMAGE') return Boolean(existing.frontImageId)
+    return Boolean(wordAudioAssetId(card.front, existing))
   }
 
   const preview = job?.status === 'READY' ? job.preview : undefined
-  const hasPreview = Boolean(preview || job?.imageBase64)
+  const hasPreview = Boolean(preview || job?.imageBase64 || job?.wordAudioBase64 || job?.exampleAudioBase64)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -661,6 +695,18 @@ function EnrichmentSheet({
                 <img src={`data:${job.imageMediaType};base64,${job.imageBase64}`} alt={job.imageAlt || 'Generated mnemonic for this vocabulary card'}
                   className="aspect-[4/3] w-full rounded-xl border object-cover" />
               )}
+              {job?.wordAudioBase64 && job.wordAudioMediaType && (
+                <MetadataSection title="Word audio">
+                  <audio controls preload="metadata" className="w-full"
+                    src={`data:${job.wordAudioMediaType};base64,${job.wordAudioBase64}`} />
+                </MetadataSection>
+              )}
+              {job?.exampleAudioBase64 && job.exampleAudioMediaType && (
+                <MetadataSection title="Example audio">
+                  <audio controls preload="metadata" className="w-full"
+                    src={`data:${job.exampleAudioMediaType};base64,${job.exampleAudioBase64}`} />
+                </MetadataSection>
+              )}
               {preview?.example && <MetadataSection title="Example"><p>{preview.example}</p></MetadataSection>}
               {(preview?.collocations.length ?? 0) > 0 && <MetadataSection title="Collocations"><TagList values={preview?.collocations ?? []} /></MetadataSection>}
               {(preview?.synonyms.length ?? 0) > 0 && <MetadataSection title="Synonyms"><TagList values={preview?.synonyms ?? []} /></MetadataSection>}
@@ -675,6 +721,7 @@ function EnrichmentSheet({
                 <Label key={option.field} className="flex min-h-14 cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-muted/40">
                   <Checkbox checked={selected.has(option.field)} onCheckedChange={(value) => toggle(option.field, value === true)} />
                   {option.field === 'IMAGE' ? <ImageIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" /> : null}
+                  {option.field === 'AUDIO' ? <Volume2 className="mt-0.5 size-4 shrink-0 text-muted-foreground" /> : null}
                   <span className="min-w-0"><span className="flex items-center gap-2 text-sm font-medium">{option.label}{hasExisting(option.field) && <Badge variant="outline" className="text-[10px]">replace existing</Badge>}</span><span className="text-xs font-normal text-muted-foreground">{option.description}</span></span>
                 </Label>
               ))}
