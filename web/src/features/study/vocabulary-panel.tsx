@@ -41,7 +41,7 @@ import {
   type PronunciationAssessment,
 } from '@/lib/study-api'
 import { useWavRecorder } from '@/lib/use-wav-recorder'
-import { audioPracticeReference, exampleAudioAssetId, wordAudioAssetId } from './vocabulary-review-state'
+import { audioPracticeReference, comparableAudioTrendAttempts, exampleAudioAssetId, parseDictationDiff, wordAudioAssetId } from './vocabulary-review-state'
 
 const EMPTY_CARDS: VocabCard[] = []
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000
@@ -579,7 +579,7 @@ function PronunciationDialog({ card, onClose }: { card: VocabCard | null; onClos
               )}
             </div>
 
-            <AttemptHistory cardId={card.id} attempts={history.data ?? []} loading={history.isLoading} />
+            <AttemptHistory cardId={card.id} attempts={history.data ?? []} loading={history.isLoading} mode={mode} />
           </>
         )}
       </DialogContent>
@@ -614,23 +614,48 @@ function BlobAudio({ blob, label }: { blob: Blob; label: string }) {
     setUrl(next)
     return () => URL.revokeObjectURL(next)
   }, [blob])
-  return <div><p className="mb-1 text-xs text-muted-foreground">{label}</p><audio controls src={url} className="w-full" /></div>
-}
-
-function DictationResultView({ result }: { result: VocabAudioAttempt }) {
   return (
-    <div className="rounded-lg border bg-card p-3" aria-live="polite">
-      <p className="text-sm font-medium">{result.accuracy === 100 ? 'Exact match' : `${Math.round(result.accuracy ?? 0)}% text match`}</p>
-      <p className="mt-1 text-sm">Answer: {result.referenceText}</p>
-      {result.dictationDiff && <p className="mt-2 font-mono text-xs text-muted-foreground">{result.dictationDiff}</p>}
+    <div>
+      <p className="mb-1 text-xs text-muted-foreground">{label}</p>
+      {url ? <audio controls src={url} className="w-full" /> : <Skeleton className="h-10 w-full" />}
     </div>
   )
 }
 
-function AttemptHistory({ cardId, attempts, loading }: { cardId: string; attempts: VocabAudioAttempt[]; loading: boolean }) {
+function DictationResultView({ result }: { result: VocabAudioAttempt }) {
+  const diff = parseDictationDiff(result.dictationDiff)
+  return (
+    <div className="rounded-lg border bg-card p-3" aria-live="polite">
+      <p className="text-sm font-medium">{result.accuracy === 100 ? 'Exact match' : `${Math.round(result.accuracy ?? 0)}% text match`}</p>
+      <p className="mt-1 text-sm">Answer: {result.referenceText}</p>
+      {(result.accuracy ?? 0) < 100 && diff.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center gap-1.5" aria-label="Dictation differences">
+          {diff.map((token, index) => token.kind === 'MATCH' ? (
+            <span key={`${token.kind}-${index}`} className="text-sm">{token.actual}</span>
+          ) : token.kind === 'MISSING' ? (
+            <Badge key={`${token.kind}-${index}`} variant="destructive">Missing: {token.expected}</Badge>
+          ) : token.kind === 'EXTRA' ? (
+            <Badge key={`${token.kind}-${index}`} variant="outline" className="border-warning/40 text-warning">Extra: {token.actual}</Badge>
+          ) : (
+            <Badge key={`${token.kind}-${index}`} variant="outline" className="border-warning/40 text-warning">
+              {token.expected} → {token.actual}
+            </Badge>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AttemptHistory({ cardId, attempts, loading, mode }: {
+  cardId: string
+  attempts: VocabAudioAttempt[]
+  loading: boolean
+  mode: AudioPracticeMode
+}) {
   const pin = usePinVocabAttempt()
   const remove = useDeleteVocabAudioAttempt()
-  const scored = attempts.filter((attempt) => attempt.mode !== 'DICTATION')
+  const scored = comparableAudioTrendAttempts(attempts, mode)
   const newest = scored[0]
   const oldest = scored.at(-1)
   const trend = (key: 'accuracy' | 'fluency' | 'prosody') => {
@@ -645,7 +670,14 @@ function AttemptHistory({ cardId, attempts, loading }: { cardId: string; attempt
         <h3 className="flex items-center gap-2 text-sm font-semibold"><Headphones className="size-4" /> Practice history</h3>
         <span className="text-xs text-muted-foreground">Recordings expire after 180 days unless pinned</span>
       </div>
-      {scored.length > 1 && (
+      {scored.length > 1 && (mode === 'DICTATION' ? (
+        <div className="rounded-lg border bg-card p-2">
+          <p className="text-xs text-muted-foreground">Text match trend</p>
+          <p className="text-sm font-semibold tabular-nums">
+            {trend('accuracy') === null ? '—' : `${trend('accuracy')! >= 0 ? '+' : ''}${trend('accuracy')}`}
+          </p>
+        </div>
+      ) : (
         <div className="grid grid-cols-3 gap-2">
           {(['accuracy', 'fluency', 'prosody'] as const).map((key) => (
             <div key={key} className="rounded-lg border bg-card p-2">
@@ -654,7 +686,7 @@ function AttemptHistory({ cardId, attempts, loading }: { cardId: string; attempt
             </div>
           ))}
         </div>
-      )}
+      ))}
       {loading ? <Skeleton className="h-20 w-full" /> : attempts.length === 0 ? (
         <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">No saved attempts yet.</p>
       ) : (
@@ -664,6 +696,7 @@ function AttemptHistory({ cardId, attempts, loading }: { cardId: string; attempt
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">{attempt.mode?.toLowerCase()}</Badge>
+                  {attempt.providerId && <span className="text-xs text-muted-foreground">{attempt.providerId}</span>}
                   <span className="text-xs text-muted-foreground">{attempt.createdAt ? new Date(attempt.createdAt).toLocaleString() : ''}</span>
                 </div>
                 <div className="flex items-center gap-1">

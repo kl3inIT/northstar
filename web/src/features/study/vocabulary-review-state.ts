@@ -1,4 +1,4 @@
-import type { VocabCard, VocabEnrichmentField, VocabMetadata, VocabRating } from '@/lib/study-api'
+import type { VocabAudioAttempt, VocabCard, VocabEnrichmentField, VocabMetadata, VocabRating } from '@/lib/study-api'
 
 export type RatingTally = Record<VocabRating, number>
 
@@ -89,4 +89,42 @@ export function audioPracticeReference(
   mode: 'WORD' | 'SHADOWING' | 'DICTATION',
 ): string {
   return mode === 'WORD' ? front : metadata.example?.trim() || front
+}
+
+/** Trend values are comparable only inside one practice mode and one provider scale. */
+export function comparableAudioTrendAttempts(
+  attempts: VocabAudioAttempt[],
+  mode: VocabAudioAttempt['mode'],
+): VocabAudioAttempt[] {
+  const matchingMode = attempts.filter((attempt) => attempt.mode === mode)
+  const providerId = matchingMode[0]?.providerId
+  return matchingMode.filter((attempt) => attempt.providerId === providerId)
+}
+
+export interface DictationDiffToken {
+  kind: 'MATCH' | 'MISSING' | 'EXTRA' | 'SUBSTITUTION'
+  expected?: string
+  actual?: string
+}
+
+export function parseDictationDiff(value: string | undefined): DictationDiffToken[] {
+  if (!value) return []
+  try {
+    const parsed = JSON.parse(value) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((token): token is DictationDiffToken => {
+      if (typeof token !== 'object' || token === null) return false
+      const candidate = token as Record<string, unknown>
+      return (candidate.kind === 'MATCH' || candidate.kind === 'MISSING'
+          || candidate.kind === 'EXTRA' || candidate.kind === 'SUBSTITUTION')
+        && (candidate.expected === undefined || candidate.expected === null || typeof candidate.expected === 'string')
+        && (candidate.actual === undefined || candidate.actual === null || typeof candidate.actual === 'string')
+    }).map((token) => ({
+      kind: token.kind,
+      expected: token.expected || undefined,
+      actual: token.actual || undefined,
+    }))
+  } catch {
+    return []
+  }
 }
