@@ -107,7 +107,7 @@ export function AssistantWidget() {
         <PopoverTrigger asChild>
           <MotionButton
             size="icon"
-            className="fixed z-40 size-11 cursor-grab rounded-full shadow-lg active:cursor-grabbing"
+            className="fixed z-40 size-11 cursor-grab rounded-full shadow-lg transition-none active:cursor-grabbing"
             style={positioned
               ? { left: 0, top: 0, x, y, touchAction: 'none' }
               : { right: 20, bottom: 80, touchAction: 'none' }}
