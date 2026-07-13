@@ -12,6 +12,9 @@ import com.northstar.core.study.VocabService;
 import com.northstar.core.finance.SubscriptionSummary;
 import com.northstar.core.finance.TransactionSummary;
 import com.northstar.core.finance.TransactionType;
+import com.northstar.core.habit.HabitInsightSummary;
+import com.northstar.core.habit.HabitInsights;
+import com.northstar.core.habit.HabitService;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteStatus;
@@ -120,7 +123,10 @@ public class AlignmentService {
               subscriptions due soon, name them and their dates in that sentence. If a
               "Study this week" section is present, ONE sentence describing the effort
               versus last week and naming the most-neglected skill and any words
-              slipping away — descriptive, never scolding. If the
+              slipping away — descriptive, never scolding. If a "Habits this week"
+              section is present, ONE sentence describing consistency and the least
+              consistent tracked behaviour — treat pauses and excused days as neutral,
+              never shame the user or prescribe protecting a streak. If the
               numbers are nearly empty, exactly 2 short sentences — do not pad. No
               headings, do not restate the numbers table, never invent work that is
               not in the numbers.
@@ -134,9 +140,11 @@ public class AlignmentService {
     private final FinanceService finance;
     private final StudyService study;
     private final VocabService vocab;
+    private final HabitService habits;
 
     public AlignmentService(AiClientRouter ai, TaskService tasks, CalendarEventService events,
-            NoteService notes, FinanceService finance, StudyService study, VocabService vocab) {
+            NoteService notes, FinanceService finance, StudyService study, VocabService vocab,
+            HabitService habits) {
         this.ai = ai;
         this.tasks = tasks;
         this.events = events;
@@ -144,6 +152,7 @@ public class AlignmentService {
         this.finance = finance;
         this.study = study;
         this.vocab = vocab;
+        this.habits = habits;
     }
 
     /** Today's review note if it was already generated (zone-local day). */
@@ -293,7 +302,36 @@ public class AlignmentService {
                 nextWeek.stream().map(t -> "- %s (due %s)".formatted(t.title(), t.dueDate())).toList());
         spendingSection(sb, monday);
         studySection(sb, monday);
+        habitSection(sb, monday, today);
         return sb.toString().stripTrailing();
+    }
+
+    /**
+     * Repeated-behaviour evidence is descriptive: consistency is the primary
+     * signal, while excused and paused dates never become failures. An empty
+     * tracker stays silent so the review does not advertise unused features.
+     */
+    private void habitSection(StringBuilder sb, LocalDate monday, LocalDate today) {
+        HabitInsights insight = habits.insights(monday, today, false);
+        if (insight.habits().isEmpty()) {
+            return;
+        }
+        int expected = insight.habits().stream().mapToInt(HabitInsightSummary::expected).sum();
+        int completed = insight.habits().stream().mapToInt(HabitInsightSummary::completed).sum();
+        int excused = insight.habits().stream().mapToInt(HabitInsightSummary::excused).sum();
+        int consistency = expected == 0 ? 0 : (int) Math.round(completed * 100.0 / expected);
+        List<String> lines = new ArrayList<>();
+        lines.add("- Overall: %d/%d scheduled repetitions completed (%d%%); %d excused"
+                .formatted(completed, expected, consistency, excused));
+        insight.habits().stream()
+                .filter(item -> item.expected() > 0)
+                .sorted(java.util.Comparator.comparingInt(HabitInsightSummary::consistency)
+                        .thenComparing(item -> item.habit().title()))
+                .limit(3)
+                .forEach(item -> lines.add("- %s: %d/%d (%d%%)%s".formatted(
+                        item.habit().title(), item.completed(), item.expected(), item.consistency(),
+                        item.excused() == 0 ? "" : "; %d excused".formatted(item.excused()))));
+        section(sb, "Habits this week (%d active)".formatted(insight.habits().size()), lines);
     }
 
     /**

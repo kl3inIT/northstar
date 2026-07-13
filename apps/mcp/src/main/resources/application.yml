@@ -27,7 +27,10 @@ spring:
           before answering questions about the user's studies, plans or saved
           knowledge; create a note when the user learns something worth keeping;
           create tasks for reminders and todos; check today_tasks to see what the
-          user should work on. For scheduling: upcoming_events shows the calendar,
+          user should work on. Use habits for repeated behaviours rather than
+          generating a task every day; today_habits shows current evidence and
+          set_habit_check_in records done or intentionally excused repetitions.
+          For scheduling: upcoming_events shows the calendar,
           find_free_slots finds room on a day, create_event books a block — all in
           the user's local wall-clock time.
 

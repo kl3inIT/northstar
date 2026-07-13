@@ -12,11 +12,16 @@ import com.northstar.core.finance.FinanceService;
 import com.northstar.core.finance.NewTransaction;
 import com.northstar.core.finance.TransactionSource;
 import com.northstar.core.finance.TransactionType;
+import com.northstar.core.habit.HabitCheckInStatus;
+import com.northstar.core.habit.HabitFrequencyType;
+import com.northstar.core.habit.HabitService;
 import com.northstar.core.note.NoteDetail;
+import com.northstar.core.shared.ColorName;
 import com.northstar.core.task.TaskService;
 import com.northstar.core.task.TaskSummary;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.EnumSet;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,6 +71,9 @@ class AlignmentServiceIntegrationTests {
 
     @Autowired
     FinanceService finance;
+
+    @Autowired
+    HabitService habits;
 
     private final ZoneId zone = ZoneId.systemDefault();
 
@@ -144,5 +152,32 @@ class AlignmentServiceIntegrationTests {
                 .contains("Ordinary spending: 35.000")
                 .contains("One-offs (1, total 500.000")
                 .contains("qua cuoi 500.000");
+    }
+
+    @Test
+    void weeklyReviewCarriesHabitConsistencyWithoutStreakPressure() {
+        LocalDate today = LocalDate.now(zone);
+        LocalDate monday = today.with(java.time.DayOfWeek.MONDAY);
+        var habit = habits.create("Shadow English", "After dinner", null, ColorName.GREEN,
+                zone, HabitFrequencyType.ON_DAYS,
+                EnumSet.allOf(java.time.DayOfWeek.class), 1, monday);
+        habits.checkIn(habit.id(), monday, HabitCheckInStatus.DONE, zone);
+        if (today.isAfter(monday)) {
+            habits.checkIn(habit.id(), monday.plusDays(1), HabitCheckInStatus.EXCUSED, zone);
+        }
+        modelReturns("- Habit evidence is available",
+                """
+                {"commentary":"Habit consistency was recorded without judging missed days.",
+                 "priority":"Keep the next week focused."}
+                """);
+
+        NoteDetail note = alignment.generateWeekly(zone);
+
+        int expected = today.isAfter(monday) ? today.getDayOfWeek().getValue() - 1 : 1;
+        assertThat(note.contentMarkdown())
+                .contains("**Habits this week (1 active):**")
+                .contains("Overall: 1/%d scheduled repetitions completed".formatted(expected))
+                .contains("Shadow English: 1/%d".formatted(expected))
+                .doesNotContain("current streak");
     }
 }
