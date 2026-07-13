@@ -43,7 +43,7 @@ import { useStagingCount } from '@/lib/notes-api'
 interface NavItem {
   label: string
   icon: LucideIcon
-  to?: '/notes' | '/tasks' | '/calendar' | '/assistant' | '/briefs' | '/disciplines' | '/projects' | '/finance' | '/study' | '/settings'
+  to?: '/notes' | '/tasks' | '/calendar' | '/assistant' | '/briefs' | '/disciplines' | '/projects' | '/finance' | '/study' | '/habits' | '/settings'
   exact?: boolean
 }
 
@@ -58,7 +58,7 @@ const NAV: NavItem[] = [
   { label: 'Finance', icon: Wallet, to: '/finance' },
   { label: 'Study', icon: BookOpen, to: '/study' },
   { label: 'Scholarships', icon: Trophy },
-  { label: 'Habits', icon: Target },
+  { label: 'Habits', icon: Target, to: '/habits' },
 ]
 
 /**

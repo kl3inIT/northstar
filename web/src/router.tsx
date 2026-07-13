@@ -90,6 +90,12 @@ const studyRoute = createRoute({
   component: lazyRouteComponent(() => import('@/pages/study'), 'StudyPage'),
 })
 
+const habitsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: 'habits',
+  component: lazyRouteComponent(() => import('@/pages/habits'), 'HabitsPage'),
+})
+
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'settings',
@@ -128,6 +134,7 @@ const routeTree = rootRoute.addChildren([
   projectRoute,
   financeRoute,
   studyRoute,
+  habitsRoute,
   settingsRoute,
   notesRoute.addChildren([notesIndexRoute, noteRoute]),
 ])
