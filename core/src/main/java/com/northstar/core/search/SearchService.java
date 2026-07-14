@@ -9,7 +9,6 @@ import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteSummary;
 import com.northstar.core.note.NoteStatus;
 import com.northstar.core.shared.Hashing;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,12 +33,10 @@ import com.northstar.core.ai.AiTask;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
-import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -103,6 +100,7 @@ public class SearchService {
     private final ObjectProvider<AiClientRouter> ai;
     private final JdbcClient jdbc;
     private final TokenTextSplitter splitter = TokenTextSplitter.builder().build();
+    private final AttachmentDocumentReader documentReader = new AttachmentDocumentReader();
 
     SearchService(NoteService notes, AttachmentService attachments,
             ObjectProvider<VectorStore> vectorStore, ObjectProvider<ChatModel> chatModel,
@@ -285,7 +283,7 @@ public class SearchService {
                         .metadata(fileMetadata(attachmentId, filename, accepted.mimeType(), hash, 0, "image", null))
                         .build());
             } else {
-                List<Document> extracted = extractDocuments(content, accepted.mimeType());
+                List<Document> extracted = documentReader.read(content, accepted.mimeType());
                 if (extracted.isEmpty()) {
                     log.debug("File {} ({}) has no extractable text — not embedded", filename, accepted.mimeType());
                     markIndexState(attachmentId, AttachmentIndexStatus.UNSUPPORTED, hash, "NO_EXTRACTABLE_TEXT");
@@ -570,27 +568,6 @@ public class SearchService {
     }
 
     // --- extraction & captioning ---------------------------------------------
-
-    /** Reader output before token splitting; PDF documents retain real page metadata. */
-    private List<Document> extractDocuments(AttachmentContent content, String mime) {
-        String filename = content.meta().filename().toLowerCase(Locale.ROOT);
-        if (mime.startsWith("text/") || mime.equals("application/json") || mime.equals("application/xml")
-                || filename.endsWith(".md")) {
-            return List.of(new Document(new String(content.data(), StandardCharsets.UTF_8)));
-        }
-        ByteArrayResource resource = new ByteArrayResource(content.data()) {
-            @Override
-            public String getFilename() {
-                return content.meta().filename(); // helps Tika's type detection
-            }
-        };
-        List<Document> extracted = mime.equals("application/pdf")
-                ? new PagePdfDocumentReader(resource).get()
-                : new TikaDocumentReader(resource).get();
-        return extracted.stream()
-                .filter(document -> document.getText() != null && !document.getText().isBlank())
-                .toList();
-    }
 
     /**
      * Caption for an image referenced inside a note: reuse the attachment's

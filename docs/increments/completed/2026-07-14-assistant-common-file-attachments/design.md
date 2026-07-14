@@ -1,6 +1,6 @@
 # Assistant Common File Attachments Design
 
-Status: active.
+Status: completed.
 
 Date: 2026-07-14
 
@@ -130,3 +130,13 @@ indexed files globally; direct Composer retrieval is a stricter per-turn path.
 6. Consolidate the Assistant/knowledge specs and test matrices, add a new
    decision, update the roadmap, move this increment to `completed/`, and append
    the verified behavior to the Northstar App Behavior note.
+
+## Verification
+
+Completed 2026-07-14. The focused policy, PDF reader, worker lifecycle,
+Assistant integration, Vitest, and Playwright suites pass. A live isolated
+local API/worker/Chromium run uploaded a TXT file, visibly waited for worker
+preparation, issued exactly one chat turn after `READY`, returned a grounded
+answer, exposed the file in Sources, downloaded the same attachment, and logged
+no browser errors. The repository-wide Gradle `clean test`, web typecheck/test/
+build, and diff checks pass.

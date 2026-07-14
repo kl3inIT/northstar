@@ -27,6 +27,13 @@ upload begins, so repeated Enter/click actions cannot submit the same user turn
 twice while the chat status still appears idle. After attachments upload and
 the AI SDK accepts the turn into the transcript, the composer clears text and
 attachments immediately instead of waiting for the model/tool stream to end.
+Raster images follow the direct multimodal path. Safe common documents (PDF,
+text/Markdown, Office, spreadsheets, HTML, JSON/XML, and ordinary source-code
+text) follow a worker-owned preparation path: the composer shows
+Uploading/Preparing/Ready/Failed, retains a failed draft, and dispatches only
+after every submitted document is `READY`. Archives, executables,
+macro-enabled Office, audio/video, and arbitrary binary are not accepted by
+this surface.
 An upload failure or synchronous dispatch failure keeps the draft available for
 retry; a later stream failure leaves the already-submitted user message in the
 transcript. Each submitted AI SDK message also sends an `Idempotency-Key`; the
@@ -39,6 +46,17 @@ tool side effect may already have committed before the failure became visible.
 The explicit Retry action creates a new message and key; deleting a conversation
 removes its claims. This at-most-once boundary is recorded in
 [Decision 0034](../../decisions/0034-assistant-turns-use-durable-idempotency-claims.md).
+
+Document bytes remain in the immutable Attachment vault and never enter a chat
+prompt as Base64. The worker selects Spring AI's page reader for PDFs and Tika
+for other supported binary documents, splits and embeds derived text, and
+publishes an observable index state. At chat time the API reads only bounded
+chunks belonging to the attachment ids in that turn, wraps them as untrusted
+evidence, and fails closed when preparation or retrieval is unavailable. PDF
+sources retain real page numbers; flattened formats cite filename and chunk
+without inventing slide, sheet, or line locations. Raw extracted context is not
+stored in conversation history. This boundary is recorded in
+[Decision 0038](../../decisions/0038-assistant-documents-use-worker-owned-scoped-etl.md).
 
 Model-backed workloads resolve an `AiTask` route at call time. Each route is a
 configured gateway id, capability target id, and optional metadata; application
@@ -219,9 +237,12 @@ as the API.
 ## Source Modules
 
 - `core.assistant`
+- `core.attachment`
+- `core.search`
 - `apps/mcp`
 - `apps/api.assistant`
 - `apps/api.speech`
+- `apps/worker`
 - `core.ai`
 - `core.speech`
 - `integrations/ai-openai-compatible`

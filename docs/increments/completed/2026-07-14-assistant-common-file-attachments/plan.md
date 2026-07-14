@@ -1,6 +1,6 @@
 # Assistant Common File Attachments Plan
 
-Status: active.
+Status: completed.
 
 Execute in order. End each block with the listed local gate before moving on.
 
