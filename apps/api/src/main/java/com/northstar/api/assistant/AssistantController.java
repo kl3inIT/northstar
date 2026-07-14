@@ -5,6 +5,10 @@ import com.northstar.core.assistant.NorthstarTool;
 import com.northstar.core.ai.AiRoute;
 import com.northstar.core.attachment.AttachmentContent;
 import com.northstar.core.attachment.AttachmentService;
+import com.northstar.core.attachment.AttachmentTypePolicy;
+import com.northstar.core.attachment.AttachmentView;
+import com.northstar.core.search.AttachmentContext;
+import com.northstar.core.search.SearchService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -135,13 +139,14 @@ class AssistantController {
     private final ObjectMapper json;
     private final JdbcClient jdbc;
     private final AttachmentService attachments;
+    private final SearchService search;
     private final MemoryTools longTermMemory;
     private final ConversationTitleService titles;
 
     AssistantController(AssistantChatClientFactory chats,
             AssistantConversationRouteService conversationRoutes, ChatMemory memory, List<NorthstarTool> tools,
             ObjectMapper json, JdbcClient jdbc, AttachmentService attachments, MemoryTools longTermMemory,
-            ConversationTitleService titles) {
+            ConversationTitleService titles, SearchService search) {
         this.chats = chats;
         this.conversationRoutes = conversationRoutes;
         this.memory = memory;
@@ -149,6 +154,7 @@ class AssistantController {
         this.json = json;
         this.jdbc = jdbc;
         this.attachments = attachments;
+        this.search = search;
         this.longTermMemory = longTermMemory;
         this.titles = titles;
     }
@@ -158,18 +164,40 @@ class AssistantController {
     ResponseEntity<Flux<ServerSentEvent<String>>> chat(
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody ChatRequest request) {
-        List<AttachmentContent> images = request.attachmentIds() == null ? List.of()
-                : request.attachmentIds().stream().map(this::imageById).toList();
+        List<UUID> attachmentIds = request.attachmentIds() == null ? List.of()
+                : request.attachmentIds().stream().distinct().toList();
+        List<AttachmentView> requested = attachmentIds.stream().map(this::attachmentById).toList();
+        List<AttachmentContent> images = requested.stream()
+                .filter(meta -> AttachmentTypePolicy.isImageMime(meta.mimeType()))
+                .map(meta -> imageById(meta.id()))
+                .toList();
+        List<UUID> documentIds = requested.stream()
+                .filter(meta -> !AttachmentTypePolicy.isImageMime(meta.mimeType()))
+                .map(AttachmentView::id)
+                .toList();
         String message = request.message() == null ? "" : request.message().strip();
-        if (message.isBlank() && images.isEmpty()) {
-            throw new IllegalArgumentException("Send a message, an image, or both.");
+        if (message.isBlank() && requested.isEmpty()) {
+            throw new IllegalArgumentException("Send a message, an attachment, or both.");
+        }
+        AttachmentContext documentContext;
+        try {
+            documentContext = search.attachmentContext(message, documentIds);
+        } catch (IllegalStateException notReady) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Document preparation is not ready yet.", notReady);
         }
         // Images ride into memory as markdown links to their stored file, so
         // /history re-renders them on reload (the bytes live in attachment, V16).
         // Fixed alt text — an attacker-chosen filename must not be able to close
         // the bracket and inject its own markdown/links into the transcript.
-        String markers = images.stream()
+        String imageMarkers = images.stream()
                 .map(a -> "![image](/api/files/%s)".formatted(a.meta().id()))
+                .collect(Collectors.joining("\n"));
+        String documentMarkers = documentIds.stream()
+                .map(id -> "[document](/api/files/%s)".formatted(id))
+                .collect(Collectors.joining("\n"));
+        String markers = java.util.stream.Stream.of(imageMarkers, documentMarkers)
+                .filter(value -> !value.isBlank())
                 .collect(Collectors.joining("\n"));
         String stored = message.isBlank() ? markers
                 : markers.isBlank() ? message : message + "\n\n" + markers;
@@ -180,6 +208,7 @@ class AssistantController {
         Flux<ServerSentEvent<String>> stream = UiMessageStream.encode(streamTurn(
                 stored,
                 toMedia(images),
+                documentContext,
                 conversationId,
                 route,
                 turnId),
@@ -228,6 +257,12 @@ class AssistantController {
                             + (content.data().length / (1024 * 1024)) + "MB)");
         }
         return content;
+    }
+
+    private AttachmentView attachmentById(UUID id) {
+        return attachments.find(id)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Unknown attachment " + id + " — upload it to /api/files first"));
     }
 
     private static List<Media> toMedia(List<AttachmentContent> images) {
@@ -415,8 +450,8 @@ class AssistantController {
         return stripped.length() <= 80 ? stripped : stripped.substring(0, 77) + "…";
     }
 
-    private Flux<Part> streamTurn(String userMessage, List<Media> images, String conversationId,
-            AiRoute route, String turnId) {
+    private Flux<Part> streamTurn(String userMessage, List<Media> images, AttachmentContext documents,
+            String conversationId, AiRoute route, String turnId) {
         Sinks.Many<Part> toolEvents = Sinks.many().unicast().onBackpressureBuffer();
         ToolTraceRecorder trace = new ToolTraceRecorder(conversationId, turnId);
         Consumer<Part> emit = part -> {
@@ -432,7 +467,8 @@ class AssistantController {
                 // turn, so the model knows what it remembers without a tool call.
                 .system(SYSTEM_PROMPT.formatted(today,
                         today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH))
-                        + "\n\n" + longTermMemory.promptSection())
+                        + "\n\n" + longTermMemory.promptSection()
+                        + (documents.promptSection().isBlank() ? "" : "\n\n" + documents.promptSection()))
                 // Never blank: an image-only turn's text is its markdown markers.
                 .user(u -> u.text(userMessage).media(images.toArray(Media[]::new)))
                 .tools(tools.toArray())
@@ -456,6 +492,10 @@ class AssistantController {
                 : tokens);
         return Flux.concat(
                 Flux.just(new Part.StartStep()),
+                Flux.fromIterable(documents.sources().stream()
+                        .<Part>map(source -> new Part.SourceDocument(
+                                source.url(), source.mimeType(), source.filename(), source.filename()))
+                        .toList()),
                 Flux.merge(text, toolEvents.asFlux()),
                 Flux.just(new Part.FinishStep()));
     }

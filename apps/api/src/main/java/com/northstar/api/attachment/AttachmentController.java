@@ -3,9 +3,12 @@ package com.northstar.api.attachment;
 import com.northstar.core.attachment.AttachmentService;
 import com.northstar.core.attachment.AttachmentTypePolicy;
 import com.northstar.core.attachment.AttachmentView;
+import com.northstar.core.search.AttachmentIndexView;
+import com.northstar.core.search.SearchService;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -45,9 +48,11 @@ class AttachmentController {
             Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
 
     private final AttachmentService attachments;
+    private final SearchService search;
 
-    AttachmentController(AttachmentService attachments) {
+    AttachmentController(AttachmentService attachments, SearchService search) {
         this.attachments = attachments;
+        this.search = search;
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -62,6 +67,16 @@ class AttachmentController {
         }
         var accepted = AttachmentTypePolicy.inspect(file.getOriginalFilename(), bytes);
         return attachments.store(file.getOriginalFilename(), accepted.mimeType(), bytes);
+    }
+
+    /** Worker preparation state for files queued in the Assistant composer. */
+    @GetMapping("/index-status")
+    @Operation(operationId = "listAttachmentIndexStatus")
+    List<AttachmentIndexView> indexStatus(@RequestParam("ids") List<UUID> ids) {
+        if (ids.isEmpty() || ids.size() > 3) {
+            throw new IllegalArgumentException("Request between 1 and 3 attachment ids");
+        }
+        return search.attachmentIndexStatuses(ids);
     }
 
     @GetMapping("/{id}")
