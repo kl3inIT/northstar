@@ -207,6 +207,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('login-page')), findsOneWidget);
+    expect(find.bySemanticsLabel('Northstar logo'), findsOneWidget);
     expect(find.byKey(const Key('assistant-page')), findsNothing);
   });
 

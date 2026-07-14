@@ -1,0 +1,18 @@
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: assets/branding/app_icon.png
+  remove_alpha_ios: true
+  background_color_ios: "#080B1A"
+  image_path_ios_dark_transparent: assets/branding/northstar_mark.png
+  image_path_ios_tinted_grayscale: assets/branding/northstar_mark.png
+  desaturate_tinted_to_grayscale_ios: true
+  adaptive_icon_background: "#080B1A"
+  adaptive_icon_foreground: assets/branding/northstar_mark.png
+  adaptive_icon_foreground_inset: 0
+  adaptive_icon_monochrome: assets/branding/northstar_mark.png
+  web:
+    generate: true
+    image_path: assets/branding/app_icon.png
+    background_color: "#080B1A"
+    theme_color: "#4F46E5"

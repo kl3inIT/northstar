@@ -1,0 +1,13 @@
+flutter_native_splash:
+  color: "#F2F2F7"
+  color_dark: "#080B1A"
+  image: assets/branding/northstar_mark.png
+  image_dark: assets/branding/northstar_mark.png
+  android: true
+  ios: true
+  web: true
+  android_12:
+    color: "#F2F2F7"
+    color_dark: "#080B1A"
+    image: assets/branding/northstar_mark.png
+    image_dark: assets/branding/northstar_mark.png
