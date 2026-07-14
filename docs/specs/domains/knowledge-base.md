@@ -17,8 +17,15 @@
   assistant-facing search path fuses lexical and semantic rankings with
   Reciprocal Rank Fusion; lexical note search uses a multilingual-friendly
   PostgreSQL `simple` tsvector plus title trigram fallback.
-- Attachments can be indexed into searchable text or captions where supported by
-  the search/indexing pipeline.
+- Attachments use an explicit safe-type policy before storage. Raster images can
+  be indexed as captions; supported documents are extracted and embedded by the
+  worker as disposable derived data. PDFs use page-aware extraction and retain
+  truthful page metadata, while Tika-flattened formats keep only filename/chunk
+  provenance. Index preparation is observable as `PENDING`, `PROCESSING`,
+  `READY`, `FAILED`, or `UNSUPPORTED`.
+- The Assistant's direct document path is stricter than global knowledge
+  search: it retrieves bounded excerpts only from the attachment ids submitted
+  in that turn and treats their content as untrusted evidence.
 - The reading view suppresses a duplicate first `# Heading` when it exactly
   matches the note title, so imported Markdown can keep its own title while the
   app avoids rendering two identical H1s.
@@ -44,3 +51,4 @@
 - [0002 - Database-First Markdown Knowledge Base](../../decisions/0002-database-first-markdown-knowledge-base.md)
 - [0005 - Notes Have One Primary Project](../../decisions/0005-notes-have-one-primary-project.md)
 - [0007 - Hybrid Search Uses Reciprocal Rank Fusion](../../decisions/0007-hybrid-search-uses-rrf.md)
+- [0038 - Assistant Documents Use Worker-Owned Scoped ETL](../../decisions/0038-assistant-documents-use-worker-owned-scoped-etl.md)

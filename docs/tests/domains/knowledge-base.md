@@ -13,5 +13,7 @@ Reusable testing mechanics live in
 | Duplicate title heading suppression | Static/UI behavior | Implemented in `web/src/components/markdown-body.tsx`; needs browser regression coverage when note UI tests are added. |
 | Mermaid note rendering | Static/UI behavior | Implemented through the Markdown renderer; needs browser regression coverage when note UI tests are added. |
 | Modulith boundaries | Automated | `core/src/test/java/com/northstar/core/ModulithVerificationTests.java` |
-| Attachment and semantic indexing behavior | Gap | Needs focused integration coverage for vector-store indexing, RRF overlap behavior, and attachment hits as indexing evolves. |
+| Attachment type and PDF provenance | Automated | `AttachmentTypePolicyTests` covers accepted common files and rejected unsafe/spoofed inputs. `AttachmentDocumentReaderTests` generates a real two-page PDF and pins exact page/file metadata from Spring AI's page reader. |
+| Attachment index lifecycle and Assistant-scoped retrieval | Automated + runtime | `AssistantControllerIntegrationTests` verifies processing/ready state, stale state returning to pending, safe parser failure, stored-hash embedding skip, bounded prompt placement, mixed image/document delivery, structured sources, and no cross-file leakage. A local API/worker run embedded a real TXT attachment and reached `READY` before chat dispatch. |
+| Global attachment/vector ranking behavior | Gap | Still needs focused integration coverage for RRF overlap and attachment-hit ranking as global indexing evolves. |
 | Live notes UI workflow | Gap | Should be covered by Playwright when the next UI increment touches notes. |
