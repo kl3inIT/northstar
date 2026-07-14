@@ -1,6 +1,7 @@
 package com.northstar.api.attachment;
 
 import com.northstar.core.attachment.AttachmentService;
+import com.northstar.core.attachment.AttachmentTypePolicy;
 import com.northstar.core.attachment.AttachmentView;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -59,47 +60,8 @@ class AttachmentController {
         } catch (IOException e) {
             throw new IllegalArgumentException("Could not read the uploaded file", e);
         }
-        String claimed = file.getContentType() == null ? "" : file.getContentType();
-        String sniffed = sniffImageType(bytes);
-        String mime;
-        // Never trust the declared type for the image fast-path: an "image/png"
-        // that is really SVG/HTML would otherwise render inline on our origin.
-        // Storing the SNIFFED type also canonicalizes quirks like "image/jpg".
-        if (claimed.toLowerCase(Locale.ROOT).startsWith("image/")) {
-            if (sniffed == null) {
-                throw new IllegalArgumentException(
-                        "Unsupported image format — use PNG, JPEG, GIF or WebP");
-            }
-            mime = sniffed;
-        } else if (sniffed != null) {
-            // The client sent no/other Content-Type (e.g. a clipboard paste) but
-            // the bytes ARE a known raster image: canonicalize to the real image
-            // type instead of pinning it to octet-stream, which — since rows are
-            // sha256-deduplicated — would render the same file as a broken image
-            // forever, even after a later, correctly-typed re-upload.
-            mime = sniffed;
-        } else {
-            mime = claimed;
-        }
-        return attachments.store(file.getOriginalFilename(), mime, bytes);
-    }
-
-    /** Magic-byte check for the inline allowlist; null = not a known raster image. */
-    private static String sniffImageType(byte[] b) {
-        if (b.length >= 8 && (b[0] & 0xFF) == 0x89 && b[1] == 'P' && b[2] == 'N' && b[3] == 'G') {
-            return "image/png";
-        }
-        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) {
-            return "image/jpeg";
-        }
-        if (b.length >= 6 && b[0] == 'G' && b[1] == 'I' && b[2] == 'F' && b[3] == '8') {
-            return "image/gif";
-        }
-        if (b.length >= 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'
-                && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') {
-            return "image/webp";
-        }
-        return null;
+        var accepted = AttachmentTypePolicy.inspect(file.getOriginalFilename(), bytes);
+        return attachments.store(file.getOriginalFilename(), accepted.mimeType(), bytes);
     }
 
     @GetMapping("/{id}")

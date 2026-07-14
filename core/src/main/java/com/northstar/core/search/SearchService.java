@@ -2,6 +2,7 @@ package com.northstar.core.search;
 
 import com.northstar.core.attachment.AttachmentContent;
 import com.northstar.core.attachment.AttachmentService;
+import com.northstar.core.attachment.AttachmentTypePolicy;
 import com.northstar.core.attachment.AttachmentView;
 import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
@@ -32,6 +33,7 @@ import com.northstar.core.ai.AiRoute;
 import com.northstar.core.ai.AiTask;
 import org.springframework.ai.content.Media;
 import org.springframework.ai.document.Document;
+import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.reader.tika.TikaDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -70,7 +72,7 @@ public class SearchService {
     private static final Logger log = LoggerFactory.getLogger(SearchService.class);
 
     /** Part of every contentHash — bump when the chunking/caption format changes. */
-    private static final int INDEX_VERSION = 3;
+    private static final int INDEX_VERSION = 4;
 
     /** Candidate window per retriever before RRF's final cut; mirrors production RRF rank windows. */
     private static final int RANK_WINDOW = 50;
@@ -247,54 +249,110 @@ public class SearchService {
         }
         String hash = contentHash(fileMeta.sha256());
         if (hash.equals(indexedHash("attachmentId", attachmentId))) {
+            markIndexState(attachmentId, AttachmentIndexStatus.READY, hash, null);
             log.debug("File {} unchanged (hash match) — embedding skipped", attachmentId);
             return false;
         }
+        markIndexState(attachmentId, AttachmentIndexStatus.PROCESSING, hash, null);
         AttachmentContent content = loadQuietly(attachmentId);
         if (content == null) {
+            markIndexState(attachmentId, AttachmentIndexStatus.FAILED, hash, "CONTENT_UNAVAILABLE");
             return false;
         }
         String filename = content.meta().filename();
-        String mime = content.meta().mimeType().toLowerCase(Locale.ROOT);
+        AttachmentTypePolicy.AcceptedType accepted;
+        try {
+            accepted = AttachmentTypePolicy.inspect(filename, content.data());
+        } catch (IllegalArgumentException rejected) {
+            markIndexState(attachmentId, AttachmentIndexStatus.UNSUPPORTED, hash, "UNSUPPORTED_TYPE");
+            log.debug("File {} is outside the searchable attachment allowlist", filename);
+            return false;
+        }
 
-        List<Document> docs;
-        if (mime.startsWith("image/")) {
-            String caption = caption(content);
-            if (caption == null) {
-                return false;
-            }
-            docs = List.of(Document.builder()
-                    .text(filename + "\n\n" + caption)
-                    .metadata(fileMetadata(attachmentId, filename, hash, 0, "image"))
-                    .build());
-        } else {
-            String text = extractText(content, mime);
-            if (text == null || text.isBlank()) {
-                log.debug("File {} ({}) has no extractable text — not embedded", filename, mime);
-                return false;
-            }
-            docs = new ArrayList<>();
-            int chunkIndex = 0;
-            for (MarkdownSections.Section section : MarkdownSections.split(filename, text)) {
-                for (Document piece : splitter.apply(List.of(new Document(section.text())))) {
-                    docs.add(Document.builder()
-                            .text(section.breadcrumb() + "\n\n" + piece.getText())
-                            .metadata(fileMetadata(attachmentId, filename, hash, chunkIndex++, "file"))
-                            .build());
+        try {
+            List<Document> docs;
+            if (accepted.kind() == AttachmentTypePolicy.Kind.IMAGE) {
+                String caption = caption(content);
+                if (caption == null) {
+                    markIndexState(attachmentId, AttachmentIndexStatus.FAILED, hash, "CAPTION_UNAVAILABLE");
+                    return false;
+                }
+                docs = List.of(Document.builder()
+                        .text(filename + "\n\n" + caption)
+                        .metadata(fileMetadata(attachmentId, filename, accepted.mimeType(), hash, 0, "image", null))
+                        .build());
+            } else {
+                List<Document> extracted = extractDocuments(content, accepted.mimeType());
+                if (extracted.isEmpty()) {
+                    log.debug("File {} ({}) has no extractable text — not embedded", filename, accepted.mimeType());
+                    markIndexState(attachmentId, AttachmentIndexStatus.UNSUPPORTED, hash, "NO_EXTRACTABLE_TEXT");
+                    return false;
+                }
+                docs = new ArrayList<>();
+                int chunkIndex = 0;
+                for (Document source : extracted) {
+                    String text = source.getText();
+                    if (text == null || text.isBlank()) {
+                        continue;
+                    }
+                    for (MarkdownSections.Section section : MarkdownSections.split(filename, text)) {
+                        for (Document piece : splitter.apply(List.of(new Document(section.text())))) {
+                            docs.add(Document.builder()
+                                    .text(section.breadcrumb() + locatorSuffix(source) + "\n\n" + piece.getText())
+                                    .metadata(fileMetadata(attachmentId, filename, accepted.mimeType(), hash,
+                                            chunkIndex++, "file", source))
+                                    .build());
+                        }
+                    }
+                }
+                if (docs.isEmpty()) {
+                    markIndexState(attachmentId, AttachmentIndexStatus.UNSUPPORTED, hash, "NO_EXTRACTABLE_TEXT");
+                    return false;
+                }
+                if (docs.size() > MAX_ATTACHMENT_CHUNKS) {
+                    log.warn("File {} produced {} chunks — embedding the first {} only",
+                            filename, docs.size(), MAX_ATTACHMENT_CHUNKS);
+                    docs = new ArrayList<>(docs.subList(0, MAX_ATTACHMENT_CHUNKS));
                 }
             }
-            if (docs.size() > MAX_ATTACHMENT_CHUNKS) {
-                log.warn("File {} produced {} chunks — embedding the first {} only",
-                        filename, docs.size(), MAX_ATTACHMENT_CHUNKS);
-                docs = docs.subList(0, MAX_ATTACHMENT_CHUNKS);
-            }
+            // Clear any prior-format vectors before re-adding, so an INDEX_VERSION bump
+            // (or a re-caption) heals the file in place instead of duplicating chunks.
+            store.delete(filter("attachmentId", attachmentId));
+            store.add(docs);
+            markIndexState(attachmentId, AttachmentIndexStatus.READY, hash, null);
+            log.debug("Embedded file {} as {} chunk(s)", filename, docs.size());
+            return true;
+        } catch (RuntimeException failure) {
+            markIndexState(attachmentId, AttachmentIndexStatus.FAILED, hash, safeIndexError(failure));
+            throw failure;
         }
-        // Clear any prior-format vectors before re-adding, so an INDEX_VERSION bump
-        // (or a re-caption) heals the file in place instead of duplicating chunks.
-        store.delete(filter("attachmentId", attachmentId));
-        store.add(docs);
-        log.debug("Embedded file {} as {} chunk(s)", filename, docs.size());
-        return true;
+    }
+
+    /** Current worker preparation state; missing/stale derived state is pending. */
+    public AttachmentIndexView attachmentIndexStatus(UUID attachmentId) {
+        AttachmentView meta = attachments.find(attachmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Unknown attachment " + attachmentId));
+        if (AttachmentTypePolicy.isImageMime(meta.mimeType())) {
+            return new AttachmentIndexView(attachmentId, AttachmentIndexStatus.READY, null, null);
+        }
+        String expectedHash = contentHash(meta.sha256());
+        IndexState stored = jdbc.sql("""
+                        SELECT status, content_hash, error_code, updated_at
+                          FROM attachment_search_index_state
+                         WHERE attachment_id = :id
+                        """)
+                .param("id", attachmentId)
+                .query((rs, _) -> new IndexState(
+                        AttachmentIndexStatus.valueOf(rs.getString("status")),
+                        rs.getString("content_hash"),
+                        rs.getString("error_code"),
+                        rs.getTimestamp("updated_at").toInstant()))
+                .optional()
+                .orElse(null);
+        if (stored == null || !expectedHash.equals(stored.contentHash())) {
+            return new AttachmentIndexView(attachmentId, AttachmentIndexStatus.PENDING, null, null);
+        }
+        return new AttachmentIndexView(attachmentId, stored.status(), stored.errorCode(), stored.updatedAt());
     }
 
     /** Drops a deleted note's vectors — vector_store has no FK to note, cleanup is ours. */
@@ -363,18 +421,12 @@ public class SearchService {
 
     // --- extraction & captioning ---------------------------------------------
 
-    /** Text out of an uploaded document; null = a format we do not index. */
-    private @Nullable String extractText(AttachmentContent content, String mime) {
+    /** Reader output before token splitting; PDF documents retain real page metadata. */
+    private List<Document> extractDocuments(AttachmentContent content, String mime) {
         String filename = content.meta().filename().toLowerCase(Locale.ROOT);
-        if (mime.startsWith("text/") || filename.endsWith(".md")) {
-            return new String(content.data(), StandardCharsets.UTF_8);
-        }
-        boolean tikaExtractable = mime.equals("application/pdf")
-                || mime.equals("application/msword")
-                || mime.equals("application/rtf")
-                || mime.contains("officedocument");
-        if (!tikaExtractable) {
-            return null;
+        if (mime.startsWith("text/") || mime.equals("application/json") || mime.equals("application/xml")
+                || filename.endsWith(".md")) {
+            return List.of(new Document(new String(content.data(), StandardCharsets.UTF_8)));
         }
         ByteArrayResource resource = new ByteArrayResource(content.data()) {
             @Override
@@ -382,11 +434,12 @@ public class SearchService {
                 return content.meta().filename(); // helps Tika's type detection
             }
         };
-        return new TikaDocumentReader(resource).get().stream()
-                .map(Document::getText)
-                .filter(text -> text != null && !text.isBlank())
-                .reduce((a, b) -> a + "\n\n" + b)
-                .orElse(null);
+        List<Document> extracted = mime.equals("application/pdf")
+                ? new PagePdfDocumentReader(resource).get()
+                : new TikaDocumentReader(resource).get();
+        return extracted.stream()
+                .filter(document -> document.getText() != null && !document.getText().isBlank())
+                .toList();
     }
 
     /**
@@ -480,14 +533,67 @@ public class SearchService {
                 "contentHash", hash);
     }
 
-    private static Map<String, Object> fileMetadata(UUID attachmentId, String filename,
-            String hash, int chunk, String kind) {
-        return Map.of(
-                "attachmentId", attachmentId.toString(),
-                "title", filename,
-                "chunk", chunk,
-                "contentHash", hash,
-                "kind", kind);
+    private static Map<String, Object> fileMetadata(UUID attachmentId, String filename, String mimeType,
+            String hash, int chunk, String kind, @Nullable Document source) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("attachmentId", attachmentId.toString());
+        metadata.put("title", filename);
+        metadata.put("mimeType", mimeType);
+        metadata.put("chunk", chunk);
+        metadata.put("contentHash", hash);
+        metadata.put("kind", kind);
+        if (source != null) {
+            Object page = source.getMetadata().get(PagePdfDocumentReader.METADATA_START_PAGE_NUMBER);
+            Object endPage = source.getMetadata().get(PagePdfDocumentReader.METADATA_END_PAGE_NUMBER);
+            if (page instanceof Number number) {
+                metadata.put("page", number.intValue());
+            }
+            if (endPage instanceof Number number) {
+                metadata.put("endPage", number.intValue());
+            }
+        }
+        return metadata;
+    }
+
+    private static String locatorSuffix(Document source) {
+        Object page = source.getMetadata().get(PagePdfDocumentReader.METADATA_START_PAGE_NUMBER);
+        Object endPage = source.getMetadata().get(PagePdfDocumentReader.METADATA_END_PAGE_NUMBER);
+        if (!(page instanceof Number start)) {
+            return "";
+        }
+        return endPage instanceof Number end && end.intValue() != start.intValue()
+                ? " · pages " + start.intValue() + "-" + end.intValue()
+                : " · page " + start.intValue();
+    }
+
+    private void markIndexState(UUID attachmentId, AttachmentIndexStatus status,
+            @Nullable String contentHash, @Nullable String errorCode) {
+        jdbc.sql("""
+                INSERT INTO attachment_search_index_state (
+                    attachment_id, status, content_hash, error_code, updated_at
+                ) VALUES (:id, :status, :hash, :error, CURRENT_TIMESTAMP)
+                ON CONFLICT (attachment_id) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    content_hash = EXCLUDED.content_hash,
+                    error_code = EXCLUDED.error_code,
+                    updated_at = CURRENT_TIMESTAMP
+                """)
+                .param("id", attachmentId)
+                .param("status", status.name())
+                .param("hash", contentHash)
+                .param("error", errorCode)
+                .update();
+    }
+
+    private static String safeIndexError(RuntimeException failure) {
+        String detail = (failure.getClass().getName() + " " + failure.getMessage()).toLowerCase(Locale.ROOT);
+        return detail.contains("password") || detail.contains("encrypt")
+                ? "ENCRYPTED_DOCUMENT"
+                : "INDEXING_FAILED";
+    }
+
+    private record IndexState(AttachmentIndexStatus status, @Nullable String contentHash,
+            @Nullable String errorCode, java.time.Instant updatedAt) {
     }
 
     /** The hash the index currently holds for one source; null = not indexed. */

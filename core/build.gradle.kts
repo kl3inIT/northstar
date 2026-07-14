@@ -22,6 +22,9 @@ dependencies {
     // Internal to :core — text extraction for attachment ETL (pdf/docx/pptx/html);
     // the search module reads uploaded bytes through it before embedding.
     implementation("org.springframework.ai:spring-ai-tika-document-reader")
+    // Tika intentionally flattens PDFs. The page reader keeps real page-number
+    // metadata so Assistant citations never infer or invent PDF locations.
+    implementation("org.springframework.ai:spring-ai-pdf-document-reader")
 
     // Internal to :core. Event Publication Registry rides JDBC, not JPA: the JPA
     // flavor maps its own @Entity, which collides with ddl-auto: validate unless
