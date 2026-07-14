@@ -7,13 +7,17 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.northstar.core.cache.ExactCacheNames;
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 
 class WebResearchServiceTests {
 
@@ -24,7 +28,7 @@ class WebResearchServiceTests {
         WebProviderRegistry registry = new WebProviderRegistry(List.of(first, second), List.of(new FakeReader()));
         WebResearchSettingRepository repository = repository();
         WebResearchSettingsService settings = settings(repository, registry, defaults(false, List.of()));
-        WebResearchService service = new WebResearchService(settings, registry);
+        WebResearchService service = service(settings, registry);
 
         assertThat(service.search(WebSearchRequest.of("before switch")).providerId()).isEqualTo("first");
 
@@ -41,7 +45,7 @@ class WebResearchServiceTests {
         FakeSearch second = new FakeSearch("second", false);
         WebProviderRegistry registry = new WebProviderRegistry(List.of(first, second), List.of(new FakeReader()));
         WebResearchSettingsService settings = settings(repository(), registry, defaults(true, List.of("second")));
-        WebResearchService service = new WebResearchService(settings, registry);
+        WebResearchService service = service(settings, registry);
 
         WebSearchResult result = service.search(WebSearchRequest.of("fallback probe"));
 
@@ -55,7 +59,7 @@ class WebResearchServiceTests {
         FakeSearch second = new FakeSearch("second", false);
         WebProviderRegistry registry = new WebProviderRegistry(List.of(first, second), List.of(new FakeReader()));
         WebResearchSettingsService settings = settings(repository(), registry, defaults(true, List.of("second")));
-        WebResearchService service = new WebResearchService(settings, registry);
+        WebResearchService service = service(settings, registry);
         WebSearchRequest request = WebSearchRequest.of("same query");
 
         assertThat(service.search(request).providerId()).isEqualTo("second");
@@ -70,6 +74,13 @@ class WebResearchServiceTests {
         return new WebResearchDefaults(true, "first", WebProviderRoute.none(), "direct",
                 WebProviderRoute.none(), fallback, fallbackOrder, List.of(),
                 Duration.ofMinutes(5), 20);
+    }
+
+    private static WebResearchService service(WebResearchSettingsService settings,
+            WebProviderRegistry registry) {
+        CacheManager caches = new ConcurrentMapCacheManager(
+                ExactCacheNames.WEB_SEARCH, ExactCacheNames.WEB_PAGE);
+        return new WebResearchService(settings, registry, Clock.systemUTC(), caches);
     }
 
     private static WebResearchSettingsService settings(WebResearchSettingRepository repository,

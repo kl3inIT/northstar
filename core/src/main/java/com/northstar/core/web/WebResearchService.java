@@ -1,7 +1,7 @@
 package com.northstar.core.web;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
+import com.northstar.core.cache.ExactCache;
+import com.northstar.core.cache.ExactCacheNames;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -9,6 +9,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.function.Function;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -17,34 +18,29 @@ public class WebResearchService {
     private final WebResearchSettingsService settings;
     private final WebProviderRegistry providers;
     private final Clock clock;
-    private final Cache<SearchKey, WebSearchResult> searchCache;
-    private final Cache<PageKey, WebPageResult> pageCache;
+    private final ExactCache<SearchKey, WebSearchResult> searchCache;
+    private final ExactCache<PageKey, WebPageResult> pageCache;
 
     @Autowired
-    WebResearchService(WebResearchSettingsService settings, WebProviderRegistry providers) {
-        this(settings, providers, Clock.systemUTC());
+    WebResearchService(WebResearchSettingsService settings, WebProviderRegistry providers,
+            CacheManager cacheManager) {
+        this(settings, providers, Clock.systemUTC(), cacheManager);
     }
 
-    WebResearchService(WebResearchSettingsService settings, WebProviderRegistry providers, Clock clock) {
+    WebResearchService(WebResearchSettingsService settings, WebProviderRegistry providers,
+            Clock clock, CacheManager cacheManager) {
         this.settings = settings;
         this.providers = providers;
         this.clock = clock;
-        WebResearchDefaults defaults = settings.defaults();
-        this.searchCache = Caffeine.newBuilder()
-                .maximumSize(defaults.cacheMaxSize())
-                .expireAfterWrite(defaults.cacheTtl())
-                .build();
-        this.pageCache = Caffeine.newBuilder()
-                .maximumSize(defaults.cacheMaxSize())
-                .expireAfterWrite(defaults.cacheTtl())
-                .build();
+        this.searchCache = ExactCache.from(cacheManager, ExactCacheNames.WEB_SEARCH);
+        this.pageCache = ExactCache.from(cacheManager, ExactCacheNames.WEB_PAGE);
     }
 
     public WebSearchResult search(WebSearchRequest request) {
         WebResearchSettings current = requireEnabled();
         SearchKey key = new SearchKey(current.searchProviderId(), current.searchRoute(), current.fallbackEnabled(),
                 settings.defaults().searchFallbackOrder(), request);
-        WebSearchResult cached = searchCache.getIfPresent(key);
+        WebSearchResult cached = searchCache.find(key).orElse(null);
         if (cached != null) return cached;
 
         List<String> candidates = candidates(current.searchProviderId(),
@@ -66,7 +62,7 @@ public class WebResearchService {
         WebResearchSettings current = requireEnabled();
         PageKey key = new PageKey(current.pageReaderId(), current.pageReaderRoute(), current.fallbackEnabled(),
                 settings.defaults().pageReaderFallbackOrder(), request.url());
-        WebPageResult cached = pageCache.getIfPresent(key);
+        WebPageResult cached = pageCache.find(key).orElse(null);
         if (cached != null) return cached;
 
         List<String> candidates = candidates(current.pageReaderId(),

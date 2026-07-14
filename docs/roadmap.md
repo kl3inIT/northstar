@@ -32,11 +32,23 @@ This file tracks delivery status. Increment descriptions and rationale live in
 | AI capability catalogs and on-demand text to speech | Done | Explicit Assistant read-aloud, isolated Chat/TTS/STT/Image/Embedding route catalogs, OpenAI/9Router discovery with manual fallback, TTS language/voice selection, persisted content-addressed MP3 reuse, and responsive AI Elements selectors/playback. No automatic generation or playback. |
 | Vocabulary audio practice | Done | Explicit target-language word/example TTS enrichment, applied-audio-first browser fallback, retained pronunciation recordings/history, provider-aware delivery trends, connected-speech live-following Shadowing, and deterministic Dictation are complete. Provider-native scores remain separate from FSRS, do not claim TTS synchronization, and are never presented as IELTS. |
 | Habit tracking V1 | Done | Repeated-behaviour definitions stay separate from Tasks, with selected-day or weekly-target schedules, local-date check-ins, neutral excuse/pause semantics, effective-dated history, consistency-first insights, responsive web workspace, Assistant/MCP tools, and weekly review facts. |
+| AI cache foundation | Done | Named exact caches now use Spring Cache with bounded/stat-tracked Caffeine defaults and a replaceable `CacheManager`; web, model-catalog, and HuggingNews-detail caches are migrated. Semantic response caching has a separate fail-closed, disabled-by-default port and never reuses Assistant/tool/grading or knowledge-vector data. |
 | Web Today dashboard | Deferred | Mobile now has a focused Today surface. Keep web Assistant/chat as the daily cockpit unless a separate desktop zero-prompt glance surface becomes necessary. |
 | Repository documentation harness | Done | Thin agent map, architecture source of truth, domain specs/tests, decisions, increment history, and testing guidance are consolidated and maintained with code changes. |
 
 ## Backlog
 
+- First semantic-cache workload/provider: only after a concrete stateless,
+  read-only use case exists; use isolated storage (not the knowledge vector
+  table), preserve owner/context/model/instruction scope, and add hit/miss plus
+  sampled false-hit evaluation before enabling it.
+- Agent runtime hardening, adopting patterns selectively from Spring AI
+  AgentCore rather than taking its AWS runtime contract wholesale:
+  conversation-summary consolidation outside the model window, async sampled
+  assistant evaluations with Micrometer, turn/session OpenTelemetry traces,
+  and a provider-neutral session artifact store with category isolation,
+  peek/consume semantics, TTL, count and byte bounds. Interactive browser and
+  code sandbox capabilities remain a later increment.
 - Study V1.5: brief study section (after automation/brief), scored Task 1
   anchors, LanguageTool sidecar, bulk HSK/Tatoeba imports, embedding-based
   new-card dispersion.

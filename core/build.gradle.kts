@@ -28,6 +28,7 @@ dependencies {
     // the entity scan and a hand-guessed DDL match Hibernate's naming — the JDBC
     // flavor has no entity and ships the official Postgres DDL (copied into V15).
     implementation("org.springframework.modulith:spring-modulith-starter-jdbc")
+    implementation("org.springframework.boot:spring-boot-starter-cache")
     implementation("com.github.ben-manes.caffeine:caffeine")
     implementation(libs.fsrs)
 

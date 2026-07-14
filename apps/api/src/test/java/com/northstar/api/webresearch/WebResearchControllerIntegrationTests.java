@@ -8,12 +8,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.northstar.core.assistant.NorthstarTool;
+import com.northstar.core.cache.ExactCacheNames;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.MediaType;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
@@ -38,6 +40,18 @@ class WebResearchControllerIntegrationTests {
 
     @Autowired
     List<NorthstarTool> tools;
+
+    @Autowired
+    CacheManager cacheManager;
+
+    @Test
+    void exactCacheManagerIncludesCoreAndIntegrationCaches() {
+        assertThat(cacheManager.getCacheNames()).containsExactlyInAnyOrder(
+                ExactCacheNames.WEB_SEARCH,
+                ExactCacheNames.WEB_PAGE,
+                ExactCacheNames.AI_MODEL_CATALOG,
+                ExactCacheNames.HUGGINGNEWS_DETAIL);
+    }
 
     @Test
     void listsProvidersUpdatesRuntimeOverrideAndResetsToDefaults() throws Exception {

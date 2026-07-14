@@ -10,5 +10,6 @@ public record HuggingNewsProperties(
         @DefaultValue("5s") Duration connectTimeout,
         @DefaultValue("15s") Duration requestTimeout,
         @DefaultValue("5m") Duration feedCacheTtl,
-        @DefaultValue("30m") Duration detailCacheTtl) {
+        @DefaultValue("30m") Duration detailCacheTtl,
+        @DefaultValue("200") long detailCacheMaxSize) {
 }

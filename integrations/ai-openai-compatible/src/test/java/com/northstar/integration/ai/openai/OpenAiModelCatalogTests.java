@@ -4,8 +4,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.northstar.core.ai.AiGatewayType;
+import com.northstar.core.cache.ExactCache;
+import com.northstar.core.cache.ExactCacheNames;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -21,6 +25,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
 import org.springframework.web.client.RestClient;
 
 class OpenAiModelCatalogTests {
@@ -28,8 +34,8 @@ class OpenAiModelCatalogTests {
     @Test
     void cleartextModelProbeDoesNotAttemptH2cUpgrade() throws Exception {
         try (H2cRejectingServer server = H2cRejectingServer.start()) {
-            OpenAiModelCatalog catalog = new OpenAiModelCatalog(properties(), null,
-                    RestClient.builder());
+            OpenAiModelCatalog catalog = new OpenAiModelCatalog(null, RestClient.builder(),
+                    cacheManager());
             AiGatewayDefinition gateway = new AiGatewayDefinition("router", AiGatewayType.NINE_ROUTER,
                     "9Router", server.baseUrl(), "secret", List.of(), List.of(), List.of(),
                     List.of(), List.of(), List.of(), List.of(), false,
@@ -45,9 +51,28 @@ class OpenAiModelCatalogTests {
         }
     }
 
-    private static AiProperties properties() {
-        return new AiProperties("router", Map.of(), AiProperties.Routes.empty(),
-                new AiProperties.Catalog(Duration.ofMinutes(5)), new AiProperties.Credentials(""));
+    @Test
+    void invalidateForcesTheNextCatalogLoad() {
+        CacheManager caches = cacheManager();
+        AiGatewayRegistry gateways = mock(AiGatewayRegistry.class);
+        AiGatewayDefinition gateway = new AiGatewayDefinition("router", AiGatewayType.NINE_ROUTER,
+                "9Router", "https://router.test/v1", "secret", List.of("fresh"), List.of(),
+                List.of(), List.of(), List.of(), List.of(), List.of(), false,
+                Duration.ofSeconds(5), AiGatewaySource.SETTINGS);
+        when(gateways.definition("router")).thenReturn(gateway);
+        ExactCache.<String, List<AiModelDescriptor>>from(caches, ExactCacheNames.AI_MODEL_CATALOG)
+                .put("router", List.of(new AiModelDescriptor("router", "cached", "cached")));
+        OpenAiModelCatalog catalog = new OpenAiModelCatalog(gateways, RestClient.builder(), caches);
+
+        assertEquals(List.of("cached"), catalog.models("router").stream()
+                .map(AiModelDescriptor::id).toList());
+        catalog.invalidate("router");
+        assertEquals(List.of("fresh"), catalog.models("router").stream()
+                .map(AiModelDescriptor::id).toList());
+    }
+
+    private static CacheManager cacheManager() {
+        return new ConcurrentMapCacheManager(ExactCacheNames.AI_MODEL_CATALOG);
     }
 
     private static final class H2cRejectingServer implements AutoCloseable {

@@ -37,7 +37,7 @@ class AiCredentialCipherTests {
 
     private static AiProperties properties(String key) {
         return new AiProperties("openai", Map.of(), AiProperties.Routes.empty(),
-                new AiProperties.Catalog(Duration.ofMinutes(5)),
+                new AiProperties.Catalog(Duration.ofMinutes(5), 64),
                 new AiProperties.Credentials(key));
     }
 }

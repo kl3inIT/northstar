@@ -23,7 +23,7 @@ public record AiProperties(
         activeGateway = normalize(activeGateway, "openai");
         gateways = gateways == null ? Map.of() : Map.copyOf(gateways);
         routes = routes == null ? Routes.empty() : routes;
-        catalog = catalog == null ? new Catalog(Duration.ofMinutes(5)) : catalog;
+        catalog = catalog == null ? new Catalog(Duration.ofMinutes(5), 64) : catalog;
         credentials = credentials == null ? new Credentials("") : credentials;
     }
 
@@ -136,9 +136,10 @@ public record AiProperties(
         }
     }
 
-    public record Catalog(Duration cacheTtl) {
+    public record Catalog(Duration cacheTtl, long cacheMaxSize) {
         public Catalog {
             cacheTtl = cacheTtl == null ? Duration.ofMinutes(5) : cacheTtl;
+            cacheMaxSize = cacheMaxSize < 1 ? 64 : cacheMaxSize;
         }
     }
 

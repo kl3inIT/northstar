@@ -1,5 +1,7 @@
 package com.northstar.integration.news.huggingnews;
 
+import com.northstar.core.cache.ExactCache;
+import com.northstar.core.cache.ExactCacheNames;
 import com.northstar.core.brief.BriefFeed;
 import com.northstar.core.brief.BriefFeedException;
 import com.northstar.core.brief.BriefFeedProvider;
@@ -12,10 +14,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -25,7 +26,6 @@ public class HuggingNewsFeedProvider implements BriefFeedProvider {
 
     private static final int MAX_FEED_BYTES = 2_000_000;
     private static final int MAX_DETAIL_BYTES = 300_000;
-    private static final int MAX_DETAIL_CACHE = 200;
     private static final Pattern ROUTE_PART = Pattern.compile("[a-z0-9][a-z0-9-]{0,159}");
 
     private final HuggingNewsProperties properties;
@@ -34,24 +34,26 @@ public class HuggingNewsFeedProvider implements BriefFeedProvider {
     private final URI base;
     private final Clock clock;
     private final Object feedLock = new Object();
-    private final Map<String, Cached<BriefStoryDetail>> details = new ConcurrentHashMap<>();
+    private final ExactCache<String, BriefStoryDetail> details;
     private volatile Cached<BriefFeed> feed;
 
     @Autowired
-    HuggingNewsFeedProvider(HuggingNewsProperties properties, ObjectMapper json) {
+    HuggingNewsFeedProvider(HuggingNewsProperties properties, ObjectMapper json,
+            CacheManager cacheManager) {
         this(properties, json, HttpClient.newBuilder()
                 .connectTimeout(properties.connectTimeout())
                 .followRedirects(HttpClient.Redirect.NEVER)
-                .build(), Clock.systemUTC());
+                .build(), Clock.systemUTC(), cacheManager);
     }
 
     HuggingNewsFeedProvider(HuggingNewsProperties properties, ObjectMapper json,
-            HttpClient http, Clock clock) {
+            HttpClient http, Clock clock, CacheManager cacheManager) {
         this.properties = properties;
         this.parser = new HuggingNewsParser(json);
         this.http = http;
         this.clock = clock;
         this.base = validBase(properties.baseUrl());
+        this.details = ExactCache.from(cacheManager, ExactCacheNames.HUGGINGNEWS_DETAIL);
     }
 
     @Override
@@ -81,15 +83,10 @@ public class HuggingNewsFeedProvider implements BriefFeedProvider {
         requireRoutePart(topic, "topic");
         requireRoutePart(slug, "slug");
         String key = topic + "/" + slug;
-        Instant now = clock.instant();
-        Cached<BriefStoryDetail> cached = details.get(key);
-        if (cached != null && cached.fresh(now)) return cached.value();
+        BriefStoryDetail cached = details.find(key).orElse(null);
+        if (cached != null) return cached;
         BriefStoryDetail fetched = parser.detail(get(base.resolve("/" + key + "/__data.json"), MAX_DETAIL_BYTES));
-        if (details.size() >= MAX_DETAIL_CACHE) {
-            details.entrySet().removeIf(entry -> !entry.getValue().fresh(now));
-            if (details.size() >= MAX_DETAIL_CACHE) details.clear();
-        }
-        details.put(key, new Cached<>(fetched, now.plus(properties.detailCacheTtl())));
+        details.put(key, fetched);
         return fetched;
     }
 

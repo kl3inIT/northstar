@@ -7,7 +7,8 @@ active increment, not here.
 ## Stack
 
 - Backend: Spring Boot 4.1, Java 25, Gradle Kotlin DSL, Spring Modulith 2.1,
-  Spring Security 7, Spring Data JPA, PostgreSQL, pgvector, Flyway, Spring AI.
+  Spring Security 7, Spring Data JPA, PostgreSQL, pgvector, Flyway, Spring AI,
+  and Spring Cache with Caffeine as the default local provider.
 - Frontend: Vite, React 19, TypeScript, Tailwind v4, shadcn/ui, TanStack Router,
   TanStack Query.
 - Mobile: Flutter 3.44, Dart 3.12, with Android, iOS, and Web targets. The app
@@ -91,6 +92,9 @@ Modulith modules. Current modules include:
 - `search` - keyword/vector search and attachment text/image indexing support.
 - `web` - provider-neutral web search/page-reading contracts, runtime routing,
   provider metadata, bounded caches, and the persisted provider override.
+- `cache` - disposable exact-cache names/specs and typed Spring Cache access,
+  plus the fail-closed semantic response-cache boundary. Caffeine is the
+  conditional default; applications may provide another `CacheManager`.
 - `automation` - typed persisted workflow definitions, trigger validation,
   handler discovery, schedule projection versions, and execution history.
 - `brief` - Morning Brief public-source orchestration, trust ranking, deterministic rendering,
@@ -149,6 +153,16 @@ verification in `:core:test` is the boundary check.
 - Assistant text history uses Spring AI's `spring_ai_chat_memory`; assistant
   tool workflow replay uses the Northstar-owned
   `northstar_assistant_tool_trace` projection table.
+- Exact web search/page, AI model-catalog, and HuggingNews-detail results use
+  named, bounded, expiring Spring caches. Provider/route/fallback context stays
+  in correctness keys; failures, secrets, audio, attachments, jobs, and client
+  registries are not cached. HuggingNews feed stale-on-error remains a separate
+  adapter snapshot rather than ordinary cache behavior.
+- Semantic response caching is a separate disabled-by-default port. Its policy
+  only admits explicit stateless, read-only, tool-free, memory-free,
+  attachment-free, non-live, non-assessment requests with complete context.
+  The general Assistant and graders are therefore not connected to it. The
+  durable knowledge `vector_store` never contains semantic-cache responses.
 - `apps/worker` wires OpenAI and pgvector for indexing jobs that should not
   compete with API request threads.
 - Search combines durable PostgreSQL data with derived keyword/vector indexes.

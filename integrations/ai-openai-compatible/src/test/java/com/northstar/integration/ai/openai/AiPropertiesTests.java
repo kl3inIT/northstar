@@ -69,7 +69,7 @@ class AiPropertiesTests {
                 "gpt-image-2",
                 "text-embedding-3-large");
         return new AiProperties("custom-router", Map.of("custom-router", gateway), routes,
-                new AiProperties.Catalog(Duration.ofMinutes(2)),
+                new AiProperties.Catalog(Duration.ofMinutes(2), 64),
                 new AiProperties.Credentials(""));
     }
 }

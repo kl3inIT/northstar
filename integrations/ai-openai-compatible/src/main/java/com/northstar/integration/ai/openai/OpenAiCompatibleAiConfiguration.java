@@ -2,6 +2,8 @@ package com.northstar.integration.ai.openai;
 
 import com.northstar.core.ai.AiRouteDefaults;
 import com.northstar.core.ai.AiRouteSettingsService;
+import com.northstar.core.cache.ExactCacheNames;
+import com.northstar.core.cache.ExactCacheSpec;
 import org.springframework.ai.audio.transcription.TranscriptionModel;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -23,6 +25,12 @@ class OpenAiCompatibleAiConfiguration {
     @Bean
     AiRouteDefaults aiRouteDefaults(AiProperties properties) {
         return new AiRouteDefaults(properties.routeDefaults());
+    }
+
+    @Bean
+    ExactCacheSpec aiModelCatalogCacheSpec(AiProperties properties) {
+        return new ExactCacheSpec(ExactCacheNames.AI_MODEL_CATALOG,
+                properties.catalog().cacheTtl(), properties.catalog().cacheMaxSize());
     }
 
     @Bean

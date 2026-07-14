@@ -1,16 +1,17 @@
 package com.northstar.integration.ai.openai;
 
+import com.northstar.core.cache.ExactCache;
+import com.northstar.core.cache.ExactCacheNames;
 import java.net.http.HttpClient;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -21,27 +22,23 @@ class OpenAiModelCatalog {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiModelCatalog.class);
 
-    private final AiProperties properties;
     private final AiGatewayRegistry gateways;
     private final RestClient.Builder restClient;
-    private final Map<String, CachedModels> cache = new ConcurrentHashMap<>();
+    private final ExactCache<String, List<AiModelDescriptor>> cache;
 
-    OpenAiModelCatalog(AiProperties properties, AiGatewayRegistry gateways,
-            RestClient.Builder restClient) {
-        this.properties = properties;
+    OpenAiModelCatalog(AiGatewayRegistry gateways, RestClient.Builder restClient,
+            CacheManager cacheManager) {
         this.gateways = gateways;
         this.restClient = restClient;
+        this.cache = ExactCache.from(cacheManager, ExactCacheNames.AI_MODEL_CATALOG);
     }
 
     List<AiModelDescriptor> models(String gatewayId) {
         AiGatewayDefinition gateway = gateways.definition(gatewayId);
-        CachedModels current = cache.get(gatewayId);
-        if (current != null && current.expiresAt().isAfter(Instant.now())) {
-            return current.models();
-        }
+        List<AiModelDescriptor> current = cache.find(gatewayId).orElse(null);
+        if (current != null) return current;
         List<AiModelDescriptor> models = load(gatewayId, gateway);
-        cache.put(gatewayId, new CachedModels(models,
-                Instant.now().plus(properties.catalog().cacheTtl())));
+        cache.put(gatewayId, models);
         return models;
     }
 
@@ -50,7 +47,7 @@ class OpenAiModelCatalog {
     }
 
     void invalidate(String gatewayId) {
-        cache.remove(gatewayId);
+        cache.evict(gatewayId);
     }
 
     private List<AiModelDescriptor> load(String gatewayId, AiGatewayDefinition gateway) {
@@ -128,6 +125,4 @@ class OpenAiModelCatalog {
     private record ModelResponse(String id) {
     }
 
-    private record CachedModels(List<AiModelDescriptor> models, Instant expiresAt) {
-    }
 }

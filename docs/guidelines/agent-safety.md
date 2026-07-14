@@ -13,6 +13,29 @@ making changes.
 - Use web search only when the needed information is not local and not available
   through Context7 or primary docs.
 
+## Reference Repositories
+
+- [`spring-ai-community/spring-ai-agentcore`](https://github.com/spring-ai-community/spring-ai-agentcore)
+  is a reference implementation for typed memory, sampled evaluations,
+  observability, session-scoped artifacts, browser sessions, and code
+  interpreter lifecycle. When work touches one of those areas, an agent may
+  shallow-clone the repository under `.tmp/`, record the inspected commit in
+  the increment research, read the relevant module and tests, then remove the
+  clone. Learn the pattern; do not import its AWS runtime contract or copy the
+  implementation wholesale.
+- For cache work specifically, the useful AgentCore pattern is its
+  `ArtifactStore` boundary: session plus category scoping, atomic concurrent
+  append, destructive `retrieve` versus non-destructive `peek`, automatic TTL,
+  a maximum entry bound, immutable artifacts, and an implementation factory.
+  Treat this as temporary artifact lifecycle, not as a semantic response
+  cache. Northstar also needs byte-size limits and a multi-instance-capable
+  provider before using the pattern for large files in production.
+- [`habuma/spring-ai-recipes`](https://github.com/habuma/spring-ai-recipes)
+  is a companion reference for Spring AI semantic caching, including the
+  VectorStore-backed variant. Spring AI's current official docs and local API
+  symbols remain the authority; the recipe is an example, not a dependency or
+  architecture decision.
+
 ## Common Stack Traps
 
 - Spring Boot 4 moved package names and starter names. Verify annotations and
