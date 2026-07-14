@@ -655,11 +655,18 @@ function AssistantChat({
         throw new Error('upload failed') // keeps the composer content for retry
       }
       setIsUploading(false)
-      await sendMessage({ text: trimmed, files: uploaded })
+      // sendMessage synchronously moves the submitted content into the transcript.
+      // Do not keep the composer waiting for the model/tool stream to finish.
+      const turn = sendMessage({ text: trimmed, files: uploaded })
       setText('')
-    } finally {
+      const releaseSubmitLock = () => {
+        submitLock.current = false
+      }
+      void turn.then(releaseSubmitLock, releaseSubmitLock)
+    } catch (error) {
       submitLock.current = false
       setIsUploading(false)
+      throw error
     }
   }
 
