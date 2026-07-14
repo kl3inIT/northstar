@@ -95,6 +95,9 @@ Modulith modules. Current modules include:
 - `cache` - disposable exact-cache names/specs and typed Spring Cache access,
   plus the fail-closed semantic response-cache boundary. Caffeine is the
   conditional default; applications may provide another `CacheManager`.
+- `artifact` - immutable, owner/session/category-scoped temporary binary
+  lifecycle. The API supplies the bounded Caffeine default; durable files stay
+  in `attachment` and applied speech stores.
 - `automation` - typed persisted workflow definitions, trigger validation,
   handler discovery, schedule projection versions, and execution history.
 - `brief` - Morning Brief public-source orchestration, trust ranking, deterministic rendering,
@@ -163,6 +166,11 @@ verification in `:core:test` is the boundary check.
   attachment-free, non-live, non-assessment requests with complete context.
   The general Assistant and graders are therefore not connected to it. The
   durable knowledge `vector_store` never contains semantic-cache responses.
+- Vocabulary enrichment keeps generated image/audio previews in the temporary
+  artifact store, not in job JSON or the exact cache. The API default expires
+  previews after 30 minutes with a 16 MiB per-item and 64 MiB total heap bound;
+  polling returns references and Apply persists through Attachment/Speech only
+  before post-commit cleanup. API restart deliberately loses unapplied content.
 - `apps/worker` wires OpenAI and pgvector for indexing jobs that should not
   compete with API request threads.
 - Search combines durable PostgreSQL data with derived keyword/vector indexes.

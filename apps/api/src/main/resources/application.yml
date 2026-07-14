@@ -63,6 +63,13 @@ spring:
 # cheaper tier (e.g. a mini/nano model) to cut titling cost — no code change; set
 # `enabled: false` to switch titling off (the list falls back to the first message).
 northstar:
+  artifacts:
+    # Short-lived generated previews only. Durable attachments and applied speech
+    # remain in PostgreSQL-backed domain stores.
+    ttl: 30m
+    maximum-artifact-bytes: 16777216
+    maximum-total-bytes: 67108864
+    maximum-entries: 100
   ai:
     active-gateway: ${NORTHSTAR_AI_GATEWAY:openai}
     gateways:

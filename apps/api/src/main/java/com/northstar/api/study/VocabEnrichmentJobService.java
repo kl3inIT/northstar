@@ -1,9 +1,15 @@
 package com.northstar.api.study;
 
 import com.northstar.core.ai.AiClientRouter;
+import com.northstar.core.ai.AiRoute;
 import com.northstar.core.ai.AiTask;
 import com.northstar.core.ai.GeneratedImage;
 import com.northstar.core.ai.ImageGenerationGateway;
+import com.northstar.core.artifact.TemporaryArtifact;
+import com.northstar.core.artifact.TemporaryArtifactMetadata;
+import com.northstar.core.artifact.TemporaryArtifactScope;
+import com.northstar.core.artifact.TemporaryArtifactStore;
+import com.northstar.core.artifact.TemporaryArtifactWrite;
 import com.northstar.core.attachment.AttachmentService;
 import com.northstar.core.speech.SpeechAssetService;
 import com.northstar.core.speech.SpeechAudio;
@@ -13,9 +19,7 @@ import com.northstar.core.study.VocabEnrichmentField;
 import com.northstar.core.study.VocabEnrichmentPreview;
 import com.northstar.core.study.VocabPracticeText;
 import com.northstar.core.study.VocabService;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -24,6 +28,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -31,6 +38,8 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.ObjectMapper;
 
@@ -39,7 +48,11 @@ import tools.jackson.databind.ObjectMapper;
 class VocabEnrichmentJobService {
 
     private static final Logger log = LoggerFactory.getLogger(VocabEnrichmentJobService.class);
-    private static final Duration TTL = Duration.ofMinutes(30);
+    private static final int MAX_JOBS = 100;
+    private static final String OWNER_SCOPE = "northstar-user";
+    private static final String IMAGE_CATEGORY = "vocab-image";
+    private static final String WORD_AUDIO_CATEGORY = "vocab-word-audio";
+    private static final String EXAMPLE_AUDIO_CATEGORY = "vocab-example-audio";
 
     private final VocabService vocab;
     private final VocabCoach coach;
@@ -47,13 +60,15 @@ class VocabEnrichmentJobService {
     private final ImageGenerationGateway images;
     private final AttachmentService attachments;
     private final SpeechAssetService speech;
+    private final TemporaryArtifactStore artifacts;
     private final AsyncTaskExecutor executor;
     private final ObjectMapper json;
     private final Map<UUID, Job> jobs = new ConcurrentHashMap<>();
+    private final Semaphore jobSlots = new Semaphore(MAX_JOBS);
 
     VocabEnrichmentJobService(VocabService vocab, VocabCoach coach, AiClientRouter ai,
             ImageGenerationGateway images, AttachmentService attachments,
-            SpeechAssetService speech,
+            SpeechAssetService speech, TemporaryArtifactStore artifacts,
             @Qualifier("applicationTaskExecutor") AsyncTaskExecutor executor,
             ObjectMapper json) {
         this.vocab = vocab;
@@ -62,6 +77,7 @@ class VocabEnrichmentJobService {
         this.images = images;
         this.attachments = attachments;
         this.speech = speech;
+        this.artifacts = artifacts;
         this.executor = executor;
         this.json = json;
     }
@@ -71,67 +87,108 @@ class VocabEnrichmentJobService {
             throw new IllegalArgumentException("Select at least one enrichment field");
         }
         VocabCardSummary card = vocab.find(cardId);
-        Job job = new Job(UUID.randomUUID(), card, EnumSet.copyOf(fields));
         evictExpired();
+        if (!jobSlots.tryAcquire()) {
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "Too many enrichment jobs are active; apply, discard, or wait for one to expire");
+        }
+        Job job = new Job(UUID.randomUUID(), card, EnumSet.copyOf(fields));
         jobs.put(job.id, job);
-        executor.execute(() -> generate(job));
-        return job.view();
+        try {
+            executor.execute(() -> generate(job));
+        } catch (RuntimeException exception) {
+            cleanup(job);
+            throw exception;
+        }
+        return view(job);
     }
 
     VocabEnrichmentJobView get(UUID id) {
         evictExpired();
         Job job = jobs.get(id);
         if (job == null) throw new IllegalArgumentException("Unknown or expired enrichment job " + id);
-        return job.view();
+        return view(job);
     }
 
     @Transactional
     VocabCardSummary apply(UUID id) {
         Job job = requiredReady(id);
-        VocabCardSummary current = vocab.find(job.card.id());
-        if (!sameContent(current, job.card)) {
+        if (!job.applying.compareAndSet(false, true)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Card content changed after enrichment started; generate a fresh preview");
+                    "Enrichment preview is already being applied");
         }
-        String metadata = job.preview.metadata();
-        if (job.image != null) {
-            String extension = switch (job.image.mediaType()) {
-                case "image/jpeg" -> "jpg";
-                case "image/webp" -> "webp";
-                default -> "png";
-            };
-            UUID imageId = attachments.store("vocab-" + current.id() + "." + extension,
-                    job.image.mediaType(), job.image.data()).id();
-            Map<String, Object> merged = metadata(metadata);
-            merged.put("frontImageId", imageId.toString());
-            merged.put("frontImageAlt", job.imageAlt);
-            metadata = json.writeValueAsString(merged);
-        }
-        if (job.wordAudio != null) {
-            UUID wordAssetId = speech.store(job.speechRoute, job.wordAudioText,
-                    job.audioLocale, job.wordAudio).asset().id();
-            Map<String, Object> merged = metadata(metadata);
-            merged.put("frontAudioAssetId", wordAssetId.toString());
-            merged.put("frontAudioText", job.wordAudioText);
-            merged.put("frontAudioTargetId", job.speechRoute.modelId());
-            merged.put("frontAudioLocale", job.audioLocale);
-            if (job.exampleAudio != null) {
-                UUID exampleAssetId = speech.store(job.speechRoute, job.exampleAudioText,
-                        job.audioLocale, job.exampleAudio).asset().id();
-                merged.put("exampleAudioAssetId", exampleAssetId.toString());
-                merged.put("exampleAudioText", job.exampleAudioText);
+        try {
+            VocabCardSummary current = vocab.find(job.card.id());
+            if (!sameContent(current, job.card)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Card content changed after enrichment started; generate a fresh preview");
             }
-            metadata = json.writeValueAsString(merged);
+            String metadata = job.preview.metadata();
+            if (job.imageArtifact != null) {
+                TemporaryArtifact image = requiredArtifact(job, job.imageArtifact, IMAGE_CATEGORY);
+                String extension = switch (image.metadata().mediaType()) {
+                    case "image/jpeg" -> "jpg";
+                    case "image/webp" -> "webp";
+                    default -> "png";
+                };
+                UUID imageId = attachments.store("vocab-" + current.id() + "." + extension,
+                        image.metadata().mediaType(), image.data()).id();
+                Map<String, Object> merged = metadata(metadata);
+                merged.put("frontImageId", imageId.toString());
+                merged.put("frontImageAlt", job.imageAlt);
+                metadata = json.writeValueAsString(merged);
+            }
+            if (job.wordAudioArtifact != null) {
+                TemporaryArtifact wordArtifact = requiredArtifact(job, job.wordAudioArtifact,
+                        WORD_AUDIO_CATEGORY);
+                SpeechAudio wordAudio = new SpeechAudio(wordArtifact.data(),
+                        wordArtifact.metadata().mediaType(), job.wordAudioFormat);
+                UUID wordAssetId = speech.store(job.speechRoute, job.wordAudioText,
+                        job.audioLocale, wordAudio).asset().id();
+                Map<String, Object> merged = metadata(metadata);
+                merged.put("frontAudioAssetId", wordAssetId.toString());
+                merged.put("frontAudioText", job.wordAudioText);
+                merged.put("frontAudioTargetId", job.speechRoute.modelId());
+                merged.put("frontAudioLocale", job.audioLocale);
+                if (job.exampleAudioArtifact != null) {
+                    TemporaryArtifact exampleArtifact = requiredArtifact(job,
+                            job.exampleAudioArtifact, EXAMPLE_AUDIO_CATEGORY);
+                    SpeechAudio exampleAudio = new SpeechAudio(exampleArtifact.data(),
+                            exampleArtifact.metadata().mediaType(), job.exampleAudioFormat);
+                    UUID exampleAssetId = speech.store(job.speechRoute, job.exampleAudioText,
+                            job.audioLocale, exampleAudio).asset().id();
+                    merged.put("exampleAudioAssetId", exampleAssetId.toString());
+                    merged.put("exampleAudioText", job.exampleAudioText);
+                }
+                metadata = json.writeValueAsString(merged);
+            }
+            VocabCardSummary updated = vocab.update(current.id(), current.front(), current.back(), metadata,
+                    current.language(), current.deck(), current.disciplineId(), current.suspended(),
+                    current.productionEnabled());
+            cleanupAfterCompletion(job);
+            return updated;
+        } catch (RuntimeException exception) {
+            job.applying.set(false);
+            throw exception;
         }
-        VocabCardSummary updated = vocab.update(current.id(), current.front(), current.back(), metadata,
-                current.language(), current.deck(), current.disciplineId(), current.suspended(),
-                current.productionEnabled());
-        jobs.remove(id);
-        return updated;
     }
 
     void discard(UUID id) {
-        jobs.remove(id);
+        Job removed = jobs.remove(id);
+        if (removed != null) {
+            removed.release(jobSlots);
+            deleteArtifacts(removed);
+        }
+    }
+
+    TemporaryArtifact artifact(UUID jobId, UUID artifactId) {
+        evictExpired();
+        Job job = jobs.get(jobId);
+        if (job == null) throw notFound("Unknown or expired enrichment job " + jobId);
+        String category = job.category(artifactId);
+        if (category == null) throw notFound("No artifact " + artifactId + " for enrichment job " + jobId);
+        return artifacts.peek(scope(job, category), artifactId)
+                .orElseThrow(() -> notFound("Unknown or expired enrichment artifact " + artifactId));
     }
 
     private void generate(Job job) {
@@ -139,32 +196,69 @@ class VocabEnrichmentJobService {
             EnumSet<VocabEnrichmentField> textFields = EnumSet.copyOf(job.fields);
             textFields.remove(VocabEnrichmentField.IMAGE);
             textFields.remove(VocabEnrichmentField.AUDIO);
-            job.preview = textFields.isEmpty() ? unchanged(job.card) : coach.enrich(job.card, textFields);
+            VocabEnrichmentPreview preview = textFields.isEmpty()
+                    ? unchanged(job.card) : coach.enrich(job.card, textFields);
+            synchronized (job) {
+                if (!active(job)) return;
+                job.preview = preview;
+            }
             if (job.fields.contains(VocabEnrichmentField.IMAGE)) {
-                job.image = images.generate(ai.route(AiTask.IMAGE_GENERATION), imagePrompt(job.card));
-                job.imageAlt = "Mnemonic illustration for this vocabulary card";
+                GeneratedImage image = images.generate(ai.route(AiTask.IMAGE_GENERATION),
+                        imagePrompt(job.card));
+                TemporaryArtifactWrite write = new TemporaryArtifactWrite(
+                        "mnemonic." + imageExtension(image.mediaType()), image.mediaType(), image.data());
+                if (!publish(job, IMAGE_CATEGORY, write, metadata -> {
+                    job.imageArtifact = metadata;
+                    job.imageAlt = "Mnemonic illustration for this vocabulary card";
+                })) return;
             }
             if (job.fields.contains(VocabEnrichmentField.AUDIO)) {
-                job.speechRoute = ai.route(AiTask.TEXT_TO_SPEECH);
-                job.audioLocale = job.card.language() == com.northstar.core.study.VocabLanguage.CHINESE
+                AiRoute speechRoute = ai.route(AiTask.TEXT_TO_SPEECH);
+                String audioLocale = job.card.language() == com.northstar.core.study.VocabLanguage.CHINESE
                         ? "zh-CN" : "en-US";
-                job.wordAudioText = job.card.front();
-                job.wordAudio = speech.preview(job.speechRoute, job.wordAudioText, job.audioLocale);
-                job.exampleAudioText = example(job.preview.metadata());
-                if (job.exampleAudioText != null) {
-                    job.exampleAudio = speech.preview(job.speechRoute, job.exampleAudioText,
-                            job.audioLocale);
+                String wordAudioText = job.card.front();
+                SpeechAudio wordAudio = speech.preview(speechRoute, wordAudioText, audioLocale);
+                TemporaryArtifactWrite wordWrite = new TemporaryArtifactWrite(
+                        "word." + wordAudio.format(), wordAudio.mimeType(), wordAudio.data());
+                if (!publish(job, WORD_AUDIO_CATEGORY, wordWrite, metadata -> {
+                    job.speechRoute = speechRoute;
+                    job.audioLocale = audioLocale;
+                    job.wordAudioText = wordAudioText;
+                    job.wordAudioFormat = wordAudio.format();
+                    job.wordAudioArtifact = metadata;
+                })) return;
+                String exampleAudioText = example(preview.metadata());
+                if (exampleAudioText != null) {
+                    SpeechAudio exampleAudio = speech.preview(speechRoute, exampleAudioText,
+                            audioLocale);
+                    TemporaryArtifactWrite exampleWrite = new TemporaryArtifactWrite(
+                            "example." + exampleAudio.format(), exampleAudio.mimeType(),
+                            exampleAudio.data());
+                    if (!publish(job, EXAMPLE_AUDIO_CATEGORY, exampleWrite, metadata -> {
+                        job.exampleAudioText = exampleAudioText;
+                        job.exampleAudioFormat = exampleAudio.format();
+                        job.exampleAudioArtifact = metadata;
+                    })) return;
                 }
             }
-            job.status = VocabEnrichmentJobStatus.READY;
+            synchronized (job) {
+                if (!active(job)) return;
+                job.status = VocabEnrichmentJobStatus.READY;
+            }
         } catch (Exception exception) {
             log.warn("Vocabulary enrichment job {} failed for card {}", job.id, job.card.id(), exception);
-            job.error = userMessage(exception);
-            job.status = VocabEnrichmentJobStatus.FAILED;
+            synchronized (job) {
+                if (!active(job)) return;
+                job.clearArtifactReferences();
+                job.error = userMessage(exception);
+                job.status = VocabEnrichmentJobStatus.FAILED;
+            }
+            deleteArtifacts(job);
         }
     }
 
     private Job requiredReady(UUID id) {
+        evictExpired();
         Job job = jobs.get(id);
         if (job == null) throw new IllegalArgumentException("Unknown or expired enrichment job " + id);
         if (job.status != VocabEnrichmentJobStatus.READY) {
@@ -199,8 +293,93 @@ class VocabEnrichmentJobService {
     }
 
     private void evictExpired() {
-        Instant cutoff = Instant.now().minus(TTL);
-        jobs.values().removeIf(job -> job.createdAt.isBefore(cutoff));
+        Instant cutoff = Instant.now().minus(artifacts.retention());
+        jobs.forEach((id, job) -> {
+            if (job.createdAt.isBefore(cutoff) && jobs.remove(id, job)) {
+                job.release(jobSlots);
+                deleteArtifacts(job);
+            }
+        });
+    }
+
+    private boolean publish(Job job, String category, TemporaryArtifactWrite write,
+            Consumer<TemporaryArtifactMetadata> publisher) {
+        synchronized (job) {
+            if (!active(job)) return false;
+            TemporaryArtifactMetadata metadata = artifacts.put(scope(job, category), write);
+            if (!active(job)) {
+                artifacts.delete(scope(job, category), metadata.id());
+                return false;
+            }
+            publisher.accept(metadata);
+            return true;
+        }
+    }
+
+    private boolean active(Job job) {
+        return jobs.get(job.id) == job;
+    }
+
+    private TemporaryArtifact requiredArtifact(Job job, TemporaryArtifactMetadata metadata,
+            String category) {
+        return artifacts.peek(scope(job, category), metadata.id())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.GONE,
+                        "Enrichment preview expired; generate a fresh preview"));
+    }
+
+    private void cleanupAfterCompletion(Job job) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            cleanup(job);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == STATUS_COMMITTED) cleanup(job);
+                else job.applying.set(false);
+            }
+        });
+    }
+
+    private void cleanup(Job job) {
+        if (jobs.remove(job.id, job)) {
+            job.release(jobSlots);
+            deleteArtifacts(job);
+        }
+    }
+
+    private void deleteArtifacts(Job job) {
+        artifacts.deleteSession(OWNER_SCOPE, job.id.toString());
+    }
+
+    private TemporaryArtifactScope scope(Job job, String category) {
+        return new TemporaryArtifactScope(OWNER_SCOPE, job.id.toString(), category);
+    }
+
+    private VocabEnrichmentJobView view(Job job) {
+        return new VocabEnrichmentJobView(job.id, job.card.id(), job.card.front(), job.status,
+                job.preview, artifactView(job, job.imageArtifact), job.imageAlt,
+                artifactView(job, job.wordAudioArtifact), artifactView(job, job.exampleAudioArtifact),
+                job.speechRoute == null ? null : job.speechRoute.modelId(), job.audioLocale, job.error);
+    }
+
+    private VocabEnrichmentArtifactView artifactView(Job job, TemporaryArtifactMetadata metadata) {
+        if (metadata == null) return null;
+        return new VocabEnrichmentArtifactView(metadata.id(),
+                "/api/study/vocab/enrichment-jobs/" + job.id + "/artifacts/" + metadata.id(),
+                metadata.mediaType(), metadata.size());
+    }
+
+    private static ResponseStatusException notFound(String message) {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, message);
+    }
+
+    private static String imageExtension(String mediaType) {
+        return switch (mediaType) {
+            case "image/jpeg" -> "jpg";
+            case "image/webp" -> "webp";
+            default -> "png";
+        };
     }
 
     private static String imagePrompt(VocabCardSummary card) {
@@ -241,13 +420,17 @@ class VocabEnrichmentJobService {
         private final Instant createdAt = Instant.now();
         private volatile VocabEnrichmentJobStatus status = VocabEnrichmentJobStatus.PENDING;
         private volatile VocabEnrichmentPreview preview;
-        private volatile GeneratedImage image;
+        private final AtomicBoolean applying = new AtomicBoolean();
+        private final AtomicBoolean slotReleased = new AtomicBoolean();
+        private volatile TemporaryArtifactMetadata imageArtifact;
         private volatile String imageAlt;
-        private volatile com.northstar.core.ai.AiRoute speechRoute;
+        private volatile AiRoute speechRoute;
         private volatile String wordAudioText;
-        private volatile SpeechAudio wordAudio;
+        private volatile String wordAudioFormat;
+        private volatile TemporaryArtifactMetadata wordAudioArtifact;
         private volatile String exampleAudioText;
-        private volatile SpeechAudio exampleAudio;
+        private volatile String exampleAudioFormat;
+        private volatile TemporaryArtifactMetadata exampleAudioArtifact;
         private volatile String audioLocale;
         private volatile String error;
 
@@ -257,15 +440,25 @@ class VocabEnrichmentJobService {
             this.fields = fields;
         }
 
-        private VocabEnrichmentJobView view() {
-            return new VocabEnrichmentJobView(id, card.id(), card.front(), status, preview,
-                    image == null ? null : Base64.getEncoder().encodeToString(image.data()),
-                    image == null ? null : image.mediaType(), imageAlt,
-                    wordAudio == null ? null : Base64.getEncoder().encodeToString(wordAudio.data()),
-                    wordAudio == null ? null : wordAudio.mimeType(),
-                    exampleAudio == null ? null : Base64.getEncoder().encodeToString(exampleAudio.data()),
-                    exampleAudio == null ? null : exampleAudio.mimeType(),
-                    speechRoute == null ? null : speechRoute.modelId(), audioLocale, error);
+        private String category(UUID artifactId) {
+            if (matches(imageArtifact, artifactId)) return IMAGE_CATEGORY;
+            if (matches(wordAudioArtifact, artifactId)) return WORD_AUDIO_CATEGORY;
+            if (matches(exampleAudioArtifact, artifactId)) return EXAMPLE_AUDIO_CATEGORY;
+            return null;
+        }
+
+        private void clearArtifactReferences() {
+            imageArtifact = null;
+            wordAudioArtifact = null;
+            exampleAudioArtifact = null;
+        }
+
+        private void release(Semaphore slots) {
+            if (slotReleased.compareAndSet(false, true)) slots.release();
+        }
+
+        private static boolean matches(TemporaryArtifactMetadata metadata, UUID artifactId) {
+            return metadata != null && metadata.id().equals(artifactId);
         }
     }
 }

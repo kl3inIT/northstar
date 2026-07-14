@@ -676,7 +676,7 @@ function EnrichmentSheet({
   }
 
   const preview = job?.status === 'READY' ? job.preview : undefined
-  const hasPreview = Boolean(preview || job?.imageBase64 || job?.wordAudioBase64 || job?.exampleAudioBase64)
+  const hasPreview = Boolean(preview || job?.image || job?.wordAudio || job?.exampleAudio)
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -698,20 +698,20 @@ function EnrichmentSheet({
           ) : hasPreview ? (
             <div className="space-y-3 pb-4">
               <h3 className="text-sm font-semibold">Preview</h3>
-              {job?.imageBase64 && job.imageMediaType && (
-                <img src={`data:${job.imageMediaType};base64,${job.imageBase64}`} alt={job.imageAlt || 'Generated mnemonic for this vocabulary card'}
+              {job?.image && (
+                <img src={job.image.url} alt={job.imageAlt || 'Generated mnemonic for this vocabulary card'}
                   className="aspect-[4/3] w-full rounded-xl border object-cover" />
               )}
-              {job?.wordAudioBase64 && job.wordAudioMediaType && (
+              {job?.wordAudio && (
                 <MetadataSection title="Word audio">
                   <audio controls preload="metadata" className="w-full"
-                    src={`data:${job.wordAudioMediaType};base64,${job.wordAudioBase64}`} />
+                    src={job.wordAudio.url} />
                 </MetadataSection>
               )}
-              {job?.exampleAudioBase64 && job.exampleAudioMediaType && (
+              {job?.exampleAudio && (
                 <MetadataSection title="Example audio">
                   <audio controls preload="metadata" className="w-full"
-                    src={`data:${job.exampleAudioMediaType};base64,${job.exampleAudioBase64}`} />
+                    src={job.exampleAudio.url} />
                 </MetadataSection>
               )}
               {preview?.example && <MetadataSection title="Example"><p>{preview.example}</p></MetadataSection>}

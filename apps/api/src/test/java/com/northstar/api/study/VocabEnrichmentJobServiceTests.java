@@ -16,6 +16,7 @@ import com.northstar.core.ai.AiRoute;
 import com.northstar.core.ai.AiTask;
 import com.northstar.core.ai.GeneratedImage;
 import com.northstar.core.ai.ImageGenerationGateway;
+import com.northstar.core.artifact.TemporaryArtifactStore;
 import com.northstar.core.attachment.AttachmentService;
 import com.northstar.core.attachment.AttachmentView;
 import com.northstar.core.speech.SpeechAssetResult;
@@ -36,7 +37,10 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.task.AsyncTaskExecutor;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
+import com.northstar.api.artifact.TemporaryArtifactTestStores;
 
 class VocabEnrichmentJobServiceTests {
 
@@ -46,6 +50,7 @@ class VocabEnrichmentJobServiceTests {
     private final ImageGenerationGateway images = mock(ImageGenerationGateway.class);
     private final AttachmentService attachments = mock(AttachmentService.class);
     private final SpeechAssetService speech = mock(SpeechAssetService.class);
+    private final TemporaryArtifactStore artifacts = TemporaryArtifactTestStores.create();
     private final AsyncTaskExecutor executor = mock(AsyncTaskExecutor.class);
     private VocabEnrichmentJobService jobs;
     private VocabCardSummary card;
@@ -60,7 +65,7 @@ class VocabEnrichmentJobServiceTests {
             invocation.<Runnable>getArgument(0).run();
             return null;
         }).when(executor).execute(any(Runnable.class));
-        jobs = new VocabEnrichmentJobService(vocab, coach, ai, images, attachments, speech,
+        jobs = new VocabEnrichmentJobService(vocab, coach, ai, images, attachments, speech, artifacts,
                 executor, new ObjectMapper());
     }
 
@@ -72,7 +77,9 @@ class VocabEnrichmentJobServiceTests {
         VocabEnrichmentJobView ready = jobs.start(card.id(), Set.of(VocabEnrichmentField.IMAGE));
 
         assertThat(ready.status()).isEqualTo(VocabEnrichmentJobStatus.READY);
-        assertThat(ready.imageBase64()).isNotBlank();
+        assertThat(ready.image()).isNotNull();
+        assertThat(ready.image().url()).contains(ready.id().toString());
+        assertThat(jobs.artifact(ready.id(), ready.image().id()).data()).containsExactly(png);
         assertThat(ready.imageAlt()).doesNotContain(card.front());
         verify(attachments, never()).store(anyString(), anyString(), any());
 
@@ -88,6 +95,7 @@ class VocabEnrichmentJobServiceTests {
         verify(vocab).update(any(), anyString(), anyString(),
                 org.mockito.ArgumentMatchers.contains(attachmentId.toString()), any(), any(), any(),
                 any(Boolean.class), any(Boolean.class));
+        assertThat(artifacts.stats().currentEntries()).isZero();
     }
 
     @Test
@@ -142,7 +150,8 @@ class VocabEnrichmentJobServiceTests {
 
         VocabEnrichmentJobView ready = jobs.start(card.id(), Set.of(VocabEnrichmentField.AUDIO));
 
-        assertThat(ready.wordAudioBase64()).isNotBlank();
+        assertThat(ready.wordAudio()).isNotNull();
+        assertThat(jobs.artifact(ready.id(), ready.wordAudio().id()).data()).containsExactly(mp3);
         assertThat(ready.audioTargetId()).isEqualTo("edge-tts/en-US-Aria");
         verify(speech, never()).store(any(), anyString(), anyString(), any());
 
@@ -173,8 +182,77 @@ class VocabEnrichmentJobServiceTests {
 
         VocabEnrichmentJobView ready = jobs.start(card.id(), Set.of(VocabEnrichmentField.AUDIO));
 
-        assertThat(ready.exampleAudioBase64()).isNotBlank();
+        assertThat(ready.exampleAudio()).isNotNull();
         verify(speech).preview(any(), eq("We assign each request once."), anyString());
+    }
+
+    @Test
+    void discardRemovesGeneratedArtifacts() {
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10};
+        when(images.generate(any(), anyString())).thenReturn(new GeneratedImage(png, "image/png"));
+        VocabEnrichmentJobView ready = jobs.start(card.id(), Set.of(VocabEnrichmentField.IMAGE));
+
+        jobs.discard(ready.id());
+
+        assertThat(artifacts.stats().currentEntries()).isZero();
+        assertThatThrownBy(() -> jobs.artifact(ready.id(), ready.image().id()))
+                .hasMessageContaining("Unknown or expired enrichment job");
+    }
+
+    @Test
+    void failureDeletesArtifactsPublishedEarlierInTheJob() {
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10};
+        when(images.generate(any(), anyString())).thenReturn(new GeneratedImage(png, "image/png"));
+        when(speech.preview(any(), anyString(), anyString()))
+                .thenThrow(new IllegalStateException("tts unavailable"));
+
+        VocabEnrichmentJobView failed = jobs.start(card.id(),
+                Set.of(VocabEnrichmentField.IMAGE, VocabEnrichmentField.AUDIO));
+
+        assertThat(failed.status()).isEqualTo(VocabEnrichmentJobStatus.FAILED);
+        assertThat(failed.image()).isNull();
+        assertThat(artifacts.stats().currentEntries()).isZero();
+    }
+
+    @Test
+    void applyKeepsArtifactsUntilTheTransactionCommits() {
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 13, 10, 26, 10};
+        when(images.generate(any(), anyString())).thenReturn(new GeneratedImage(png, "image/png"));
+        when(attachments.store(anyString(), anyString(), any())).thenReturn(new AttachmentView(
+                UUID.randomUUID(), "image.png", "image/png", png.length, "hash", Instant.now()));
+        when(vocab.update(any(), anyString(), anyString(), anyString(), any(), any(), any(),
+                any(Boolean.class), any(Boolean.class))).thenReturn(card);
+        VocabEnrichmentJobView ready = jobs.start(card.id(), Set.of(VocabEnrichmentField.IMAGE));
+
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            jobs.apply(ready.id());
+            assertThat(artifacts.stats().currentEntries()).isEqualTo(1);
+            assertThat(jobs.get(ready.id()).status()).isEqualTo(VocabEnrichmentJobStatus.READY);
+
+            TransactionSynchronizationManager.getSynchronizations().forEach(
+                    synchronization -> synchronization.afterCompletion(
+                            TransactionSynchronization.STATUS_COMMITTED));
+
+            assertThat(artifacts.stats().currentEntries()).isZero();
+            assertThatThrownBy(() -> jobs.get(ready.id())).hasMessageContaining("Unknown or expired");
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void activeJobRegistryIsBoundedBeforeMoreProviderWorkStarts() {
+        VocabEnrichmentPreview preview = new VocabEnrichmentPreview("Example", List.of(), List.of(),
+                List.of(), null, null, null, "{\"example\":\"Example\"}");
+        when(coach.enrich(any(), any())).thenReturn(preview);
+
+        for (int index = 0; index < 100; index++) {
+            jobs.start(card.id(), Set.of(VocabEnrichmentField.EXAMPLE));
+        }
+
+        assertThatThrownBy(() -> jobs.start(card.id(), Set.of(VocabEnrichmentField.EXAMPLE)))
+                .hasMessageContaining("Too many enrichment jobs");
     }
 
     private static VocabCardSummary card() {

@@ -30,9 +30,11 @@ import com.northstar.core.study.VocabService;
 import com.northstar.core.study.WritingFeedbackSummary;
 import com.northstar.core.study.WritingService;
 import com.northstar.core.study.WavAudio;
+import com.northstar.core.artifact.TemporaryArtifact;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.DateTimeException;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -41,6 +43,7 @@ import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.ObjectProvider;
@@ -231,6 +234,24 @@ class StudyController {
     @Operation(operationId = "discardVocabEnrichmentJob")
     void discardVocabEnrichmentJob(@PathVariable("jobId") UUID jobId) {
         enrichmentJobs.discard(jobId);
+    }
+
+    @GetMapping("/vocab/enrichment-jobs/{jobId}/artifacts/{artifactId}")
+    @Operation(operationId = "serveVocabEnrichmentArtifact")
+    ResponseEntity<byte[]> vocabEnrichmentArtifact(@PathVariable("jobId") UUID jobId,
+            @PathVariable("artifactId") UUID artifactId) {
+        TemporaryArtifact artifact = enrichmentJobs.artifact(jobId, artifactId);
+        ContentDisposition disposition = ContentDisposition.inline()
+                .filename(artifact.metadata().filename(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .header("X-Content-Type-Options", "nosniff")
+                .header("Content-Security-Policy", "sandbox; default-src 'none'")
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .contentLength(artifact.metadata().size())
+                .contentType(MediaType.parseMediaType(artifact.metadata().mediaType()))
+                .body(artifact.data());
     }
 
     @PostMapping("/vocab")
