@@ -498,6 +498,9 @@ export type PromptInputProps = Omit<
   globalDrop?: boolean;
   // Render a hidden input with given name and keep it in sync for native form posts. Default false.
   syncHiddenInput?: boolean;
+  // Preserve blob URLs for upload-only consumers. Default true keeps the
+  // portable data-URL behavior expected by existing PromptInput consumers.
+  convertBlobUrlsToDataUrls?: boolean;
   // Minimal constraints
   maxFiles?: number;
   // bytes
@@ -518,6 +521,7 @@ export const PromptInput = ({
   multiple,
   globalDrop,
   syncHiddenInput,
+  convertBlobUrlsToDataUrls = true,
   maxFiles,
   maxFileSize,
   onError,
@@ -843,20 +847,21 @@ export const PromptInput = ({
       }
 
       try {
-        // Convert blob URLs to data URLs asynchronously
-        const convertedFiles: (FileUIPart & { id: string })[] = await Promise.all(
-          files.map(async (item) => {
-            if (item.url?.startsWith("blob:")) {
-              const dataUrl = await convertBlobUrlToDataUrl(item.url);
-              // If conversion failed, keep the original blob URL
-              return {
-                ...item,
-                url: dataUrl ?? item.url,
-              };
-            }
-            return item;
-          })
-        );
+        const convertedFiles: (FileUIPart & { id: string })[] = convertBlobUrlsToDataUrls
+          ? await Promise.all(
+              files.map(async (item) => {
+                if (item.url?.startsWith("blob:")) {
+                  const dataUrl = await convertBlobUrlToDataUrl(item.url);
+                  // If conversion failed, keep the original blob URL
+                  return {
+                    ...item,
+                    url: dataUrl ?? item.url,
+                  };
+                }
+                return item;
+              })
+            )
+          : files;
 
         const result = onSubmit({ files: convertedFiles, text }, event);
 
@@ -882,7 +887,7 @@ export const PromptInput = ({
         // Don't clear on error - user may want to retry
       }
     },
-    [usingProvider, controller, files, onSubmit, clear]
+    [usingProvider, controller, files, onSubmit, clear, convertBlobUrlsToDataUrls]
   );
 
   // Render with or without local provider

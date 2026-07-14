@@ -1,7 +1,8 @@
 package com.northstar.core.attachment;
 
-import java.nio.ByteBuffer;
-import java.nio.charset.CharacterCodingException;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -115,12 +116,15 @@ public final class AttachmentTypePolicy {
                 throw new IllegalArgumentException("Text attachment contains binary data");
             }
         }
-        try {
-            StandardCharsets.UTF_8.newDecoder()
-                    .onMalformedInput(CodingErrorAction.REPORT)
-                    .onUnmappableCharacter(CodingErrorAction.REPORT)
-                    .decode(ByteBuffer.wrap(bytes));
-        } catch (CharacterCodingException e) {
+        try (var reader = new InputStreamReader(new ByteArrayInputStream(bytes),
+                StandardCharsets.UTF_8.newDecoder()
+                        .onMalformedInput(CodingErrorAction.REPORT)
+                        .onUnmappableCharacter(CodingErrorAction.REPORT))) {
+            char[] buffer = new char[4096];
+            while (reader.read(buffer) != -1) {
+                // Incremental decode validates UTF-8 without a full-size CharBuffer.
+            }
+        } catch (IOException e) {
             throw new IllegalArgumentException("Text attachment must use UTF-8", e);
         }
     }

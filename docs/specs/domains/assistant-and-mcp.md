@@ -241,6 +241,7 @@ as the API.
 - `core.search`
 - `apps/mcp`
 - `apps/api.assistant`
+- `apps/api.attachment`
 - `apps/api.speech`
 - `apps/worker`
 - `core.ai`

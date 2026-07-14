@@ -670,17 +670,17 @@ function AssistantChat({
     const trimmed = message.text.trim()
     const files = message.files
     if (!trimmed && files.length === 0) return
-    for (const image of files.filter((file) => file.mediaType?.startsWith('image/'))) {
-      const blob = await fetch(image.url).then((response) => response.blob())
-      if (blob.size > 8 * 1024 * 1024) {
-        toast.error('Chat images must be under 8MB.')
-        throw new Error('image too large')
-      }
-    }
     submitLock.current = true
-    setIsPreparing(true)
-    setAttachmentStates(Object.fromEntries(files.map((file) => [file.id, 'UPLOADING'])))
     try {
+      for (const image of files.filter((file) => file.mediaType?.startsWith('image/'))) {
+        const blob = await fetch(image.url).then((response) => response.blob())
+        if (blob.size > 8 * 1024 * 1024) {
+          toast.error('Chat images must be under 8MB.')
+          throw new Error('image too large')
+        }
+      }
+      setIsPreparing(true)
+      setAttachmentStates(Object.fromEntries(files.map((file) => [file.id, 'UPLOADING'])))
       let uploaded: UploadedAttachment<(typeof files)[number]>[]
       try {
         uploaded = await Promise.all(files.map(uploadAttachmentPart))
@@ -745,6 +745,7 @@ function AssistantChat({
       onSubmit={onSubmit}
       className={PILL_INPUT}
       accept={ASSISTANT_FILE_ACCEPT}
+      convertBlobUrlsToDataUrls={false}
       globalDrop
       multiple
       maxFiles={3}
