@@ -24,3 +24,17 @@ The app deliberately uses Cupertino presentation on Android and Web as well as
 iOS so its iPhone-first direction remains reviewable from Windows. Layout
 decisions are still based on available constraints, text scale, and input
 capabilities rather than device labels.
+
+## Branding assets
+
+The source artwork lives under `assets/branding/`. Regenerate every platform
+icon and native launch screen after changing those files:
+
+```powershell
+dart run flutter_launcher_icons -f flutter_launcher_icons.yaml
+dart run flutter_native_splash:create --path flutter_native_splash.yaml
+```
+
+The launcher configuration emits opaque standard icons, Android adaptive and
+themed icons, iOS 18 dark/tinted variants, and Flutter Web icons from the same
+Northstar compass mark.

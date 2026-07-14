@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart';
+import 'package:northstar/ui/core/design_system/northstar_brand_mark.dart';
 import 'package:northstar/ui/core/design_system/northstar_tokens.dart';
 import 'package:northstar/ui/features/auth/view_models/auth_view_model.dart';
 
@@ -41,11 +42,7 @@ class _LoginViewState extends State<LoginView> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Icon(
-                          CupertinoIcons.sparkles,
-                          size: 44,
-                          color: NorthstarColors.accent.resolveFrom(context),
-                        ),
+                        const Center(child: NorthstarBrandMark()),
                         const SizedBox(height: NorthstarSpacing.md),
                         const Text(
                           'Welcome to Northstar',
