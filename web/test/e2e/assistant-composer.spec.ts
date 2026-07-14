@@ -23,6 +23,8 @@ async function mockAssistant(page: Page) {
     if (message.type() === 'error') browserErrors.push(message.text())
   })
   let chatStarted = false
+  let chatBody: Record<string, unknown> | undefined
+  let preparationReady = false
   let finishChat: (() => void) | undefined
   const releaseChat = new Promise<void>((resolve) => {
     finishChat = resolve
@@ -39,6 +41,7 @@ async function mockAssistant(page: Page) {
     requests.push(`${requestRoute.request().method()} ${url.pathname}`)
 
     if (url.pathname === '/api/assistant/chat') {
+      chatBody = requestRoute.request().postDataJSON() as Record<string, unknown>
       chatStarted = true
       await releaseChat
       await requestRoute.fulfill({
@@ -68,7 +71,24 @@ async function mockAssistant(page: Page) {
     }
 
     let response: unknown
-    if (url.pathname === '/api/auth/me') {
+    if (url.pathname === '/api/files' && requestRoute.request().method() === 'POST') {
+      await requestRoute.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: '00000000-0000-0000-0000-000000000123',
+          filename: 'brief.txt',
+          mimeType: 'text/plain',
+          sizeBytes: 34,
+        }),
+      })
+      return
+    } else if (url.pathname === '/api/files/index-status') {
+      response = [{
+        attachmentId: '00000000-0000-0000-0000-000000000123',
+        status: preparationReady ? 'READY' : 'PROCESSING',
+      }]
+    } else if (url.pathname === '/api/auth/me') {
       response = { authenticated: true, username: 'playwright' }
     } else if (url.pathname === '/api/auth/csrf') {
       await requestRoute.fulfill({
@@ -116,6 +136,8 @@ async function mockAssistant(page: Page) {
 
   return {
     chatStarted: () => chatStarted,
+    chatBody: () => chatBody,
+    releasePreparation: () => { preparationReady = true },
     finishChat: () => finishChat?.(),
     diagnostics: () => ({ requests, unexpectedRequests, browserErrors }),
   }
@@ -134,6 +156,37 @@ test('clears the composer as soon as an Assistant turn is dispatched', async ({ 
 
   await expect.poll(chat.chatStarted).toBe(true)
   await expect(composer).toHaveValue('')
+
+  chat.finishChat()
+  await expect(page.getByText('Done')).toBeVisible()
+  expect(chat.diagnostics().unexpectedRequests).toEqual([])
+  expect(chat.diagnostics().browserErrors).toEqual([])
+})
+
+test('keeps a document visible while preparing and dispatches it exactly once when ready', async ({ page }) => {
+  const chat = await mockAssistant(page)
+  await page.goto('/assistant')
+
+  const composer = page.getByPlaceholder('Message Northstar…')
+  await composer.waitFor({ state: 'visible' })
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'brief.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('Aurora launches on July 20.'),
+  })
+  await composer.fill('When does Aurora launch?')
+  await composer.press('Enter')
+
+  await expect(page.getByText('Preparing')).toBeVisible()
+  expect(chat.chatStarted()).toBe(false)
+
+  chat.releasePreparation()
+  await expect.poll(chat.chatStarted).toBe(true)
+  expect(chat.chatBody()).toMatchObject({
+    message: 'When does Aurora launch?',
+    attachmentIds: ['00000000-0000-0000-0000-000000000123'],
+  })
+  expect(chat.diagnostics().requests.filter((request) => request === 'POST /api/assistant/chat')).toHaveLength(1)
 
   chat.finishChat()
   await expect(page.getByText('Done')).toBeVisible()

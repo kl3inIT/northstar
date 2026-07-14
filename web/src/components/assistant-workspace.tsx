@@ -34,6 +34,7 @@ import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 're
 import { toast } from 'sonner'
 import {
   Attachment,
+  AttachmentInfo,
   AttachmentPreview,
   AttachmentRemove,
   Attachments,
@@ -119,7 +120,13 @@ import type {
   ConversationSummary as ApiConversationSummary,
   HistoryMessage as ApiHistoryMessage,
 } from '@/lib/hey-api'
-import { fileUrl, uploadFile } from '@/lib/files-api'
+import {
+  AttachmentPreparationError,
+  uploadAttachmentPart,
+  waitForAttachmentPreparation,
+  type AttachmentPreparationState,
+  type UploadedAttachment,
+} from '@/lib/files-api'
 import { apiFetch } from '@/lib/http'
 import {
   useChatAiModels,
@@ -209,6 +216,22 @@ const PILL_INPUT =
   'w-full [&_[data-slot=input-group]]:rounded-3xl [&_[data-slot=input-group]]:!border-transparent ' +
   '[&_[data-slot=input-group]]:bg-muted/60 [&_[data-slot=input-group]]:shadow-none ' +
   '[&_[data-slot=input-group]]:!ring-0'
+
+const ASSISTANT_FILE_ACCEPT = [
+  'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+  'application/pdf', 'text/plain', 'text/markdown', 'text/csv', 'text/html',
+  'application/json', 'application/xml', 'application/rtf', 'application/msword',
+  'application/vnd.ms-powerpoint', 'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.txt', '.md', '.markdown', '.rtf', '.doc', '.docx', '.ppt', '.pptx',
+  '.csv', '.xls', '.xlsx', '.html', '.htm', '.json', '.xml',
+  '.c', '.cc', '.cpp', '.cs', '.css', '.dart', '.go', '.gradle', '.graphql',
+  '.h', '.hpp', '.java', '.js', '.jsx', '.kt', '.kts', '.php', '.properties',
+  '.py', '.rb', '.rs', '.scala', '.scss', '.sh', '.sql', '.svelte', '.swift',
+  '.toml', '.ts', '.tsx', '.vue', '.yaml', '.yml', '.ps1',
+].join(',')
 
 // The server always populates every field; the generated schema marks them
 // optional (no `required` in the contract), so assert them present here.
@@ -628,7 +651,10 @@ function AssistantChat({
 
   const [text, setText] = useState('')
   const submitLock = useRef(false)
-  const [isUploading, setIsUploading] = useState(false)
+  const preparationAbort = useRef<AbortController | null>(null)
+  const [isPreparing, setIsPreparing] = useState(false)
+  const [attachmentStates, setAttachmentStates] = useState<Record<string, AttachmentPreparationState>>({})
+  useEffect(() => () => preparationAbort.current?.abort(), [])
   const busy = status === 'submitted' || status === 'streaming'
   const latestMessage = messages.at(-1)
   const showWaiting = busy && (
@@ -642,30 +668,74 @@ function AssistantChat({
     // the first submission owns them.
     if (submitLock.current || busy) throw new Error('Assistant turn already in progress')
     const trimmed = message.text.trim()
-    const images = message.files.filter((f) => f.mediaType?.startsWith('image/'))
-    if (!trimmed && images.length === 0) return
+    const files = message.files
+    if (!trimmed && files.length === 0) return
+    for (const image of files.filter((file) => file.mediaType?.startsWith('image/'))) {
+      const blob = await fetch(image.url).then((response) => response.blob())
+      if (blob.size > 8 * 1024 * 1024) {
+        toast.error('Chat images must be under 8MB.')
+        throw new Error('image too large')
+      }
+    }
     submitLock.current = true
-    setIsUploading(true)
+    setIsPreparing(true)
+    setAttachmentStates(Object.fromEntries(files.map((file) => [file.id, 'UPLOADING'])))
     try {
-      let uploaded: FileUIPart[]
+      let uploaded: UploadedAttachment<(typeof files)[number]>[]
       try {
-        uploaded = await Promise.all(images.map(uploadImage))
+        uploaded = await Promise.all(files.map(uploadAttachmentPart))
       } catch {
-        toast.error('Image upload failed — try again.')
+        setAttachmentStates(Object.fromEntries(files.map((file) => [file.id, 'FAILED'])))
+        toast.error('Attachment upload failed — check the file type and try again.')
         throw new Error('upload failed') // keeps the composer content for retry
       }
-      setIsUploading(false)
+      const localIdByAttachmentId = new Map(uploaded.map((item) => [item.meta.id, item.part.id]))
+      const documentIds = uploaded
+        .filter((item) => !item.meta.mimeType.startsWith('image/'))
+        .map((item) => item.meta.id)
+      setAttachmentStates(Object.fromEntries(uploaded.map((item) => [
+        item.part.id,
+        item.meta.mimeType.startsWith('image/') ? 'READY' : 'PENDING',
+      ])))
+      if (documentIds.length > 0) {
+        preparationAbort.current?.abort()
+        const controller = new AbortController()
+        preparationAbort.current = controller
+        try {
+          await waitForAttachmentPreparation(documentIds, {
+            signal: controller.signal,
+            onStatus: (statuses) => setAttachmentStates((current) => {
+              const next = { ...current }
+              statuses.forEach((item) => {
+                const localId = item.attachmentId && localIdByAttachmentId.get(item.attachmentId)
+                if (localId && item.status) next[localId] = item.status
+              })
+              return next
+            }),
+          })
+        } catch (error) {
+          const message = error instanceof AttachmentPreparationError || error instanceof Error
+            ? error.message
+            : 'Document preparation failed.'
+          toast.error(message)
+          throw error
+        } finally {
+          if (preparationAbort.current === controller) preparationAbort.current = null
+        }
+      }
+      setIsPreparing(false)
       // sendMessage synchronously moves the submitted content into the transcript.
       // Do not keep the composer waiting for the model/tool stream to finish.
-      const turn = sendMessage({ text: trimmed, files: uploaded })
+      const turn = sendMessage({ text: trimmed, files: uploaded.map((item) => item.part) })
       setText('')
+      setAttachmentStates({})
       const releaseSubmitLock = () => {
         submitLock.current = false
       }
       void turn.then(releaseSubmitLock, releaseSubmitLock)
     } catch (error) {
       submitLock.current = false
-      setIsUploading(false)
+      setIsPreparing(false)
       throw error
     }
   }
@@ -674,23 +744,23 @@ function AssistantChat({
     <PromptInput
       onSubmit={onSubmit}
       className={PILL_INPUT}
-      accept="image/*"
+      accept={ASSISTANT_FILE_ACCEPT}
       globalDrop
       multiple
       maxFiles={3}
-      maxFileSize={8 * 1024 * 1024}
+      maxFileSize={25 * 1024 * 1024}
       onError={(err) =>
         toast.error(
           err.code === 'max_file_size'
-            ? 'Images must be under 8MB.'
+            ? 'Documents must be under 25MB; chat images under 8MB.'
             : err.code === 'max_files'
-              ? 'Up to 3 images per message.'
-              : 'Only images can be attached.',
+              ? 'Up to 3 attachments per message.'
+              : 'Use a common image, PDF, document, spreadsheet, text, or source-code file.',
         )
       }
     >
       <PromptInputHeader>
-        <AttachmentStrip />
+        <AttachmentStrip states={attachmentStates} />
       </PromptInputHeader>
       <PromptInputBody>
         <PromptInputTextarea
@@ -706,7 +776,7 @@ function AssistantChat({
           <PromptInputActionMenu>
             <PromptInputActionMenuTrigger aria-label="Add attachment" tooltip="Add attachment" />
             <PromptInputActionMenuContent>
-              <PromptInputActionAddAttachments label="Add images" />
+              <PromptInputActionAddAttachments label="Add files" />
               <PromptInputActionAddScreenshot />
             </PromptInputActionMenuContent>
           </PromptInputActionMenu>
@@ -726,9 +796,9 @@ function AssistantChat({
         <div className="flex items-center gap-1">
           <MicButton value={text} onChange={setText} compact />
           <PromptInputSubmit
-            status={isUploading ? 'submitted' : status}
+            status={isPreparing ? 'submitted' : status}
             onStop={stop}
-            disabled={isUploading}
+            disabled={isPreparing}
             className="rounded-full"
           />
         </div>
@@ -1256,28 +1326,36 @@ function truncate(value: string, max = 100): string {
   return value.length <= max ? value : `${value.slice(0, max - 1)}…`
 }
 
-/**
- * Stores one composer image in the attachment vault (V16) and rewrites its
- * part to the durable /api/files URL the api and history both understand.
- */
-async function uploadImage(file: FileUIPart): Promise<FileUIPart> {
-  const blob = await fetch(file.url).then((r) => r.blob())
-  const meta = await uploadFile(blob, file.filename ?? 'image')
-  return { ...file, url: fileUrl(meta.id) }
-}
-
-/** Thumbnails of images queued for the next message, each removable. */
-function AttachmentStrip() {
+/** Compact queued-file chips with observable worker preparation state. */
+function AttachmentStrip({ states }: { states: Record<string, AttachmentPreparationState> }) {
   const attachments = usePromptInputAttachments()
   if (attachments.files.length === 0) return null
   return (
-    <Attachments variant="grid" className="ml-0 w-full justify-start px-3 pt-3">
-      {attachments.files.map((file) => (
-        <Attachment key={file.id} data={file} onRemove={() => attachments.remove(file.id)} className="size-14">
-          <AttachmentPreview />
-          <AttachmentRemove label={`Remove ${file.filename ?? 'image'}`} className="-right-1.5 -top-1.5" />
-        </Attachment>
-      ))}
+    <Attachments variant="inline" className="ml-0 w-full justify-start px-3 pt-3">
+      {attachments.files.map((file) => {
+        const state = states[file.id]
+        const preparing = state === 'UPLOADING' || state === 'PENDING' || state === 'PROCESSING'
+        const failed = state === 'FAILED' || state === 'UNSUPPORTED'
+        return (
+          <Attachment key={file.id} data={file} onRemove={() => attachments.remove(file.id)}>
+            <AttachmentPreview />
+            <AttachmentInfo className="max-w-40" />
+            {state && (
+              <span className={cn(
+                'flex items-center gap-1 text-[11px]',
+                failed ? 'text-destructive' : 'text-muted-foreground',
+              )}>
+                {preparing && <Loader2 className="size-3 animate-spin" aria-hidden="true" />}
+                {state === 'READY' && <CheckCircle2 className="size-3 text-emerald-600" aria-hidden="true" />}
+                {failed && <XCircle className="size-3" aria-hidden="true" />}
+                {preparing ? (state === 'UPLOADING' ? 'Uploading' : 'Preparing')
+                  : state === 'READY' ? 'Ready' : 'Failed'}
+              </span>
+            )}
+            <AttachmentRemove label={`Remove ${file.filename ?? 'attachment'}`} className="size-5" />
+          </Attachment>
+        )
+      })}
     </Attachments>
   )
 }
