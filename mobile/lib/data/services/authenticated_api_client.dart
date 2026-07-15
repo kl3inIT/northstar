@@ -24,6 +24,11 @@ class AuthenticatedApiClient {
     this._onUnauthorized,
   );
 
+  // Bounds time-to-response-headers so a stalled connection cannot hang the UI
+  // forever. Only covers establishing the response; streamed bodies (SSE) apply
+  // their own longer timeout on the stream.
+  static const _connectTimeout = Duration(seconds: 60);
+
   final http.Client _client;
   final String? Function() _accessToken;
   final Future<String?> Function() _refreshAccessToken;
@@ -38,7 +43,9 @@ class AuthenticatedApiClient {
       throw const AuthenticatedApiUnauthorizedException();
     }
 
-    var response = await _client.send(createRequest(token));
+    var response = await _client
+        .send(createRequest(token))
+        .timeout(_connectTimeout);
     if (response.statusCode != 401) {
       return response;
     }
@@ -48,7 +55,9 @@ class AuthenticatedApiClient {
       _onUnauthorized();
       throw const AuthenticatedApiUnauthorizedException();
     }
-    response = await _client.send(createRequest(token));
+    response = await _client
+        .send(createRequest(token))
+        .timeout(_connectTimeout);
     if (response.statusCode == 401) {
       await response.stream.drain<void>();
       _onUnauthorized();
