@@ -75,8 +75,16 @@ class AssistantViewModel extends ChangeNotifier {
     _messages.clear();
     _lastPrompt = null;
     _loadError = null;
-    await _loadModels(_conversationId!);
     notifyListeners();
+    // Mirror initialize()/selectConversation(): a failed model load must surface
+    // as _loadError, not an unhandled async exception that breaks the UI.
+    try {
+      await _loadModels(_conversationId!);
+    } on Object catch (error) {
+      _loadError = _messageFor(error);
+    } finally {
+      notifyListeners();
+    }
   }
 
   Future<void> selectConversation(String id) async {
