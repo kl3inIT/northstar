@@ -65,6 +65,7 @@ export function useRealtimeDictation(
   const finishTimerRef = useRef<number | null>(null)
   const baseRef = useRef('')
   const segRef = useRef('')
+  const mountedRef = useRef(true)
 
   function cleanup() {
     if (timerRef.current !== null) window.clearInterval(timerRef.current)
@@ -87,15 +88,21 @@ export function useRealtimeDictation(
       const res = await apiFetch('/api/capture/realtime-session', { method: 'POST' })
       if (!res.ok) throw new Error(`mint failed: ${res.status}`)
       const { clientSecret, websocketUrl } = (await res.json()) as { clientSecret: string; websocketUrl: string }
+      // The host may unmount mid-connect; bail before prompting for the mic so a
+      // late-resolving start() can't wire up resources the unmount teardown
+      // already ran past. Every guard after a resource is acquired calls cleanup.
+      if (!mountedRef.current) return
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
+      if (!mountedRef.current) { cleanup(); return }
       // 24kHz context ==> the worklet's PCM already matches the session format.
       const ctx = new AudioContext({ sampleRate: 24000 })
       ctxRef.current = ctx
       await ctx.audioWorklet.addModule(
         URL.createObjectURL(new Blob([WORKLET_SRC], { type: 'text/javascript' })),
       )
+      if (!mountedRef.current) { cleanup(); return }
 
       // Browser WebSockets cannot set headers; the ephemeral secret rides as a
       // subprotocol (the only variant OpenAI accepts — probed, not guessed).
@@ -164,9 +171,17 @@ export function useRealtimeDictation(
   }
 
   // Release the mic, AudioContext, WebSocket and timers if the host unmounts
-  // mid-dictation (route change, composer/popover closed). `cleanup` only closes
-  // over refs and stable setters, so capturing the first-render copy is safe.
-  useEffect(() => cleanup, [])
+  // mid-dictation (route change, composer/popover closed), and mark the hook
+  // unmounted so an in-flight start() bails instead of acquiring late resources.
+  // `cleanup` only closes over refs and stable setters, so the first-render copy
+  // is safe to capture.
+  useEffect(
+    () => () => {
+      mountedRef.current = false
+      cleanup()
+    },
+    [],
+  )
 
   return { state, seconds, start, stop }
 }
