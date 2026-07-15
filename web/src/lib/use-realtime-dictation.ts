@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { apiFetch } from './http'
 
 /**
@@ -162,6 +162,11 @@ export function useRealtimeDictation(
       cleanup()
     }
   }
+
+  // Release the mic, AudioContext, WebSocket and timers if the host unmounts
+  // mid-dictation (route change, composer/popover closed). `cleanup` only closes
+  // over refs and stable setters, so capturing the first-render copy is safe.
+  useEffect(() => cleanup, [])
 
   return { state, seconds, start, stop }
 }
