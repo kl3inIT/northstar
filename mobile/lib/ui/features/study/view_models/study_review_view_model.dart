@@ -55,13 +55,21 @@ class StudyReviewViewModel extends ChangeNotifier {
     await load();
   }
 
+  int _loadToken = 0;
+
   Future<void> load() async {
     if (_submitting) return;
+    // Guard against overlapping loads (e.g. rapid language switches): only the
+    // most recent load applies its result, so an earlier one can't resolve last
+    // and overwrite the queue with a stale language.
+    final token = ++_loadToken;
     _phase = StudyReviewPhase.loading;
     _errorMessage = null;
     notifyListeners();
     try {
-      _cards = await _repository.reviewQueue(language: _language);
+      final cards = await _repository.reviewQueue(language: _language);
+      if (token != _loadToken) return;
+      _cards = cards;
       _index = 0;
       _revealed = false;
       for (final rating in VocabRating.values) {
@@ -69,6 +77,7 @@ class StudyReviewViewModel extends ChangeNotifier {
       }
       _phase = StudyReviewPhase.ready;
     } on Object catch (error) {
+      if (token != _loadToken) return;
       _phase = StudyReviewPhase.error;
       _errorMessage = _messageFor(error);
     }
