@@ -7,10 +7,11 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * Two-layer request-rate limiter for the MCP endpoint: a global bucket (the
- * DDoS backstop) checked first, then a per-client-IP bucket. Global-first so a
- * flood from many IPs still trips the global limit; per-IP so one client cannot
- * starve everyone else.
+ * Two-layer request-rate limiter for the MCP endpoint: a per-client-IP bucket
+ * checked first, then a global bucket (the DDoS backstop). Per-IP first so a
+ * single rate-limited IP cannot drain the shared global budget and starve
+ * everyone else; the global bucket is still consumed by every request that
+ * clears its per-IP limit, so a flood spread across many IPs still trips it.
  *
  * <p>The per-IP map is a bounded access-ordered LRU: it can never exceed
  * {@code maxTrackedIps} regardless of workload, so a spray of distinct source
@@ -35,9 +36,6 @@ public class McpRateLimiter {
     /** null = allowed; non-null = rejected, with which limit and the retry-after seconds. */
     public @Nullable Rejection check(String ip) {
         long now = System.nanoTime();
-        if (!global.tryConsume(now)) {
-            return new Rejection("global", global.retryAfterSeconds(now));
-        }
         TokenBucket bucket;
         // LinkedHashMap is not thread-safe and access-order reordering mutates on
         // get, so guard get+put together; the eldest entry is evicted on insert.
@@ -48,8 +46,13 @@ public class McpRateLimiter {
                 perIp.put(ip, bucket);
             }
         }
+        // Enforce the per-IP limit before touching the global bucket, so a
+        // request that will be rejected here never burns a shared global token.
         if (!bucket.tryConsume(now)) {
             return new Rejection("ip", bucket.retryAfterSeconds(now));
+        }
+        if (!global.tryConsume(now)) {
+            return new Rejection("global", global.retryAfterSeconds(now));
         }
         return null;
     }

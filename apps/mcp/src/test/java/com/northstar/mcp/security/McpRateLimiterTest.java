@@ -40,6 +40,25 @@ class McpRateLimiterTest {
     }
 
     @Test
+    void rejectedIpRequestsDoNotDrainGlobalBudget() {
+        // One IP capped at 1/window against a global budget of 2. Once the
+        // attacker's per-IP bucket is empty, its further (rejected) requests must
+        // not consume global tokens, so a second IP can still be served.
+        McpRateLimiter limiter = new McpRateLimiter(props(2, 1));
+
+        assertThat(limiter.check("attacker")).isNull(); // 1 ip + 1 global consumed
+
+        McpRateLimiter.Rejection first = limiter.check("attacker");
+        assertThat(first).isNotNull();
+        assertThat(first.limit()).isEqualTo("ip");
+        McpRateLimiter.Rejection second = limiter.check("attacker");
+        assertThat(second).isNotNull();
+        assertThat(second.limit()).isEqualTo("ip"); // still "ip", never falls through to "global"
+
+        assertThat(limiter.check("victim")).isNull(); // global still has a token left
+    }
+
+    @Test
     void globalLimitTripsAcrossManyIps() {
         McpRateLimiter limiter = new McpRateLimiter(props(2, 1000));
 
