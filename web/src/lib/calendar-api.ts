@@ -144,13 +144,17 @@ export function useDeleteEvent() {
   })
 }
 
-/** Drag of one buổi in a series: cancel that occurrence, re-create it standalone. */
+/** Drag of one buổi in a series: re-create it standalone, then cancel that occurrence. */
 export function useDetachOccurrence() {
   const invalidate = useInvalidateEvents()
   return useMutation({
     mutationFn: async ({ masterId, occurrenceStart, body }: { masterId: string; occurrenceStart: string; body: CalendarEventInput }) => {
+      // Create the replacement first: if the cancel then fails the worst case is
+      // a recoverable duplicate, not a silently lost occurrence (which happened
+      // when the delete ran first and the create rejected).
+      const created = await createEvent(body)
       await deleteEvent(masterId, occurrenceStart)
-      return createEvent(body)
+      return created
     },
     onSuccess: invalidate,
   })
