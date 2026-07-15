@@ -40,6 +40,14 @@ public class HabitService {
             ZoneId zone, HabitFrequencyType frequencyType, Set<DayOfWeek> days,
             int weeklyTarget, LocalDate effectiveFrom) {
         validate(title, cue, color, zone, frequencyType, days, weeklyTarget);
+        // A habit's first schedule must cover the present: a future effectiveFrom
+        // would leave today with no applicable schedule, which then breaks the
+        // whole today()/list() collection reads for every habit. (update() may
+        // legitimately add a future schedule version because the current one
+        // still covers today, so this guard belongs only here.)
+        if (effectiveFrom != null && effectiveFrom.isAfter(LocalDate.now(zone))) {
+            throw new IllegalArgumentException("effectiveFrom cannot be in the future");
+        }
         Habit habit = habits.save(new Habit(UUID.randomUUID(), cleanRequired(title), clean(cue),
                 clean(notes), color, zone.getId()));
         HabitSchedule schedule = schedules.save(new HabitSchedule(UUID.randomUUID(), habit.getId(),
