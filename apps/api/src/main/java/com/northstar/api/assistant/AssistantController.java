@@ -469,10 +469,14 @@ class AssistantController {
                 .options(ChatOptions.builder().model(route.modelId()))
                 // Memory rules + the LIVE index ride the system prompt every
                 // turn, so the model knows what it remembers without a tool call.
+                // The trust policy rides EVERY turn too, not just turns that carry
+                // new attachments: chat memory replays an earlier turn's
+                // UNTRUSTED_ATTACHMENT_EVIDENCE_JSON, so the guard must stay in the
+                // system prompt whenever that content can reappear in the window.
                 .system(SYSTEM_PROMPT.formatted(today,
                         today.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH))
                         + "\n\n" + longTermMemory.promptSection()
-                        + (documents.excerpts().isEmpty() ? "" : "\n\n" + ATTACHMENT_TRUST_POLICY))
+                        + "\n\n" + ATTACHMENT_TRUST_POLICY)
                 // Never blank: an image-only turn's text is its markdown markers.
                 .user(u -> u.text(userMessageWithEvidence(userMessage, documents))
                         .media(images.toArray(Media[]::new)))
