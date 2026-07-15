@@ -20,15 +20,24 @@ class PlatformDeviceTimezoneProvider implements DeviceTimezoneProvider {
     if (offset == Duration.zero) {
       return 'UTC';
     }
-    if (offset.inMinutes % Duration.minutesPerHour != 0) {
+    final totalMinutes = offset.inMinutes;
+    if (totalMinutes < -14 * Duration.minutesPerHour ||
+        totalMinutes > 14 * Duration.minutesPerHour) {
       return 'UTC';
     }
-    final hours = offset.inHours;
-    if (hours < -14 || hours > 14) {
-      return 'UTC';
-    }
-    // IANA's Etc/GMT signs are intentionally reversed.
-    final sign = hours > 0 ? '-' : '+';
-    return 'Etc/GMT$sign${hours.abs()}';
+    // A ±HH:mm offset id (accepted by the backend's ZoneId parser) preserves
+    // half-hour and 45-minute zones (+05:30, +05:45, +03:30) that whole-hour
+    // Etc/GMT ids cannot express.
+    final sign = totalMinutes > 0 ? '+' : '-';
+    final absMinutes = totalMinutes.abs();
+    final hours = (absMinutes ~/ Duration.minutesPerHour).toString().padLeft(
+      2,
+      '0',
+    );
+    final minutes = (absMinutes % Duration.minutesPerHour).toString().padLeft(
+      2,
+      '0',
+    );
+    return '$sign$hours:$minutes';
   }
 }
