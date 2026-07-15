@@ -57,6 +57,17 @@ export type InlineCitationCardTriggerProps = ComponentProps<typeof Badge> & {
   sources: string[];
 };
 
+// Citation sources come from model output and are not guaranteed to be valid
+// absolute URLs — `new URL()` throws on bare domains or relative paths, which
+// would crash render. Fall back to the raw string in that case.
+const hostnameOf = (source: string): string => {
+  try {
+    return new URL(source).hostname;
+  } catch {
+    return source;
+  }
+};
+
 export const InlineCitationCardTrigger = ({
   sources,
   className,
@@ -70,7 +81,7 @@ export const InlineCitationCardTrigger = ({
     >
       {sources[0] ? (
         <>
-          {new URL(sources[0]).hostname}{" "}
+          {hostnameOf(sources[0])}{" "}
           {sources.length > 1 && `+${sources.length - 1}`}
         </>
       ) : (
