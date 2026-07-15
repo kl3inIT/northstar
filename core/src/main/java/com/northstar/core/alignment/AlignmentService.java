@@ -253,6 +253,13 @@ public class AlignmentService {
                 .toList();
         List<TaskSummary> dueToday = todayList.stream()
                 .filter(t -> t.status() == TaskStatus.OPEN && today.equals(t.dueDate())).toList();
+        // Open tasks present because they were PLANNED for today (null or future
+        // due date) — they belong to neither overdue nor dueToday and would
+        // otherwise vanish from the review entirely.
+        List<TaskSummary> plannedToday = todayList.stream()
+                .filter(t -> t.status() == TaskStatus.OPEN
+                        && (t.dueDate() == null || t.dueDate().isAfter(today)))
+                .toList();
         List<TaskSummary> tomorrow = tasks.range(today.plusDays(1), today.plusDays(1)).stream()
                 .filter(t -> t.status() == TaskStatus.OPEN).toList();
         List<CalendarEventSummary> tomorrowEvents = events.range(
@@ -263,12 +270,15 @@ public class AlignmentService {
         StringBuilder sb = new StringBuilder("## The numbers\n");
         section(sb, "Done today (%d)".formatted(done.size()),
                 done.stream().map(t -> "- " + t.title()).toList());
-        section(sb, "Still open (%d, %d overdue)".formatted(overdue.size() + dueToday.size(), overdue.size()),
-                Stream.concat(
+        section(sb, "Still open (%d, %d overdue)"
+                        .formatted(overdue.size() + dueToday.size() + plannedToday.size(), overdue.size()),
+                Stream.of(
                         overdue.stream().map(t -> "- %s — overdue %s"
                                 .formatted(t.title(), count(ChronoUnit.DAYS.between(t.dueDate(), today), "day"))),
                         dueToday.stream().map(t -> "- %s — due today%s"
-                                .formatted(t.title(), t.dueTime() == null ? "" : " " + TIME.format(t.dueTime()))))
+                                .formatted(t.title(), t.dueTime() == null ? "" : " " + TIME.format(t.dueTime()))),
+                        plannedToday.stream().map(t -> "- %s — planned today".formatted(t.title())))
+                        .flatMap(s -> s)
                         .toList());
         section(sb, "Notes awaiting review / Staging (%d)".formatted(staging.size()),
                 staging.stream().map(n -> "- " + n.title()).toList());
