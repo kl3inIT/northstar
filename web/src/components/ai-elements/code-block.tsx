@@ -135,8 +135,21 @@ const highlighterCache = new Map<
   Promise<HighlighterGeneric<BundledLanguage, BundledTheme>>
 >();
 
-// Token cache
+// Token cache. Bounded because a streaming assistant message re-highlights with
+// a new (growing) `code` string on every token, minting a distinct key each
+// time; without eviction this Map grows for the whole session.
+const MAX_TOKENS_CACHE = 100;
 const tokensCache = new Map<string, TokenizedCode>();
+
+const cacheTokens = (key: string, value: TokenizedCode) => {
+  tokensCache.set(key, value);
+  if (tokensCache.size > MAX_TOKENS_CACHE) {
+    const oldest = tokensCache.keys().next().value;
+    if (oldest !== undefined) {
+      tokensCache.delete(oldest);
+    }
+  }
+};
 
 // Subscribers for async token updates
 const subscribers = new Map<string, Set<(result: TokenizedCode) => void>>();
@@ -225,7 +238,7 @@ export const highlightCode = (
       };
 
       // Cache the result
-      tokensCache.set(tokensCacheKey, tokenized);
+      cacheTokens(tokensCacheKey, tokenized);
 
       // Notify all subscribers
       const subs = subscribers.get(tokensCacheKey);
