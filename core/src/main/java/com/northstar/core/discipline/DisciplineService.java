@@ -27,7 +27,7 @@ public class DisciplineService {
 
     @Transactional
     public DisciplineSummary create(String name, ColorName color) {
-        Discipline discipline = new Discipline(UUID.randomUUID(), name.strip(), color);
+        Discipline discipline = new Discipline(UUID.randomUUID(), validatedName(name), color);
         disciplines.save(discipline);
         return summary(discipline);
     }
@@ -41,8 +41,20 @@ public class DisciplineService {
     public DisciplineSummary update(UUID id, String name, ColorName color) {
         Discipline discipline = disciplines.findById(id)
                 .orElseThrow(() -> new DisciplineNotFoundException(id));
-        discipline.edit(name.strip(), color);
+        discipline.edit(validatedName(name), color);
         return summary(discipline);
+    }
+
+    /** Guard the public API (incl. the assistant/MCP path) — the REST DTO is not the only caller. */
+    private static String validatedName(String name) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("discipline name is required");
+        }
+        String trimmed = name.strip();
+        if (trimmed.length() > 255) {
+            throw new IllegalArgumentException("discipline name must be at most 255 characters");
+        }
+        return trimmed;
     }
 
     @Transactional
