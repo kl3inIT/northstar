@@ -1,4 +1,5 @@
 import { format, parseISO } from "date-fns";
+import { toast } from "sonner";
 
 import { useDetachOccurrence, useRescheduleEvent } from "@/lib/calendar-api";
 import { useUpdateTask } from "@/lib/tasks-api";
@@ -17,6 +18,10 @@ export function useUpdateEvent() {
   const updateTask = useUpdateTask();
   const detach = useDetachOccurrence();
 
+  // Drag-drop mutations have no optimistic update, so on failure the event just
+  // snaps back after invalidation; surface a toast so the move isn't silently lost.
+  const onError = () => toast.error("Couldn't move that — please try again.");
+
   const updateEvent = (event: IEvent) => {
     if (event.kind === "task") {
       if (!event.task) return;
@@ -30,7 +35,7 @@ export function useUpdateEvent() {
           plannedDate: event.task.plannedDate ?? undefined,
           disciplineId: event.task.disciplineId ?? undefined,
         },
-      });
+      }, { onError });
       return;
     }
     if (event.rrule && event.masterId && event.occurrenceStart) {
@@ -46,14 +51,14 @@ export function useUpdateEvent() {
           color: event.color.toUpperCase() as EventColor,
           disciplineId: event.disciplineId,
         },
-      });
+      }, { onError });
       return;
     }
     reschedule.mutate({
       id: event.id,
       startAt: new Date(event.startDate).toISOString(),
       endAt: new Date(event.endDate).toISOString(),
-    });
+    }, { onError });
   };
 
   return { updateEvent };
