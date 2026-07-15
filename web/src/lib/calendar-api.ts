@@ -156,6 +156,8 @@ export function useDetachOccurrence() {
       await deleteEvent(masterId, occurrenceStart)
       return created
     },
-    onSuccess: invalidate,
+    // onSettled (not onSuccess): a failed delete leaves a recoverable duplicate
+    // on the server, so refresh the cache on error too to make it visible.
+    onSettled: invalidate,
   })
 }
