@@ -65,6 +65,7 @@ export function CapturePage() {
     queryClient.invalidateQueries({ queryKey: ['finance-summary'] })
     queryClient.invalidateQueries({ queryKey: ['study'] })
     queryClient.invalidateQueries({ queryKey: ['study-summary'] })
+    queryClient.invalidateQueries({ queryKey: ['study-vocab'] })
   }
 
   function report(result: Awaited<ReturnType<typeof capture>>) {
@@ -284,7 +285,10 @@ function RecentSection({ pending }: { pending: PendingCapture[] }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
-  const taskRows: Row[] = [...today, ...upcoming].map((t: Task) => ({
+  // A task planned for today but due later appears in both today() and
+  // upcoming(); dedup by id so it renders once (and React keys stay unique).
+  const uniqueTasks = [...new Map([...today, ...upcoming].map((t: Task) => [t.id, t])).values()]
+  const taskRows: Row[] = uniqueTasks.map((t: Task) => ({
     kind: 'TASK',
     key: `t-${t.id}`,
     id: t.id,
