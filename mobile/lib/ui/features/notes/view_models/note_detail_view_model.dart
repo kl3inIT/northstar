@@ -21,6 +21,8 @@ class NoteDetailViewModel extends ChangeNotifier {
   NoteDetail? _note;
   String? _errorMessage;
 
+  bool _disposed = false;
+
   NoteDetailPhase get phase => _phase;
   NoteDetail? get note => _note;
   String? get errorMessage => _errorMessage;
@@ -28,7 +30,7 @@ class NoteDetailViewModel extends ChangeNotifier {
   Future<void> load() async {
     _phase = NoteDetailPhase.loading;
     _errorMessage = null;
-    notifyListeners();
+    _notify();
     try {
       _note = await _repository.get(slug);
       _phase = NoteDetailPhase.ready;
@@ -36,6 +38,18 @@ class NoteDetailViewModel extends ChangeNotifier {
       _phase = NoteDetailPhase.error;
       _errorMessage = 'This note is unavailable.';
     }
-    notifyListeners();
+    // The route may have been popped (and this VM disposed) while get() was in
+    // flight; notifying a disposed ChangeNotifier throws.
+    _notify();
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
