@@ -42,13 +42,13 @@ public record MorningBriefConfig(
         language = language == null ? "" : language.strip();
         topics = clean(topics);
         queries = clean(queries);
-        blockedDomains = clean(blockedDomains).stream().map(String::toLowerCase).toList();
+        blockedDomains = clean(blockedDomains).stream().map(MorningBriefConfig::lower).toList();
         sourceIds = sourceIds == null ? DEFAULT_SOURCES : clean(sourceIds).stream()
-                .map(String::toLowerCase).toList();
+                .map(MorningBriefConfig::lower).toList();
         githubRepositories = githubRepositories == null ? DEFAULT_REPOSITORIES : clean(githubRepositories);
         feedUrls = feedUrls == null ? DEFAULT_FEEDS : clean(feedUrls);
         blueskyHandles = blueskyHandles == null ? DEFAULT_BLUESKY_HANDLES : clean(blueskyHandles).stream()
-                .map(String::toLowerCase).toList();
+                .map(MorningBriefConfig::lower).toList();
         firecrawlCreditBudget = firecrawlCreditBudget == null || firecrawlCreditBudget == 0
                 ? 25 : firecrawlCreditBudget;
     }
@@ -71,5 +71,11 @@ public record MorningBriefConfig(
         if (values == null) return List.of();
         return values.stream().filter(java.util.Objects::nonNull).map(String::strip)
                 .filter(value -> !value.isBlank()).distinct().toList();
+    }
+
+    // Locale.ROOT, matching how the handler normalizes hosts/source ids — the
+    // default locale (e.g. tr-TR) would lowercase 'I' to a dotless 'ı'.
+    private static String lower(String value) {
+        return value.toLowerCase(java.util.Locale.ROOT);
     }
 }

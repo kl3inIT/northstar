@@ -21,6 +21,7 @@ import type {
   VocabItem,
 } from './hey-api'
 import { createEvent, deleteEvent } from './calendar-api'
+import { iso } from './dates'
 import { listDisciplines } from './disciplines-api'
 import { createNote } from './notes-api'
 import { createTask, deleteTask } from './tasks-api'
@@ -244,7 +245,7 @@ export async function capture(text: string, kind?: CaptureKind): Promise<Capture
   if (draft.kind === 'EVENT' && draft.event) {
     const ev = draft.event
     const disciplineId = await resolveDisciplineId(ev.disciplineName)
-    const date = ev.date || new Date().toISOString().slice(0, 10)
+    const date = ev.date || iso(new Date())
     // Same local-time convention as the calendar dialogs: all-day = 00:00→23:59,
     // a timed event with no stated end gets a 1-hour default.
     const allDay = !ev.startTime

@@ -163,6 +163,13 @@ public class TaskService {
                 .stream().map(this::summary).toList();
     }
 
+    /** Title substring search across all tasks, any status or date — the assistant's find_tasks. */
+    @Transactional(readOnly = true)
+    public List<TaskSummary> searchByTitle(String query) {
+        return tasks.findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(query)
+                .stream().map(this::summary).toList();
+    }
+
     /** Open tasks of one discipline — the agenda inside a study block's details. */
     @Transactional(readOnly = true)
     public List<TaskSummary> openByDiscipline(UUID disciplineId) {

@@ -41,6 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 /** Expiring, process-local previews that let review continue during generation. */
@@ -276,7 +277,14 @@ class VocabEnrichmentJobService {
     private Map<String, Object> metadata(String value) {
         Map<String, Object> result = new LinkedHashMap<>();
         if (value == null || value.isBlank()) return result;
-        Object parsed = json.readValue(value, Object.class);
+        Object parsed;
+        try {
+            parsed = json.readValue(value, Object.class);
+        } catch (JacksonException malformed) {
+            // Card metadata is a free-form persisted string with no JSON contract
+            // on the write path; a non-JSON blob must not 500 enrichment.
+            return result;
+        }
         if (parsed instanceof Map<?, ?> map) {
             map.forEach((key, item) -> {
                 if (key instanceof String name) result.put(name, item);

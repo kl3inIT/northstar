@@ -4,8 +4,10 @@ import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -86,7 +88,10 @@ final class RecurrenceRule {
                 }
                 case "UNTIL" -> {
                     if (value.contains("T")) {
-                        untilInstant = Instant.from(UNTIL_DATETIME.parse(value));
+                        // The pattern's trailing 'Z' is a literal, so parsing yields a
+                        // LocalDateTime with no offset; Instant.from() on it throws.
+                        // The 'Z' means UTC, so attach that offset explicitly.
+                        untilInstant = LocalDateTime.parse(value, UNTIL_DATETIME).toInstant(ZoneOffset.UTC);
                     } else {
                         untilDate = LocalDate.parse(value, UNTIL_DATE);
                     }

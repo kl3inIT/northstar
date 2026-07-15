@@ -23,6 +23,9 @@ interface TaskRepository extends JpaRepository<Task, UUID> {
     /** Undated open tasks — "someday". */
     List<Task> findByStatusAndDueDateIsNullOrderByCreatedAtAsc(TaskStatus status);
 
+    /** Title substring match across every task, any status or date — the assistant's find_tasks. */
+    List<Task> findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(String title);
+
     /** Tasks completed on/after {@code since} — Today keeps just-finished items visible. */
     List<Task> findByStatusAndCompletedAtGreaterThanEqualOrderByCompletedAtDesc(
             TaskStatus status, java.time.Instant since);

@@ -659,7 +659,14 @@ public class SearchService {
         Set<UUID> ids = new LinkedHashSet<>();
         Matcher matcher = NOTE_IMAGE.matcher(body);
         while (matcher.find()) {
-            ids.add(UUID.fromString(matcher.group(1)));
+            // The regex accepts 36 chars of [0-9a-fA-F-], which is looser than a
+            // valid UUID layout; skip a non-parseable match rather than let it
+            // abort indexing of the whole note.
+            try {
+                ids.add(UUID.fromString(matcher.group(1)));
+            } catch (IllegalArgumentException malformed) {
+                // not a real attachment id — ignore
+            }
         }
         return ids;
     }

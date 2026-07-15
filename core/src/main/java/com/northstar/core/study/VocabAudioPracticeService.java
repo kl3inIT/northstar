@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
@@ -157,7 +158,14 @@ public class VocabAudioPracticeService {
 
     private Optional<String> example(VocabCardSummary card) {
         if (card.metadata() == null || card.metadata().isBlank()) return Optional.empty();
-        Object parsed = json.readValue(card.metadata(), Object.class);
+        Object parsed;
+        try {
+            parsed = json.readValue(card.metadata(), Object.class);
+        } catch (JacksonException malformed) {
+            // Card metadata has no JSON contract on the write path; a non-JSON
+            // blob must not crash practice — just treat it as no example.
+            return Optional.empty();
+        }
         if (parsed instanceof Map<?, ?> map && map.get("example") instanceof String value
                 && !value.isBlank()) {
             return VocabPracticeText.targetExample(value);

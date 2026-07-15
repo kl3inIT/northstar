@@ -61,6 +61,17 @@ class RecurrenceRuleTests {
     }
 
     @Test
+    void untilDatetimeInUtcIsParsedAndStopsTheSeries() {
+        // 2026-07-20 19:00 ICT == 12:00:00Z; the UTC datetime UNTIL form must parse
+        // (it previously threw) and remain inclusive of that final occurrence.
+        List<Instant> starts = expand("FREQ=WEEKLY;BYDAY=MO;UNTIL=20260720T120000Z",
+                ict(2026, 7, 1, 0, 0), ict(2026, 8, 31, 0, 0));
+
+        assertThat(starts).containsExactly(
+                ict(2026, 7, 6, 19, 0), ict(2026, 7, 13, 19, 0), ict(2026, 7, 20, 19, 0));
+    }
+
+    @Test
     void intervalSkipsWeeksAndCountCapsTotalOccurrences() {
         assertThat(expand("FREQ=WEEKLY;INTERVAL=2;BYDAY=MO", ict(2026, 7, 1, 0, 0), ict(2026, 8, 10, 0, 0)))
                 .containsExactly(ict(2026, 7, 6, 19, 0), ict(2026, 7, 20, 19, 0), ict(2026, 8, 3, 19, 0));

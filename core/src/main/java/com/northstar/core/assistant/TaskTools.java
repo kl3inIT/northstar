@@ -9,10 +9,7 @@ import static com.northstar.core.assistant.ToolSupport.zone;
 import com.northstar.core.discipline.DisciplineService;
 import com.northstar.core.task.TaskService;
 import com.northstar.core.task.TaskSummary;
-import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpToolParam;
@@ -97,13 +94,9 @@ class TaskTools implements NorthstarTool {
             @ToolParam(description = "Part of the task title, e.g. 'essay'")
             @McpToolParam(description = "Part of the task title, e.g. 'essay'",
                     required = true) String query) {
-        String needle = query.strip().toLowerCase(Locale.ROOT);
-        LocalDate today = LocalDate.now(zone());
-        List<TaskSummary> pool = new ArrayList<>(tasks.someday());
-        pool.addAll(tasks.range(today.minusDays(180), today.plusDays(365)));
-        return pool.stream()
-                .filter(t -> t.title().toLowerCase(Locale.ROOT).contains(needle))
-                .distinct()
+        // Search every task by title (any status or date) so the model can resolve
+        // done/undated tasks and ones outside a fixed window before acting on them.
+        return tasks.searchByTitle(query.strip()).stream()
                 .limit(20)
                 .toList();
     }

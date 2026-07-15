@@ -18,6 +18,7 @@ import com.northstar.core.speech.SpeechSynthesisException;
 import com.northstar.core.task.TaskNotFoundException;
 import com.northstar.core.web.WebResearchException;
 import com.northstar.core.web.WebResearchFailureCode;
+import java.time.DateTimeException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -69,6 +70,12 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     /** Domain guard rejected the request (bad reference id, invalid span, ...). */
     @ExceptionHandler(IllegalArgumentException.class)
     ProblemDetail badRequest(IllegalArgumentException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    /** Bad client-supplied temporal input (e.g. an unknown X-Timezone header). */
+    @ExceptionHandler(DateTimeException.class)
+    ProblemDetail badDateTime(DateTimeException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
     }
 

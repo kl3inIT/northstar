@@ -215,7 +215,9 @@ class AssistantApi {
   }
 
   Future<String> _readBody(http.StreamedResponse response) async {
-    final body = await response.stream.bytesToString();
+    final body = await response.stream.bytesToString().timeout(
+      const Duration(seconds: 120),
+    );
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw AssistantApiException.fromBody(
         body,

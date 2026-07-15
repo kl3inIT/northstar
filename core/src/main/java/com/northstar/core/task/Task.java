@@ -126,6 +126,9 @@ public class Task extends BaseEntity {
     }
 
     public void complete(Instant now) {
+        // Idempotent: re-completing an already-done task must keep the original
+        // completedAt, otherwise a repeated set_task_done(true) resurfaces it in Today.
+        if (this.status == TaskStatus.DONE) return;
         this.status = TaskStatus.DONE;
         this.completedAt = now;
     }

@@ -7,7 +7,6 @@ import com.northstar.core.note.NoteDetail;
 import com.northstar.core.note.NoteService;
 import com.northstar.core.note.NoteStatus;
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -352,11 +351,21 @@ public class MorningBriefHandler implements AutomationHandler<MorningBriefConfig
                         }).collect(java.util.stream.Collectors.joining("&"));
                 if (query.isBlank()) query = null;
             }
-            String path = uri.getPath() == null || uri.getPath().isBlank() ? "/" : uri.getPath();
+            // Rebuild from raw components: the multi-arg URI constructor treats its
+            // String args as decoded and re-percent-encodes them, which would turn
+            // an already-encoded query (%20) into %2520 and collapse encoded path
+            // slashes. Assembling the string keeps the encoded octets verbatim.
+            String rawPath = uri.getRawPath();
+            String path = rawPath == null || rawPath.isBlank() ? "/" : rawPath;
             if (path.length() > 1 && path.endsWith("/")) path = path.substring(0, path.length() - 1);
-            return new URI(uri.getScheme().toLowerCase(Locale.ROOT), null,
-                    uri.getHost().toLowerCase(Locale.ROOT), uri.getPort(), path, query, null).toString();
-        } catch (IllegalArgumentException | URISyntaxException exception) {
+            StringBuilder canonical = new StringBuilder()
+                    .append(uri.getScheme().toLowerCase(Locale.ROOT)).append("://")
+                    .append(uri.getHost().toLowerCase(Locale.ROOT));
+            if (uri.getPort() >= 0) canonical.append(':').append(uri.getPort());
+            canonical.append(path);
+            if (query != null) canonical.append('?').append(query);
+            return canonical.toString();
+        } catch (IllegalArgumentException exception) {
             return "";
         }
     }

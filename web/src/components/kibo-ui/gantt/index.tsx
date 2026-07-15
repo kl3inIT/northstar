@@ -1184,6 +1184,11 @@ export const GanttProvider: FC<GanttProviderProps> = ({
   const [timelineData, setTimelineData] = useState<TimelineData>(
     createInitialTimelineData(new Date())
   );
+  // Latest snapshot for the throttled scroll handler, which is memoized with an
+  // empty dependency list and would otherwise read the initial timelineData
+  // forever (dropping every prepend/append after the first).
+  const timelineDataRef = useRef(timelineData);
+  timelineDataRef.current = timelineData;
   const [, setScrollX] = useGanttScrollX();
   const [sidebarWidth, setSidebarWidth] = useState(0);
 
@@ -1254,7 +1259,8 @@ export const GanttProvider: FC<GanttProviderProps> = ({
     };
   }, []);
 
-  // Fix the useCallback to include all dependencies
+  // Stable throttled handler: timelineData is read via timelineDataRef so the
+  // empty dependency list is correct and the throttle isn't recreated per render.
   const handleScroll = useCallback(
     throttle(() => {
       const scrollElement = scrollRef.current;
@@ -1267,13 +1273,13 @@ export const GanttProvider: FC<GanttProviderProps> = ({
 
       if (scrollLeft === 0) {
         // Extend timelineData to the past
-        const firstYear = timelineData[0]?.year;
+        const firstYear = timelineDataRef.current[0]?.year;
 
         if (!firstYear) {
           return;
         }
 
-        const newTimelineData: TimelineData = [...timelineData];
+        const newTimelineData: TimelineData = [...timelineDataRef.current];
         newTimelineData.unshift({
           year: firstYear - 1,
           quarters: new Array(4).fill(null).map((_, quarterIndex) => ({
@@ -1293,13 +1299,13 @@ export const GanttProvider: FC<GanttProviderProps> = ({
         setScrollX(scrollElement.scrollLeft);
       } else if (scrollLeft + clientWidth >= scrollWidth) {
         // Extend timelineData to the future
-        const lastYear = timelineData.at(-1)?.year;
+        const lastYear = timelineDataRef.current.at(-1)?.year;
 
         if (!lastYear) {
           return;
         }
 
-        const newTimelineData: TimelineData = [...timelineData];
+        const newTimelineData: TimelineData = [...timelineDataRef.current];
         newTimelineData.push({
           year: lastYear + 1,
           quarters: new Array(4).fill(null).map((_, quarterIndex) => ({

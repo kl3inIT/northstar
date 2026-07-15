@@ -55,6 +55,23 @@ class VocabAudioPracticeServiceTests {
     }
 
     @Test
+    void malformedMetadataFallsBackInsteadOfCrashing() {
+        UUID cardId = UUID.randomUUID();
+        VocabCardSummary card = mock(VocabCardSummary.class);
+        when(card.front()).thenReturn("serendipity");
+        when(card.metadata()).thenReturn("not-json{oops");
+        when(vocab.find(cardId)).thenReturn(card);
+
+        // Dictation falls back to the front rather than propagating a JSON error.
+        assertThat(service.referenceText(cardId, VocabAudioPracticeMode.DICTATION))
+                .isEqualTo("serendipity");
+        // Shadowing has no example, so it rejects cleanly (not a parse crash).
+        assertThatThrownBy(() -> service.referenceText(cardId, VocabAudioPracticeMode.SHADOWING))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("connected example");
+    }
+
+    @Test
     void connectedSpeechRulesSupportSpacedAndHanLanguageExamples() {
         assertThat(VocabPracticeText.supportsShadowing("Take it. — Cầm lấy đi.")).isFalse();
         assertThat(VocabPracticeText.supportsShadowing("Please take a seat. — Xin mời ngồi.")).isTrue();
