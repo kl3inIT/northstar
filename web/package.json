@@ -16,7 +16,7 @@
     "gen:api": "pnpm dlx --package @hey-api/openapi-ts@0.99.0 --package typescript@6.0.1-rc openapi-ts -i ../contracts/openapi.json -o src/lib/hey-api -c @hey-api/client-fetch -p @hey-api/typescript @hey-api/sdk zod @tanstack/react-query"
   },
   "dependencies": {
-    "@ai-sdk/react": "^4.0.12",
+    "@ai-sdk/react": "^4.0.32",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.10.4",
     "@codemirror/lang-markdown": "^6.5.0",
