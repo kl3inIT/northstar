@@ -122,7 +122,7 @@ jobs:
           # Keep CI deterministic: pnpm 11.12.0 currently crashes the action's
           # self-installer before any repository command runs.
           version: 11.9.0
-      - uses: actions/setup-node@v6.4.0
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: "24"
           cache: pnpm
