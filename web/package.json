@@ -47,7 +47,7 @@
     "date-fns": "^4.4.0",
     "embla-carousel-react": "^8.6.0",
     "github-slugger": "^2.0.0",
-    "jotai": "^2.20.1",
+    "jotai": "^2.20.2",
     "lodash.throttle": "^4.1.1",
     "lucide-react": "^1.23.0",
     "media-chrome": "^4.19.2",
