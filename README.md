@@ -1,10 +1,10 @@
 <div align="center">
   <img src="./web/public/logo.png" alt="Northstar" width="96" />
   <h1>Northstar</h1>
-  <p><strong>A personal growth operating system for knowledge, planning, finance, study, and AI-assisted daily work.</strong></p>
+  <p><strong>An AI-native personal operating system for knowledge, planning, finance, study, habits, and automations.</strong></p>
 </div>
 
-[![CI](https://github.com/kl3inIT/northstar/actions/workflows/ci.yml/badge.svg)](https://github.com/kl3inIT/northstar/actions/workflows/ci.yml) [![Mobile CI](https://github.com/kl3inIT/northstar/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/kl3inIT/northstar/actions/workflows/mobile-ci.yml) ![Java 25](https://img.shields.io/badge/Java-25-007396?logo=openjdk&logoColor=white) ![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white) ![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=0B1220) ![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white) ![PostgreSQL + pgvector](https://img.shields.io/badge/PostgreSQL%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)
+[![CI](https://github.com/kl3inIT/northstar/actions/workflows/ci.yml/badge.svg)](https://github.com/kl3inIT/northstar/actions/workflows/ci.yml) [![Mobile CI](https://github.com/kl3inIT/northstar/actions/workflows/mobile-ci.yml/badge.svg)](https://github.com/kl3inIT/northstar/actions/workflows/mobile-ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE) ![Java 25](https://img.shields.io/badge/Java-25-007396?logo=openjdk&logoColor=white) ![Spring Boot 4.1](https://img.shields.io/badge/Spring%20Boot-4.1-6DB33F?logo=springboot&logoColor=white) ![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=0B1220) ![Flutter](https://img.shields.io/badge/Flutter-3.44-02569B?logo=flutter&logoColor=white) ![PostgreSQL + pgvector](https://img.shields.io/badge/PostgreSQL%20%2B%20pgvector-4169E1?logo=postgresql&logoColor=white)
 
 Northstar brings notes, projects, tasks, calendar, personal finance, study,
 automations, and an AI assistant into one personal system. Raw input is captured
@@ -26,7 +26,7 @@ external agents.
   events, free-slot lookup, and daily/weekly alignment reviews.
 - **Finance** - VND ledger, balance reconciliation, learned categories,
   budgets, savings goals, subscriptions, CSV export, and spending insights.
-- **Study** - study logs, Ebisu vocabulary memory, writing feedback, IELTS-style
+- **Study** - study logs, FSRS-6 vocabulary scheduling, writing feedback, IELTS-style
   rubric guidance, speaking practice, and Azure pronunciation assessment.
 - **Automations and Briefs** - typed persisted schedules, execution history,
   retries, public-source Morning Brief research, and reviewable note output.
@@ -148,5 +148,4 @@ consolidation. Generated API clients are never edited by hand.
 
 ## License
 
-No open-source license has been selected. The source is currently published for
-reference; no redistribution or derivative-use rights are granted by default.
+Northstar is open-source software licensed under the [MIT License](./LICENSE).
