@@ -117,7 +117,7 @@ jobs:
         working-directory: web
     steps:
       - uses: actions/checkout@v7.0.0
-      - uses: pnpm/action-setup@v6.0.9
+      - uses: pnpm/action-setup@v6.0.10
         with:
           # Keep CI deterministic: pnpm 11.12.0 currently crashes the action's
           # self-installer before any repository command runs.
