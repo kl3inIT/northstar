@@ -1,12 +1,12 @@
-# Northstar — application services (api, web, worker; mcp behind a profile).
+# Northstar — one backend runtime plus the web frontend.
 #
 #   docker compose \
 #     -f docker/docker-compose.infra.yml \
 #     -f docker/docker-compose.yml \
 #     --env-file .env up -d
 #
-# Image vars are overridden by the deploy workflow with versioned/rollback
-# refs; left empty they fall back to locally-built :latest tags.
+# The server composes REST, MCP and background jobs in one Spring Boot process.
+# Image vars are overridden by the manual deploy workflow with immutable refs.
 name: northstar
 
 x-logging: &default-logging
@@ -17,34 +17,32 @@ x-logging: &default-logging
     compress: "true"
 
 services:
-  api:
+  server:
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
-    image: ${NORTHSTAR_API_IMAGE:-northstar-api:latest}
-    container_name: northstar-api
+    image: ${NORTHSTAR_SERVER_IMAGE:-northstar-server:latest}
+    container_name: northstar-server
     restart: unless-stopped
     env_file: ../.env
     environment:
       SPRING_PROFILES_ACTIVE: prod
-      # The app resolves the user's "today"/"this week" from the JVM's system
-      # zone (ToolSupport.zone(), the assistant's date injection, reviews). This
-      # is a single-user OS, so pin that zone to the user's — otherwise a UTC
-      # container files reviews and tasks on the wrong calendar day for UTC+7.
+      # Single-user wall-clock semantics for REST, MCP tools and scheduled jobs.
       TZ: ${TZ:-Asia/Ho_Chi_Minh}
       NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
       NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
       NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    mem_limit: 1200m
-    mem_reservation: 800m
-    # Keep Java out of swap; host swap stays a system-level safety net only.
-    memswap_limit: 1200m
-    stop_grace_period: 40s
+    mem_limit: 2048m
+    mem_reservation: 1024m
+    memswap_limit: 2048m
+    # Worst case: db-scheduler's two 1m waits plus Spring scheduling's 2m wait,
+    # with one minute of container margin before Docker sends SIGKILL.
+    stop_grace_period: 300s
     networks:
       - northstar-proxy
       - northstar-internal
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8888/actuator/health || exit 1"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8888/actuator/health || exit 1"]
       interval: 30s
       timeout: 10s
       start_period: 90s
@@ -65,75 +63,6 @@ services:
       interval: 30s
       timeout: 5s
       start_period: 10s
-      retries: 3
-    logging: *default-logging
-
-  # MCP server for EXTERNAL clients (Claude Desktop / claude.ai / Claude Code /
-  # codex, etc.) — Streamable-HTTP at /mcp on :8081.
-  #
-  # DEPLOYED WITHOUT AUTH by the user's explicit choice (2026-07-07): it must
-  # work uniformly across every MCP client, and static bearer/OAuth don't. The
-  # tools grant full read/write/delete over all personal data, so anyone with
-  # the URL has that power. Mitigation in use is obscurity only — route it at a
-  # SECRET, unguessable NPM host/path (not the literal /mcp), keep the URL
-  # private, and add real auth (OAuth 2.1 resource server) before wider exposure.
-  mcp:
-    build:
-      context: ..
-      dockerfile: apps/mcp/Dockerfile
-    image: ${NORTHSTAR_MCP_IMAGE:-northstar-mcp:latest}
-    container_name: northstar-mcp
-    restart: unless-stopped
-    env_file: ../.env
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      TZ: ${TZ:-Asia/Ho_Chi_Minh}
-      NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
-      NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
-      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    mem_limit: 768m
-    memswap_limit: 768m
-    stop_grace_period: 40s
-    networks:
-      - northstar-proxy
-      - northstar-internal
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      start_period: 90s
-      retries: 3
-    logging: *default-logging
-
-  # Background worker: no HTTP surface, internal network only. Consumes its
-  # own Modulith events / scheduled jobs against the same database; the api
-  # keeps its own event backlog (see worker application.yml re: republish).
-  worker:
-    build:
-      context: ..
-      dockerfile: apps/worker/Dockerfile
-    image: ${NORTHSTAR_WORKER_IMAGE:-northstar-worker:latest}
-    container_name: northstar-worker
-    restart: unless-stopped
-    env_file: ../.env
-    environment:
-      SPRING_PROFILES_ACTIVE: prod
-      TZ: ${TZ:-Asia/Ho_Chi_Minh}
-      NORTHSTAR_DB_URL: jdbc:postgresql://zeromail-postgres:5432/${POSTGRES_DB:-northstar}
-      NORTHSTAR_DB_USER: ${POSTGRES_USER:-northstar}
-      NORTHSTAR_DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
-    mem_limit: 512m
-    mem_reservation: 256m
-    memswap_limit: 512m
-    # db-scheduler may drain an in-flight job for up to two minutes.
-    stop_grace_period: 140s
-    networks:
-      - northstar-internal
-    healthcheck:
-      test: ["CMD-SHELL", "pgrep -f org.springframework.boot.loader.launch.JarLauncher || exit 1"]
-      interval: 30s
-      timeout: 5s
-      start_period: 60s
       retries: 3
     logging: *default-logging
 

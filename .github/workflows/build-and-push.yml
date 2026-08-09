@@ -1,15 +1,13 @@
 # Build container images and push to GHCR.
 #
 # Single-developer simplification of zero-mail's pipeline: no semver release
-# train. Every green CI run on main publishes :main + :sha-<short> images, and
-# the deploy workflow rolls the VPS onto the immutable :sha-<short> that CI
-# actually validated. Rollback safety comes from both manual sha tags and the
-# deploy job's image-ID snapshot (zero-mail's .last-deploy.txt pattern).
+# train. Every green CI run on main publishes :main + :sha-<full> images, and
+# a later manual deployment can select the immutable :sha-<full> that CI
+# actually validated. Publishing an image never deploys production.
 #
 # Gated on CI: this runs only after the "CI" workflow completes successfully on
 # main (workflow_run), so a red suite (Modulith verify, integration tests, web
-# build via gen:api drift) never produces images — and, since deploy triggers
-# off THIS workflow's success, never auto-deploys. build-and-push itself only
+# build via gen:api drift) never produces images. build-and-push itself only
 # compiles (bootJar -x test); the test gate lives in CI upstream.
 name: Build and Push Images
 
@@ -18,7 +16,6 @@ on:
     workflows: ["CI"]
     types: [completed]
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
@@ -33,28 +30,30 @@ jobs:
     name: Build ${{ matrix.component }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Only build when CI passed (manual dispatch always proceeds).
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # Images are provenance artifacts of a successful push to this repository's
+    # main branch only. Do not grant package-write privileges to a workflow_run
+    # originating from a pull request or fork with a branch also named `main`.
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.event == 'push'
+          && github.event.workflow_run.head_branch == 'main'
+          && github.event.workflow_run.head_repository.full_name == github.repository }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - component: api
+          - component: server
             dockerfile: apps/api/Dockerfile
           - component: web
             dockerfile: web/Dockerfile
-          - component: mcp
-            dockerfile: apps/mcp/Dockerfile
-          - component: worker
-            dockerfile: apps/worker/Dockerfile
 
     steps:
       # workflow_run checks out the default branch tip by default; pin the exact
-      # commit CI validated so the :sha-<short> tag matches the tested code.
+      # commit CI validated so the :sha-<full> tag matches the tested code.
       - uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
-          ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - uses: docker/setup-buildx-action@v4.2.0
 
@@ -67,10 +66,12 @@ jobs:
       - name: Compute image meta
         id: meta
         run: |
-          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          echo "sha=sha-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
-          # GHCR requires a lowercase repository path; the owner is kl3inIT.
-          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          {
+            echo "revision=$(git rev-parse HEAD)"
+            echo "sha=sha-$(git rev-parse HEAD)"
+            # GHCR requires a lowercase repository path; the owner is kl3inIT.
+            echo "owner=${GITHUB_REPOSITORY_OWNER,,}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v7.3.0

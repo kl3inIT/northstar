@@ -4,6 +4,8 @@ plugins {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":apps:mcp"))
+    implementation(project(":apps:worker"))
     implementation(project(":integrations:web-openai"))
     implementation(project(":integrations:web-firecrawl"))
     implementation(project(":integrations:web-nine-router"))

@@ -1,6 +1,7 @@
 # Environment Configuration
 
-Northstar has three Spring Boot deployables. Each owns the same profile shape:
+Northstar has one Spring Boot deployable, `northstar-server`, which owns the
+runtime profile shape for REST, MCP, migrations, and jobs:
 
 - `application.yml` contains environment-independent behavior and safe
   defaults;
@@ -28,8 +29,8 @@ beside the ciphertext it protects would remove the security boundary.
 
 ## Database Pools
 
-API, MCP, and worker use independent Hikari pools and names. Defaults cap the
-three processes at 18 total connections. Tune maximum and minimum sizes from
+The unified server owns one Hikari pool, named `northstar-server`, capped at 10
+connections by default. Tune maximum and minimum sizes from
 PostgreSQL capacity and pool metrics, not request concurrency or virtual-thread
 count. Keep Hikari lifetime and keepalive defaults until an upstream database,
 proxy, or network timeout provides a concrete lower bound.
@@ -41,15 +42,18 @@ Spring AI `SimpleLoggerAdvisor` is `OFF` in base/production because its payloads
 can contain private note, finance, study, and conversation content; only
 `local` enables it at `DEBUG`.
 
-Production exposes only Actuator health. Local API additionally exposes info
+Production exposes only Actuator health. The local server additionally exposes info
 and Modulith inspection. Never broaden production exposure without matching
 authorization and a concrete operational consumer.
 
 ## Shutdown
 
-Spring Boot 4.1 graceful shutdown is enabled by default. Its phase timeout must
-stay shorter than the service's Compose `stop_grace_period`. Worker gets the
-longest window because db-scheduler may drain an in-flight automation.
+Spring Boot graceful shutdown is explicit in production. db-scheduler can use
+two one-minute executor waits, and Spring scheduling has a separate two-minute
+await-termination period. Compose therefore provides a five-minute outer stop
+budget: four minutes for the sequential worst case plus one minute of margin
+before Docker sends `SIGKILL`. The 130-second Spring timeout remains a per-phase
+bound rather than being mistaken for the whole container budget.
 
 References:
 

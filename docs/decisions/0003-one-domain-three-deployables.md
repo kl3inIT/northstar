@@ -1,6 +1,6 @@
 # 0003 - One Domain, Three Deployables
 
-Status: accepted
+Status: superseded by [0040](0040-one-domain-one-backend-runtime.md)
 
 ## Context
 

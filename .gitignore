@@ -33,6 +33,10 @@ web/.vite/
 output/
 tmp/
 
+# --- Local production deployment state ---
+.last-deploy.txt
+backups/
+
 # --- OS ---
 .DS_Store
 Thumbs.db

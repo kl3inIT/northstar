@@ -1,21 +1,28 @@
 spring:
   datasource:
     hikari:
-      pool-name: northstar-api
-      maximum-pool-size: ${NORTHSTAR_API_DB_POOL_MAX:8}
-      minimum-idle: ${NORTHSTAR_API_DB_POOL_MIN:2}
-      connection-timeout: ${NORTHSTAR_API_DB_CONNECTION_TIMEOUT_MS:5000}
-      validation-timeout: ${NORTHSTAR_API_DB_VALIDATION_TIMEOUT_MS:3000}
+      pool-name: northstar-server
+      maximum-pool-size: ${NORTHSTAR_SERVER_DB_POOL_MAX:10}
+      minimum-idle: ${NORTHSTAR_SERVER_DB_POOL_MIN:2}
+      connection-timeout: ${NORTHSTAR_SERVER_DB_CONNECTION_TIMEOUT_MS:5000}
+      validation-timeout: ${NORTHSTAR_SERVER_DB_VALIDATION_TIMEOUT_MS:3000}
   flyway:
     # The shared PostgreSQL container is external to this compose project. On
     # host reboot, wait for it instead of crash-looping before it accepts TCP.
     connect-retries: 30
     connect-retries-interval: 5s
   lifecycle:
-    timeout-per-shutdown-phase: 30s
+    # db-scheduler drains for at most two minutes.
+    timeout-per-shutdown-phase: 130s
+  task:
+    scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: 120s
 
 server:
   forward-headers-strategy: native
+  shutdown: graceful
 
 northstar:
   auth:

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Build context: repo root
-#   docker build -f apps/api/Dockerfile -t northstar-api .
+#   docker build -f apps/api/Dockerfile -t northstar-server .
 #
 # Same 3-stage shape as zero-mail's api image (proven on the shared VPS):
 # a dependency-resolver stage that caches the Gradle home between builds, a
@@ -50,6 +50,8 @@ FROM deps AS builder
 
 COPY core/src/main/       core/src/main/
 COPY apps/api/src/main/   apps/api/src/main/
+COPY apps/mcp/src/main/   apps/mcp/src/main/
+COPY apps/worker/src/main/ apps/worker/src/main/
 COPY integrations/web-openai/src/main/ integrations/web-openai/src/main/
 COPY integrations/web-firecrawl/src/main/ integrations/web-firecrawl/src/main/
 COPY integrations/web-nine-router/src/main/ integrations/web-nine-router/src/main/
@@ -111,8 +113,8 @@ ENV JAVA_TOOL_OPTIONS="--enable-native-access=ALL-UNNAMED \
 
 EXPOSE 8888
 
-LABEL org.opencontainers.image.title="Northstar API" \
-      org.opencontainers.image.description="Northstar API server — Spring Boot 4 / JDK 25" \
+LABEL org.opencontainers.image.title="Northstar Server" \
+      org.opencontainers.image.description="Unified Northstar REST, MCP and jobs server — Spring Boot 4 / JDK 25" \
       org.opencontainers.image.source="https://github.com/kl3inIT/northstar"
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \

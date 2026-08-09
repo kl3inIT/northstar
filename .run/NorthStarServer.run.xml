@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="NorthStarMcp" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
-    <module name="northstar.apps.mcp.main" />
-    <option name="SPRING_BOOT_MAIN_CLASS" value="com.northstar.mcp.NorthstarMcpApplication" />
+  <configuration default="false" name="NorthStarServer" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot">
+    <module name="northstar.apps.api.main" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="com.northstar.api.NorthstarServerApplication" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="false" />
     <option name="ACTIVE_PROFILES" value="local" />
     <method v="2">

@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.authorization.AuthorizationDecision;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -33,12 +34,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @NullMarked
 @Configuration(proxyBeanMethods = false)
 @EnableWebSecurity
-@EnableConfigurationProperties({AuthProperties.class, MobileAuthProperties.class, CorsProperties.class})
+@EnableConfigurationProperties({AuthProperties.class, MobileAuthProperties.class, CorsProperties.class,
+        McpAuthProperties.class})
 class SecurityConfig {
+
+    private static final String MCP_TOKEN_HEADER = "X-Northstar-MCP-Token";
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, AuthProperties auth,
-            MobileAuthProperties mobileAuth, CorsProperties corsProperties,
+            MobileAuthProperties mobileAuth, CorsProperties corsProperties, McpAuthProperties mcpAuth,
             SecurityContextRepository securityContextRepository,
             ObjectProvider<JwtDecoder> jwtDecoderProvider) throws Exception {
         if (mobileAuth.enabled() && !auth.enabled()) {
@@ -51,6 +55,7 @@ class SecurityConfig {
                     .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
                     .build();
         }
+        mcpAuth.requireConfigured();
 
         if (!allowedOrigins.isEmpty()) {
             CorsConfiguration corsConfiguration = new CorsConfiguration();
@@ -68,7 +73,7 @@ class SecurityConfig {
         http
                 .csrf(csrf -> csrf
                         .spa()
-                        .ignoringRequestMatchers("/api/auth/mobile/**"))
+                        .ignoringRequestMatchers("/api/auth/mobile/**", "/mcp", "/mcp/**"))
                 .securityContext(securityContext -> securityContext.securityContextRepository(securityContextRepository))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/auth/csrf").permitAll()
@@ -77,6 +82,12 @@ class SecurityConfig {
                                 "/api/auth/mobile/logout").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/v3/api-docs", "/v3/api-docs/**")
                         .permitAll()
+                        // MCP clients authenticate independently of browser sessions.
+                        // A dedicated header avoids CSRF/cookie coupling and remains
+                        // compatible with streamable-HTTP clients that support headers.
+                        .requestMatchers("/mcp", "/mcp/**")
+                        .access((authentication, context) -> new AuthorizationDecision(
+                                mcpAuth.matches(context.getRequest().getHeader(MCP_TOKEN_HEADER))))
                         .requestMatchers("/", "/index.html", "/assets/**", "/logo.png", "/favicon.ico").permitAll()
                         .anyRequest().authenticated())
                 .formLogin(AbstractHttpConfigurer::disable)

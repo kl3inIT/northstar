@@ -40,9 +40,9 @@ import org.springframework.core.io.ClassPathResource;
  * evaluation feedback, then a loud failure.</li>
  * </ul>
  *
- * <p>Deliberately NOT a component (the CaptureService precedent): the api app
- * wires it with its ChatClient; mcp and worker boot without an LLM and only
- * see {@link WritingService}.
+ * <p>Deliberately NOT a component (the CaptureService precedent): API delivery
+ * configuration wires it with its ChatClient while core exposes only
+ * {@link WritingService} to the other feature modules.
  */
 public class WritingGrader {
 

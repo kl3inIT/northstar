@@ -30,6 +30,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
         "northstar.auth.enabled=true",
         "northstar.auth.username=datph",
         "northstar.auth.password-hash={bcrypt}$2a$10$dXJ3SW6G7P50lGmMkkmwe.20cQQubK3.HZWzG3YB1tlRy.fqvM/BG",
+        "northstar.mcp.auth.token=test-mcp-token",
         "northstar.auth.mobile.enabled=true",
         "northstar.auth.mobile.jwt-secret=YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE=",
         "northstar.security.cors.allowed-origins=http://127.0.0.1:7357,https://mobile-preview.example.com"
