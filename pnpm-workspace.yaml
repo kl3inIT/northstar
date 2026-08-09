@@ -3,6 +3,13 @@ packages:
 
 sharedWorkspaceLockfile: false
 
+# Streamdown currently allows these patched transitive releases but its lock
+# resolution can retain the vulnerable versions. Keep the security floor at
+# the workspace root, where pnpm applies overrides.
+overrides:
+  dompurify: 3.4.13
+  mermaid: 11.16.1
+
 minimumReleaseAgeExclude:
   - typescript@7.0.2
   - '@typescript/*'
