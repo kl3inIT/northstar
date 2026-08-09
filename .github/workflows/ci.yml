@@ -37,9 +37,10 @@ jobs:
       backend: ${{ steps.scope.outputs.backend }}
       web: ${{ steps.scope.outputs.web }}
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Map changed files to CI areas
         id: scope
         shell: bash
@@ -97,7 +98,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-java@v5.7.0
         with:
           distribution: temurin
@@ -116,7 +119,9 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v6.0.10
         with:
           # Keep CI deterministic: pnpm 11.12.0 currently crashes the action's
