@@ -87,6 +87,24 @@ class UiMessageStreamTests {
     }
 
     @Test
+    void aGatewayRejectionEmitsTheActionableProtocolError() {
+        List<String> data = UiMessageStream.encode(
+                        Flux.error(new IllegalStateException("400: Function tools with reasoning_effort"
+                                + " are not supported for gpt-5.6-terra in /v1/chat/completions.")),
+                        json, Duration.ofHours(1), Duration.ofMinutes(1))
+                .map(ServerSentEvent::data)
+                .collectList()
+                .block();
+
+        assertThat(data).hasSize(3);
+        assertThat(data.get(1))
+                .contains("\"type\":\"error\"")
+                .contains("Pick a different chat model")
+                .doesNotContain("reasoning_effort");
+        assertThat(data.getLast()).isEqualTo("[DONE]");
+    }
+
+    @Test
     void failureEmitsSafeProtocolErrorAndDone() {
         List<String> data = UiMessageStream.encode(
                         Flux.error(new IllegalStateException("provider secret")),

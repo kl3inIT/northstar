@@ -45,7 +45,8 @@ final class UiMessageStream {
                     Flux.just(encoder.finish(), encoder.done()))
                     .onErrorResume(AssistantStreamAbortedException.class,
                             error -> Flux.just(encoder.abort(error.getMessage()), encoder.done()))
-                    .onErrorResume(_ -> Flux.just(encoder.error(), encoder.done()));
+                    .onErrorResume(error -> Flux.just(
+                            encoder.error(AssistantStreamFailures.describe(error)), encoder.done()));
         });
     }
 
@@ -91,9 +92,8 @@ final class UiMessageStream {
                     "type", "finish", "finishReason", "stop")));
         }
 
-        ServerSentEvent<String> error() {
-            return event(json.writeValueAsString(
-                    fields("type", "error", "errorText", "The assistant stream failed.")));
+        ServerSentEvent<String> error(String errorText) {
+            return event(json.writeValueAsString(fields("type", "error", "errorText", errorText)));
         }
 
         ServerSentEvent<String> abort(String reason) {
