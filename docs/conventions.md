@@ -7,8 +7,9 @@
 - Cross-module calls go through public module APIs or events, not another
   module's internals.
 - Java package root is `com.northstar`.
-- The only application entry point is `NorthstarServerApplication`; API, MCP
-  and jobs remain separate packages and Gradle modules.
+- The only production application entry point is `NorthstarServerApplication`;
+  API, MCP and jobs remain separate packages and Gradle modules. Test-only
+  application classes may provide isolated module contexts.
 - Prefer existing local helpers and module patterns before adding new
   abstractions.
 - Bind application configuration with immutable `@ConfigurationProperties`

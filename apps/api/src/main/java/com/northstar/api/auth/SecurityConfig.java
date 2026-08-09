@@ -49,13 +49,22 @@ class SecurityConfig {
             throw new IllegalStateException("Mobile auth requires northstar.auth.enabled=true");
         }
         List<String> allowedOrigins = corsProperties.origins();
+        mcpAuth.requireConfigured();
         if (!auth.enabled()) {
             return http
                     .csrf(AbstractHttpConfigurer::disable)
-                    .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+                    .authorizeHttpRequests(authorize -> authorize
+                            .requestMatchers("/mcp", "/mcp/**")
+                            .access((authentication, context) -> new AuthorizationDecision(
+                                    mcpAuth.matches(context.getRequest().getHeader(MCP_TOKEN_HEADER))))
+                            .anyRequest().permitAll())
+                    .exceptionHandling(exceptions -> exceptions
+                            .authenticationEntryPoint((request, response, exception) ->
+                                    writeProblem(response, HttpStatus.UNAUTHORIZED, "Authentication required"))
+                            .accessDeniedHandler((request, response, exception) ->
+                                    writeProblem(response, HttpStatus.FORBIDDEN, "Access denied")))
                     .build();
         }
-        mcpAuth.requireConfigured();
 
         if (!allowedOrigins.isEmpty()) {
             CorsConfiguration corsConfiguration = new CorsConfiguration();

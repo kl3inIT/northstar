@@ -98,17 +98,24 @@ class UnifiedBackendRuntimeTests {
         assertThat(response.body()).contains("\"name\":\"northstar\"");
         String session = response.headers().firstValue("Mcp-Session-Id").orElseThrow();
 
-        post(session, "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
+        HttpResponse<String> initialized = post(session,
+                "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}");
         HttpResponse<String> tools = post(session,
                 "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}");
         HttpResponse<String> readOnlyTool = post(session, """
                 {"jsonrpc":"2.0","id":3,"method":"tools/call","params":{
                   "name":"today_tasks","arguments":{}}}""");
 
+        assertThat(initialized.statusCode()).isBetween(200, 299);
+        assertThat(initialized.body()).doesNotContain("\"error\"");
         assertThat(tools.statusCode()).isEqualTo(200);
-        assertThat(tools.body()).contains("search_knowledge", "\"readOnlyHint\":true");
+        assertThat(tools.body())
+                .contains("\"result\"", "search_knowledge", "\"readOnlyHint\":true")
+                .doesNotContain("\"error\"");
         assertThat(readOnlyTool.statusCode()).isEqualTo(200);
-        assertThat(readOnlyTool.body()).doesNotContain("\"isError\":true");
+        assertThat(readOnlyTool.body())
+                .contains("\"result\"")
+                .doesNotContain("\"error\"", "\"isError\":true");
     }
 
     private HttpResponse<String> post(String session, String body) throws Exception {

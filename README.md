@@ -103,7 +103,7 @@ Local URLs:
 
 To exercise the web login locally, set `NORTHSTAR_AUTH_ENABLED=true` plus
 `NORTHSTAR_AUTH_USERNAME` and a bcrypt `NORTHSTAR_AUTH_PASSWORD_HASH` in
-`.env`. When authentication is enabled, MCP clients must also send
+`.env`. Independently of REST login, every MCP client must send
 `X-Northstar-MCP-Token` with the configured `NORTHSTAR_MCP_TOKEN`. Production
 Compose always activates the `prod` profile and uses the server environment
 template under `docker/`.

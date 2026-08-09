@@ -54,8 +54,10 @@ the report only on failure.
   available for Gradle, Flutter, Dart and pnpm rather than thrashing its 10 GiB
   repository budget.
 - Image builds publish both `:main` and `:sha-<full-commit>`; manual deployments
-  derive and use that immutable full-commit tag from a revision reachable from
-  `origin/main`, then verify each pulled image's OCI revision label.
+  use the full-commit tag only to locate the candidate from a revision reachable
+  from `origin/main`. After pulling, the workflow verifies each OCI revision label,
+  resolves both candidates to GHCR `@sha256` references, and starts Compose with
+  those digest-pinned image references.
 - `:main` remains useful for manual smoke/debug work only; it is not the
   auto-deploy target.
 - Deployment runs under the GitHub `production` environment so secrets, vars,

@@ -16,6 +16,9 @@ spring:
     timeout-per-shutdown-phase: 130s
   task:
     scheduling:
+      pool:
+        # Search indexing and subscription sweeps must not block each other.
+        size: 2
       shutdown:
         await-termination: true
         await-termination-period: 120s

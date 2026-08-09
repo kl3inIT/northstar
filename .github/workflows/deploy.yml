@@ -36,7 +36,8 @@ jobs:
           cd /apps/north-star
           mkdir -p backups
           snapshot_marker="${RUNNER_TEMP}/northstar-deploy-${GITHUB_RUN_ID}.snapshot"
-          rm -f "$snapshot_marker"
+          dump_marker="${snapshot_marker}.dump"
+          rm -f "$snapshot_marker" "$dump_marker"
 
           git fetch --quiet origin main
           requested_ref="${DEPLOY_REF_INPUT}"
@@ -108,15 +109,20 @@ jobs:
           git checkout --quiet "$DEPLOY_REF" -- docker/docker-compose.yml docker/docker-compose.infra.yml
 
           echo "::group::Backup database before migrate"
+          dump_path="backups/pre-deploy-$(date +%Y%m%d-%H%M%S).dump"
           docker exec zeromail-postgres pg_dump -U northstar -d northstar -Fc \
-            > "backups/pre-deploy-$(date +%Y%m%d-%H%M%S).dump"
+            > "$dump_path"
+          printf '%s\n' "$dump_path" > "$dump_marker"
+          echo "Pre-migration database dump: $dump_path"
           # Names are generated from digits only, so word-splitting is impossible.
           # shellcheck disable=SC2012
           ls -t backups/pre-deploy-*.dump 2>/dev/null | tail -n +8 | xargs -r rm --
           echo "::endgroup::"
 
-          export NORTHSTAR_SERVER_IMAGE="ghcr.io/${OWNER}/northstar-server:${DEPLOY_TAG}"
-          export NORTHSTAR_WEB_IMAGE="ghcr.io/${OWNER}/northstar-web:${DEPLOY_TAG}"
+          NORTHSTAR_SERVER_TAG="ghcr.io/${OWNER}/northstar-server:${DEPLOY_TAG}"
+          NORTHSTAR_WEB_TAG="ghcr.io/${OWNER}/northstar-web:${DEPLOY_TAG}"
+          export NORTHSTAR_SERVER_IMAGE="$NORTHSTAR_SERVER_TAG"
+          export NORTHSTAR_WEB_IMAGE="$NORTHSTAR_WEB_TAG"
 
           echo "::group::Pull unified release"
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
@@ -129,6 +135,28 @@ jobs:
               exit 1
             fi
           done
+          resolve_digest() {
+            local tag="$1"
+            local repository="${tag%:*}"
+            local digest_ref=""
+            local candidate
+            while IFS= read -r candidate; do
+              if [[ "$candidate" == "${repository}@sha256:"* ]]; then
+                digest_ref="$candidate"
+                break
+              fi
+            done < <(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tag")
+            if [[ -z "$digest_ref" ]]; then
+              echo "::error::Could not resolve a trusted registry digest for $tag." >&2
+              return 1
+            fi
+            printf '%s' "$digest_ref"
+          }
+          NORTHSTAR_SERVER_IMAGE=$(resolve_digest "$NORTHSTAR_SERVER_TAG")
+          NORTHSTAR_WEB_IMAGE=$(resolve_digest "$NORTHSTAR_WEB_TAG")
+          export NORTHSTAR_SERVER_IMAGE NORTHSTAR_WEB_IMAGE
+          echo "Server digest: ${NORTHSTAR_SERVER_IMAGE#*@}"
+          echo "Web digest: ${NORTHSTAR_WEB_IMAGE#*@}"
           echo "::endgroup::"
 
           echo "::group::Stop legacy backend processes to prevent duplicate jobs"
@@ -150,14 +178,14 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Wait for server and web readiness"
-          for attempt in {1..75}; do
+          for attempt in {1..180}; do
             server_state=$(docker inspect --format '{{.State.Health.Status}}' northstar-server 2>/dev/null || echo missing)
             web_state=$(docker inspect --format '{{.State.Health.Status}}' northstar-web 2>/dev/null || echo missing)
             if [[ "$server_state" == "healthy" && "$web_state" == "healthy" ]]; then
               echo "server and web ready"
               break
             fi
-            if [[ $attempt -eq 75 ]]; then
+            if [[ $attempt -eq 180 ]]; then
               echo "::error::readiness failed (server=$server_state web=$web_state)"
               docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
                 --env-file .env logs --tail=250 server web
@@ -223,7 +251,7 @@ jobs:
           # disabled Northstar route; cutover remains a separate approved action.
           docker exec nginx-proxy-manager nginx -t
           docker exec nginx-proxy-manager nginx -s reload
-          rm -f "$snapshot_marker"
+          rm -f "$snapshot_marker" "$dump_marker"
           echo "::endgroup::"
 
       - name: Roll back to previous topology on failure
@@ -232,6 +260,7 @@ jobs:
           set -euo pipefail
           cd /apps/north-star || exit 1
           snapshot_marker="${RUNNER_TEMP}/northstar-deploy-${GITHUB_RUN_ID}.snapshot"
+          dump_marker="${snapshot_marker}.dump"
           if [[ ! -f "$snapshot_marker" || ! -s .last-deploy.txt \
               || ! -s backups/docker-compose.rollback.yml \
               || ! -s backups/docker-compose.infra.rollback.yml ]]; then
@@ -266,13 +295,18 @@ jobs:
           fi
 
           echo "::warning::Deploy failed; restoring previous topology: ${rollback_services[*]}"
+          latest_dump="unavailable"
+          [[ -s "$dump_marker" ]] && latest_dump=$(<"$dump_marker")
+          echo "::warning::Automatic rollback does not undo Flyway migrations."
+          echo "::warning::Latest pre-migration dump: ${latest_dump:-unavailable}"
+          echo "::warning::Restore that dump manually before a schema-incompatible rollback."
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
             --env-file .env up -d --no-build "${rollback_services[@]}"
 
           for attempt in {1..90}; do
             all_healthy=true
             for container in "${rollback_containers[@]}"; do
-              status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' \
+              status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{if .State.Running}}healthy{{else}}{{.State.Status}}{{end}}{{end}}' \
                 "$container" 2>/dev/null || echo missing)
               if [[ "$status" != "healthy" ]]; then
                 all_healthy=false
@@ -282,7 +316,7 @@ jobs:
             if [[ "$all_healthy" == true ]]; then
               docker exec nginx-proxy-manager nginx -t
               docker exec nginx-proxy-manager nginx -s reload
-              rm -f "$snapshot_marker"
+              rm -f "$snapshot_marker" "$dump_marker"
               echo "Previous topology restored; deployment run remains failed for investigation."
               exit 0
             fi

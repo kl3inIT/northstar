@@ -45,6 +45,7 @@ class ApiApplicationProfileTests {
             assertThat(environment.getProperty("server.shutdown")).isEqualTo("graceful");
             assertThat(environment.getProperty(
                     "spring.task.scheduling.shutdown.await-termination", Boolean.class)).isTrue();
+            assertThat(environment.getProperty("spring.task.scheduling.pool.size", Integer.class)).isEqualTo(2);
             assertThat(environment.getProperty(
                     "spring.task.scheduling.shutdown.await-termination-period")).isEqualTo("120s");
             assertThat(environment.getProperty("logging.structured.format.console")).isEqualTo("ecs");

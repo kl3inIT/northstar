@@ -12,15 +12,16 @@ perform this cutover; the `Deploy` workflow is manual-only.
   sends it as `X-Northstar-MCP-Token`.
 - A current `pg_dump` exists and the deploy workflow can write `backups/`.
 - `/data/nginx/proxy_host/9.conf.disabled` exists, the active route does not, and
-  `nginx -t` passes.
+  the currently active Nginx configuration passes `nginx -t`.
 - The legacy image IDs and Compose topology are still available for rollback.
 
 ## Deploy and verify internally
 
 Dispatch `Deploy` with the reviewed exact 40-character commit SHA. The
-workflow derives the immutable `sha-<full-commit>` image tag and snapshots the
-running topology. It dumps the database, stops legacy backend processes, and
-starts `northstar-server` plus `northstar-web`.
+workflow pulls the matching `sha-<full-commit>` candidates, verifies their OCI
+revision labels, pins their GHCR digests, and snapshots the running topology. It
+dumps the database, stops legacy backend processes, and starts
+`northstar-server` plus `northstar-web`.
 
 Before it succeeds, the workflow verifies:
 
@@ -46,9 +47,12 @@ Only after internal REST, session, MCP, Flyway, and jobs checks are healthy:
 1. Change every Northstar backend upstream from `northstar-api:8888` or
    `northstar-mcp:8081` to `northstar-server:8888`.
 2. Keep REST paths unchanged and route MCP to `/mcp` on the same server.
-3. Run `nginx -t` before enabling the host configuration.
-4. Enable the route, reload Nginx, and smoke the web root, authenticated REST,
-   token-authenticated MCP `initialize`, `tools/list`, and one read-only tool.
+3. Stage the edited route as `/data/nginx/proxy_host/9.conf` without reloading.
+4. Run `nginx -t` against that staged active configuration. If validation fails,
+   move it back to `.disabled` and do not reload.
+5. Reload Nginx only after validation passes, then smoke the web root,
+   authenticated REST, token-authenticated MCP `initialize`, `tools/list`, and
+   one read-only tool.
 
 ## Rollback
 
