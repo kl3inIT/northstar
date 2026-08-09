@@ -127,14 +127,18 @@ public class SpringAiClientRouter implements AiClientRouter {
                 ? properties.routes().assistant()
                 : gateway.models().getFirst();
         return switch (gateway.type()) {
-            case OPENAI, NINE_ROUTER, OPENAI_CHAT_COMPATIBLE -> OpenAiChatModel.builder()
-                    .options(OpenAiChatOptions.builder()
-                            .baseUrl(gateway.baseUrl())
-                            .apiKey(gateway.apiKey())
-                            .model(defaultModel)
-                            .timeout(gateway.timeout())
-                            .build())
-                    .build();
+            // Every gateway type here speaks /v1/chat/completions, where a
+            // reasoning tier can refuse function tools. The fallback keys off the
+            // provider's rejection, so it stays inert for models that accept both.
+            case OPENAI, NINE_ROUTER, OPENAI_CHAT_COMPATIBLE -> new ToolReasoningFallbackChatModel(
+                    OpenAiChatModel.builder()
+                            .options(OpenAiChatOptions.builder()
+                                    .baseUrl(gateway.baseUrl())
+                                    .apiKey(gateway.apiKey())
+                                    .model(defaultModel)
+                                    .timeout(gateway.timeout())
+                                    .build())
+                            .build());
         };
     }
 

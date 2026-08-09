@@ -14,6 +14,11 @@ quiet, and preserves message/step/text/tool/finish boundaries through `[DONE]`.
 Tool failures end their tool row with `tool-output-error`; a server-side turn
 timeout emits `abort` and `[DONE]` instead of leaving the client busy. Client
 disconnect cancellation propagates upstream through the reactive subscription.
+A failed turn emits one actionable `error` frame derived from the gateway status
+alone — a rejected model, a rejected credential, an unavailable model, a
+timeout, rate limiting, or a gateway fault each name their own fix, while any
+other failure keeps the generic text. Provider bodies never reach the browser,
+and the web chat surfaces that sentence instead of ending the turn in silence.
 Conversation text is stored in Spring AI's `spring_ai_chat_memory` table, while
 tool workflow parts are stored in `northstar_assistant_tool_trace` and replayed
 from `/api/assistant/history` so completed workflow steps survive page reloads
@@ -72,6 +77,16 @@ Gateway instances declare `OPENAI`, `NINE_ROUTER`, or
 `OPENAI_CHAT_COMPATIBLE`. OpenAI and 9Router reuse the shared chat transport but
 advertise the additional capability protocols Northstar has implemented;
 generic compatible endpoints remain a conservative chat-only contract.
+That shared chat transport is `/v1/chat/completions`, where a reasoning tier can
+refuse function tools. Because every Assistant turn attaches tools, a chat call
+rejected for combining tools with reasoning is retried once with reasoning
+disabled, and the model is remembered so later turns spend no rejected call. The
+retry belongs to the model, not the chat client: chat memory records the user
+message and the tool-calling loop runs above the model, so a higher retry would
+duplicate that memory entry and could re-run committed tool calls. A call is
+never replayed once it has produced output. Selection is unrestricted — no
+model-name allowlist gates the picker, and the provider's own rejection is what
+triggers the fallback.
 Settings can edit a deployment-backed gateway by saving an encrypted overlay
 under the same id. The logical gateway remains one row; removing the overlay
 restores its optional environment credential without deleting workload routes.
