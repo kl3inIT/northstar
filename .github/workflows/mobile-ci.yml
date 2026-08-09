@@ -47,6 +47,8 @@ jobs:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-java@v5.7.0
         with:
@@ -126,6 +128,8 @@ jobs:
       MOBILE_API_BASE_URL: ${{ inputs.api_base_url || vars.NORTHSTAR_BASE_URL || 'http://localhost:8888' }}
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Cache Flutter SDK
         id: flutter-cache

@@ -53,6 +53,7 @@ jobs:
       # commit CI validated so the :sha-<short> tag matches the tested code.
       - uses: actions/checkout@v7.0.1
         with:
+          persist-credentials: false
           ref: ${{ github.event.workflow_run.head_sha || github.ref }}
 
       - uses: docker/setup-buildx-action@v4.2.0
