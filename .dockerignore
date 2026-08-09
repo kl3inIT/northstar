@@ -13,6 +13,8 @@
 .vscode
 .playwright-mcp
 tmp
+.last-deploy.txt
+backups
 node_modules
 **/node_modules
 **/build

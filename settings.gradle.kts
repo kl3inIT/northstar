@@ -28,7 +28,7 @@ include(":integrations:ai-openai-compatible")
 include(":integrations:speech-azure")
 include(":integrations:news-huggingnews")
 
-// Deployable Spring Boot applications (thin bootstraps over :core).
+// One deployable composition root plus two runtime feature libraries.
 include(":apps:api")
 include(":apps:mcp")
 include(":apps:worker")

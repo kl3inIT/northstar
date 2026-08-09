@@ -1,38 +1,14 @@
-# Deploy to the VPS — manual dispatch, runs ON the box.
-#
-# Straight port of zero-mail's hard-won deploy shape, minus the semver gate
-# (single dev -> auto-deploy the exact sha image that passed CI):
-#   • self-hosted runner on the VPS: the deploy is a local process, so
-#     Hostinger's edge DDoS filter can never drop an inbound SSH session
-#   • snapshot the running image IDs BEFORE recreate → auto-rollback on any
-#     deploy/smoke failure (stays RED so the failure gets investigated)
-#   • pg_dump before `up -d` — the one gap zero-mail documents is that
-#     rollback cannot undo a partially-applied forward migration; a fresh
-#     dump makes even that recoverable
-#   • reload nginx-proxy-manager after recreate: NPM pins upstream container
-#     IPs at config load, so a recreated api gets 502'd until a reload
-#
-# Prerequisites on the VPS (one-time, see docs/ops/DEPLOY.md):
-#   /apps/north-star          — clone of this repo (compose files + .env)
-#   northstar-proxy/internal — external docker networks, NPM attached
-#   a self-hosted runner registered on this repo with labels [self-hosted, northstar]
+# Manual deployment to the self-hosted VPS runner.
+# Publishing images from main never deploys production. A human selects the Git
+# revision only after CI, image build and review have completed.
 name: Deploy
 
 on:
-  # Auto-CD: after images are built+pushed on a push to main, deploy the
-  # immutable sha-<short> tag from that build.
-  # (northstar is not strict like zero-mail — no manual gate on every release.)
-  workflow_run:
-    workflows: ["Build and Push Images"]
-    types: [completed]
-    branches: [main]
-  # Manual dispatch is kept for rollback: deploy a specific sha-<short> tag.
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Image tag to deploy (main, or a sha-<short> for pinpoint rollback)'
-        required: false
-        default: 'main'
+      ref:
+        description: 'Commit on main whose immutable full-SHA image should be deployed'
+        required: true
         type: string
 
 permissions:
@@ -46,189 +22,304 @@ jobs:
   deploy:
     name: Deploy (self-hosted VPS runner)
     runs-on: [self-hosted, northstar]
-    timeout-minutes: 20
+    timeout-minutes: 25
     environment: production
-    # On workflow_run, only proceed if the build actually succeeded; manual
-    # dispatch always proceeds.
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Deploy stack
         env:
-          DEPLOY_TAG_INPUT: ${{ inputs.tag }}
-          BUILD_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEPLOY_REF_INPUT: ${{ inputs.ref }}
           OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
-          # GHCR paths are lowercase; the repo owner is kl3inIT.
           OWNER="${OWNER,,}"
-          if [[ -n "${DEPLOY_TAG_INPUT:-}" ]]; then
-            DEPLOY_TAG="$DEPLOY_TAG_INPUT"
-          elif [[ -n "${BUILD_HEAD_SHA:-}" ]]; then
-            DEPLOY_TAG="sha-${BUILD_HEAD_SHA:0:7}"
-          else
-            echo "::error::Cannot determine image tag to deploy."
+          cd /apps/north-star
+          mkdir -p backups
+          snapshot_marker="${RUNNER_TEMP}/northstar-deploy-${GITHUB_RUN_ID}.snapshot"
+          dump_marker="${snapshot_marker}.dump"
+          rm -f "$snapshot_marker" "$dump_marker"
+
+          git fetch --quiet origin main
+          requested_ref="${DEPLOY_REF_INPUT}"
+          if [[ ! "$requested_ref" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Deploy input must be an exact 40-character lowercase commit SHA."
             exit 1
           fi
-          echo "Deploying image tag: ${DEPLOY_TAG}"
+          DEPLOY_REF=$(git rev-parse --verify --end-of-options "${requested_ref}^{commit}")
+          if [[ "$DEPLOY_REF" != "$requested_ref" ]]; then
+            echo "::error::Deploy input did not resolve to the exact requested commit."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$DEPLOY_REF" origin/main; then
+            echo "::error::Deploy revision must be reachable from origin/main."
+            exit 1
+          fi
+          DEPLOY_TAG="sha-${DEPLOY_REF}"
+          echo "Deploying ${DEPLOY_REF} (${DEPLOY_TAG})"
 
-          cd /apps/north-star
-          git fetch --quiet origin main
-          DEPLOY_REF="${BUILD_HEAD_SHA:-origin/main}"
+          if ! grep -Eq '^NORTHSTAR_MCP_TOKEN=.{16,}$' .env; then
+            echo "::error::Set a non-empty NORTHSTAR_MCP_TOKEN in .env before deployment."
+            exit 1
+          fi
+
+          echo "::group::Validate rollbackable current topology"
+          has_server=0
+          legacy_count=0
+          if docker inspect northstar-server >/dev/null 2>&1; then
+            has_server=1
+          fi
+          for c in northstar-api northstar-mcp northstar-worker; do
+            if docker inspect "$c" >/dev/null 2>&1; then
+              legacy_count=$((legacy_count + 1))
+            fi
+          done
+          if ! docker inspect northstar-web >/dev/null 2>&1; then
+            echo "::error::Current web container is missing; refusing a deployment without rollback evidence."
+            exit 1
+          fi
+          if [[ "$has_server" -eq 1 && "$legacy_count" -ne 0 ]]; then
+            echo "::error::Current backend topology is mixed; refusing deployment."
+            exit 1
+          fi
+          if [[ "$has_server" -eq 0 && "$legacy_count" -ne 3 ]]; then
+            echo "::error::Legacy backend topology is incomplete; refusing deployment."
+            exit 1
+          fi
+          echo "::endgroup::"
+
+          echo "::group::Snapshot current topology and images"
+          : > .last-deploy.txt
+          for c in northstar-server northstar-api northstar-web northstar-mcp northstar-worker; do
+            docker inspect --format="$c {{index .Image}}" "$c" 2>/dev/null | tee -a .last-deploy.txt || true
+          done
+          previous_revision=""
+          for c in northstar-server northstar-api; do
+            previous_revision=$(docker inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$c" 2>/dev/null || true)
+            [[ -n "$previous_revision" ]] && break
+          done
+          if [[ -n "$previous_revision" ]] && git cat-file -e "${previous_revision}^{commit}:docker/docker-compose.yml" 2>/dev/null; then
+            git show "${previous_revision}:docker/docker-compose.yml" > backups/docker-compose.rollback.yml
+          else
+            cp docker/docker-compose.yml backups/docker-compose.rollback.yml
+          fi
+          cp docker/docker-compose.infra.yml backups/docker-compose.infra.rollback.yml
+          touch "$snapshot_marker"
+          echo "::endgroup::"
+
           git checkout --quiet "$DEPLOY_REF" -- docker/docker-compose.yml docker/docker-compose.infra.yml
 
           echo "::group::Backup database before migrate"
-          # Northstar shares the zero-mail Postgres instance; dump the dedicated
-          # northstar database from that container.
+          dump_path="backups/pre-deploy-$(date +%Y%m%d-%H%M%S).dump"
           docker exec zeromail-postgres pg_dump -U northstar -d northstar -Fc \
-            > "/apps/north-star/backups/pre-deploy-$(date +%Y%m%d-%H%M%S).dump" \
-            || echo "::warning::pg_dump failed (first deploy with no postgres yet is fine)"
-          ls -t /apps/north-star/backups/pre-deploy-*.dump 2>/dev/null | tail -n +8 | xargs -r rm --
+            > "$dump_path"
+          printf '%s\n' "$dump_path" > "$dump_marker"
+          echo "Pre-migration database dump: $dump_path"
+          # Names are generated from digits only, so word-splitting is impossible.
+          # shellcheck disable=SC2012
+          ls -t backups/pre-deploy-*.dump 2>/dev/null | tail -n +8 | xargs -r rm --
           echo "::endgroup::"
 
-          echo "::group::Snapshot previous image digests for rollback"
-          : > .last-deploy.txt
-          for c in northstar-api northstar-web northstar-mcp northstar-worker; do
-            docker inspect --format="$c {{index .Image}}" "$c" 2>/dev/null | tee -a .last-deploy.txt || true
-          done
-          echo "::endgroup::"
+          NORTHSTAR_SERVER_TAG="ghcr.io/${OWNER}/northstar-server:${DEPLOY_TAG}"
+          NORTHSTAR_WEB_TAG="ghcr.io/${OWNER}/northstar-web:${DEPLOY_TAG}"
+          export NORTHSTAR_SERVER_IMAGE="$NORTHSTAR_SERVER_TAG"
+          export NORTHSTAR_WEB_IMAGE="$NORTHSTAR_WEB_TAG"
 
-          export NORTHSTAR_API_IMAGE="ghcr.io/${OWNER}/northstar-api:${DEPLOY_TAG}"
-          export NORTHSTAR_WEB_IMAGE="ghcr.io/${OWNER}/northstar-web:${DEPLOY_TAG}"
-          export NORTHSTAR_MCP_IMAGE="ghcr.io/${OWNER}/northstar-mcp:${DEPLOY_TAG}"
-          export NORTHSTAR_WORKER_IMAGE="ghcr.io/${OWNER}/northstar-worker:${DEPLOY_TAG}"
-
-          echo "::group::Pull and recreate"
+          echo "::group::Pull unified release"
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-            --env-file .env pull api web worker mcp
-          docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-            --env-file .env up -d --no-build api web worker mcp
-          echo "::endgroup::"
-
-          echo "::group::Wait for api readiness"
-          for attempt in {1..60}; do
-            if docker exec northstar-api curl -fsS http://localhost:8888/actuator/health >/dev/null 2>&1; then
-              echo "api ready"; break
-            fi
-            if [[ $attempt -eq 60 ]]; then
-              echo "::error::api failed readiness within 120s"
-              docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-                --env-file .env logs --tail=200 api web
+            --env-file .env pull server web
+          for image in "$NORTHSTAR_SERVER_IMAGE" "$NORTHSTAR_WEB_IMAGE"; do
+            image_revision=$(docker image inspect \
+              --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")
+            if [[ "$image_revision" != "$DEPLOY_REF" ]]; then
+              echo "::error::Image provenance mismatch for $image (expected $DEPLOY_REF, got $image_revision)."
               exit 1
             fi
-            sleep 2
           done
-          echo "::endgroup::"
-
-          echo "::group::Wait for mcp readiness"
-          for attempt in {1..60}; do
-            if docker exec northstar-mcp curl -fsS http://localhost:8081/actuator/health >/dev/null 2>&1; then
-              echo "mcp ready"; break
+          resolve_digest() {
+            local tag="$1"
+            local repository="${tag%:*}"
+            local digest_ref=""
+            local candidate
+            while IFS= read -r candidate; do
+              if [[ "$candidate" == "${repository}@sha256:"* ]]; then
+                digest_ref="$candidate"
+                break
+              fi
+            done < <(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$tag")
+            if [[ -z "$digest_ref" ]]; then
+              echo "::error::Could not resolve a trusted registry digest for $tag." >&2
+              return 1
             fi
-            if [[ $attempt -eq 60 ]]; then
-              echo "::error::mcp failed readiness within 120s"
-              docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-                --env-file .env logs --tail=200 mcp
-              exit 1
-            fi
-            sleep 2
-          done
-          echo "::endgroup::"
-
-          echo "::group::Wait for worker liveness"
-          # No HTTP surface — healthy means the container's pgrep healthcheck
-          # passes (start_period 60s, so give it a couple of minutes).
-          for attempt in {1..60}; do
-            state=$(docker inspect --format '{{.State.Health.Status}}' northstar-worker 2>/dev/null || echo missing)
-            if [[ "$state" == "healthy" ]]; then echo "worker healthy"; break; fi
-            if [[ $attempt -eq 60 ]]; then
-              echo "::error::worker not healthy within 120s (state=$state)"
-              docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-                --env-file .env logs --tail=100 worker
-              exit 1
-            fi
-            sleep 2
-          done
-          echo "::endgroup::"
-
-          echo "::group::Reload edge proxy (NPM pins upstream IPs at config load)"
-          docker exec nginx-proxy-manager nginx -s reload \
-            && echo "edge proxy reloaded" \
-            || echo "::warning::NPM reload failed — /api may 502 until reloaded manually"
-          echo "::endgroup::"
-
-      - name: Post-deploy smoke check
-        env:
-          BASE_URL: ${{ vars.NORTHSTAR_BASE_URL }}
-        run: |
-          # Dual probe (zero-mail lesson): / proves TLS+web, and a real /api
-          # endpoint proves the edge reaches the RECREATED api. Deliberately NOT
-          # /api/actuator/health — actuator
-          # is mapped at /actuator on the container, so through the edge's /api
-          # route it 404s even when healthy; that path can't tell "healthy" from
-          # "edge route broken". /api/disciplines/cards returns 200 when auth is
-          # disabled, or 401 after the single-user login gate is enabled. Either
-          # response proves the edge reached the recreated api instead of 502ing.
-          smoke_ok() {
-            local root api
-            root=$(curl -o /dev/null -s -w '%{http_code}' "${BASE_URL}/" || echo 000)
-            api=$(curl -o /dev/null -s -w '%{http_code}' "${BASE_URL}/api/disciplines/cards" || echo 000)
-            echo "root=${root} api=${api}"
-            [[ "$root" == "200" ]] && [[ "$api" == "200" || "$api" == "401" ]]
+            printf '%s' "$digest_ref"
           }
-          for attempt in {1..20}; do
-            if smoke_ok; then echo "smoke OK"; exit 0; fi
-            sleep 5
-          done
-          echo "::error::smoke check failed within 100s"
-          exit 1
+          NORTHSTAR_SERVER_IMAGE=$(resolve_digest "$NORTHSTAR_SERVER_TAG")
+          NORTHSTAR_WEB_IMAGE=$(resolve_digest "$NORTHSTAR_WEB_TAG")
+          export NORTHSTAR_SERVER_IMAGE NORTHSTAR_WEB_IMAGE
+          echo "Server digest: ${NORTHSTAR_SERVER_IMAGE#*@}"
+          echo "Web digest: ${NORTHSTAR_WEB_IMAGE#*@}"
+          echo "::endgroup::"
 
-      - name: Roll back to previous images on failure
-        if: failure()
+          echo "::group::Stop legacy backend processes to prevent duplicate jobs"
+          for c in northstar-api northstar-mcp northstar-worker; do
+            if docker inspect "$c" >/dev/null 2>&1; then
+              docker stop --time 300 "$c"
+              running=$(docker inspect --format '{{.State.Running}}' "$c")
+              [[ "$running" == "false" ]] || {
+                echo "::error::Legacy process $c is still running; refusing unified startup."
+                exit 1
+              }
+            fi
+          done
+          echo "::endgroup::"
+
+          echo "::group::Start unified server"
+          docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
+            --env-file .env up -d --no-build server web
+          echo "::endgroup::"
+
+          echo "::group::Wait for server and web readiness"
+          for attempt in {1..180}; do
+            server_state=$(docker inspect --format '{{.State.Health.Status}}' northstar-server 2>/dev/null || echo missing)
+            web_state=$(docker inspect --format '{{.State.Health.Status}}' northstar-web 2>/dev/null || echo missing)
+            if [[ "$server_state" == "healthy" && "$web_state" == "healthy" ]]; then
+              echo "server and web ready"
+              break
+            fi
+            if [[ $attempt -eq 180 ]]; then
+              echo "::error::readiness failed (server=$server_state web=$web_state)"
+              docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
+                --env-file .env logs --tail=250 server web
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "::endgroup::"
+
+          echo "::group::REST authentication boundary smoke"
+          docker exec northstar-server sh -c '
+            set -eu
+            status=$(curl -sS -o /tmp/rest-anonymous -w "%{http_code}" \
+              http://localhost:8888/api/notes)
+            test "$status" = "401"
+            curl -fsS -D /tmp/csrf-headers -o /tmp/csrf-body \
+              http://localhost:8888/api/auth/csrf
+            grep -qi "set-cookie: XSRF-TOKEN=" /tmp/csrf-headers
+          '
+          echo "::endgroup::"
+
+          echo "::group::MCP streamable HTTP smoke"
+          docker exec northstar-server sh -c '
+            set -eu
+            test -n "${NORTHSTAR_MCP_TOKEN:-}"
+            curl -fsS -D /tmp/mcp-headers -o /tmp/mcp-init \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              -H "X-Northstar-MCP-Token: $NORTHSTAR_MCP_TOKEN" \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"deploy-smoke\",\"version\":\"1\"}}}" \
+              http://localhost:8888/mcp
+            session=$(awk -F": " "tolower(\$1)==\"mcp-session-id\" {gsub(\"\\r\",\"\",\$2); print \$2}" /tmp/mcp-headers)
+            test -n "$session"
+            curl -fsS -o /dev/null \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              -H "X-Northstar-MCP-Token: $NORTHSTAR_MCP_TOKEN" \
+              -H "Mcp-Session-Id: $session" \
+              --data "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/initialized\"}" \
+              http://localhost:8888/mcp
+            curl -fsS -o /tmp/mcp-tools \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              -H "X-Northstar-MCP-Token: $NORTHSTAR_MCP_TOKEN" \
+              -H "Mcp-Session-Id: $session" \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\"}" \
+              http://localhost:8888/mcp
+            grep -q "search_knowledge" /tmp/mcp-tools
+            curl -fsS -o /tmp/mcp-read-only \
+              -H "Content-Type: application/json" \
+              -H "Accept: application/json, text/event-stream" \
+              -H "X-Northstar-MCP-Token: $NORTHSTAR_MCP_TOKEN" \
+              -H "Mcp-Session-Id: $session" \
+              --data "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"today_tasks\",\"arguments\":{}}}" \
+              http://localhost:8888/mcp
+            ! grep -q "isError.*true" /tmp/mcp-read-only
+          '
+          echo "::endgroup::"
+
+          echo "::group::Finalize topology"
+          docker rm northstar-api northstar-mcp northstar-worker 2>/dev/null || true
+          # Reload only existing NPM configuration. This workflow never enables a
+          # disabled Northstar route; cutover remains a separate approved action.
+          docker exec nginx-proxy-manager nginx -t
+          docker exec nginx-proxy-manager nginx -s reload
+          rm -f "$snapshot_marker" "$dump_marker"
+          echo "::endgroup::"
+
+      - name: Roll back to previous topology on failure
+        if: ${{ failure() || cancelled() }}
         run: |
-          set -uo pipefail
-          cd /apps/north-star
-          if [[ ! -s .last-deploy.txt ]]; then
-            echo "::error::No previous-image snapshot — cannot auto-roll back."
+          set -euo pipefail
+          cd /apps/north-star || exit 1
+          snapshot_marker="${RUNNER_TEMP}/northstar-deploy-${GITHUB_RUN_ID}.snapshot"
+          dump_marker="${snapshot_marker}.dump"
+          if [[ ! -f "$snapshot_marker" || ! -s .last-deploy.txt \
+              || ! -s backups/docker-compose.rollback.yml \
+              || ! -s backups/docker-compose.infra.rollback.yml ]]; then
+            echo "::error::Current deployment has no complete rollback snapshot; manual intervention required."
             exit 1
           fi
+
+          prev_server=$(awk '/^northstar-server /{print $2}' .last-deploy.txt)
           prev_api=$(awk '/^northstar-api /{print $2}' .last-deploy.txt)
           prev_web=$(awk '/^northstar-web /{print $2}' .last-deploy.txt)
-          prev_worker=$(awk '/^northstar-worker /{print $2}' .last-deploy.txt)
           prev_mcp=$(awk '/^northstar-mcp /{print $2}' .last-deploy.txt)
-          # Guard EACH request-path image individually: an empty var would resolve
-          # to compose's :latest default, which does not exist on the box under
-          # --no-build and fails the roll-back. api and web are both required.
-          missing=()
-          [[ -z "$prev_api" ]] && missing+=(api)
-          [[ -z "$prev_web" ]] && missing+=(web)
-          if (( ${#missing[@]} )); then
-            echo "::error::Snapshot missing previous image(s): ${missing[*]} — manual intervention required."
-            exit 1
-          fi
-          # Roll api+web back to their snapshots. The worker is additive (not on
-          # the request path): recreate it only if we actually snapshotted it —
-          # never invent a :main/:latest ref -- otherwise leave the new one in place.
-          rollback_services="api web"
-          export NORTHSTAR_API_IMAGE="$prev_api"
+          prev_worker=$(awk '/^northstar-worker /{print $2}' .last-deploy.txt)
+          [[ -z "$prev_web" ]] && { echo "::error::Previous web image is missing."; exit 1; }
+
+          cp backups/docker-compose.rollback.yml docker/docker-compose.yml
+          cp backups/docker-compose.infra.rollback.yml docker/docker-compose.infra.yml
           export NORTHSTAR_WEB_IMAGE="$prev_web"
-          if [[ -n "$prev_worker" ]]; then
-            export NORTHSTAR_WORKER_IMAGE="$prev_worker"
-            rollback_services="$rollback_services worker"
-          fi
-          if [[ -n "$prev_mcp" ]]; then
+
+          if [[ -n "$prev_server" ]]; then
+            export NORTHSTAR_SERVER_IMAGE="$prev_server"
+            rollback_services=(server web)
+            rollback_containers=(northstar-server northstar-web)
+          else
+            [[ -z "$prev_api" || -z "$prev_mcp" || -z "$prev_worker" ]] \
+              && { echo "::error::Legacy topology snapshot is incomplete."; exit 1; }
+            docker rm -f northstar-server 2>/dev/null || true
+            export NORTHSTAR_API_IMAGE="$prev_api"
             export NORTHSTAR_MCP_IMAGE="$prev_mcp"
-            rollback_services="$rollback_services mcp"
+            export NORTHSTAR_WORKER_IMAGE="$prev_worker"
+            rollback_services=(api web mcp worker)
+            rollback_containers=(northstar-api northstar-web northstar-mcp northstar-worker)
           fi
-          echo "::warning::Deploy failed — rolling back (api=${prev_api} web=${prev_web} worker=${prev_worker:-keep-current} mcp=${prev_mcp:-keep-current})"
+
+          echo "::warning::Deploy failed; restoring previous topology: ${rollback_services[*]}"
+          latest_dump="unavailable"
+          [[ -s "$dump_marker" ]] && latest_dump=$(<"$dump_marker")
+          echo "::warning::Automatic rollback does not undo Flyway migrations."
+          echo "::warning::Latest pre-migration dump: ${latest_dump:-unavailable}"
+          echo "::warning::Restore that dump manually before a schema-incompatible rollback."
           docker compose -f docker/docker-compose.infra.yml -f docker/docker-compose.yml \
-            --env-file .env up -d --no-build $rollback_services
-          docker exec nginx-proxy-manager nginx -s reload >/dev/null 2>&1 || true
-          for attempt in {1..60}; do
-            if docker exec northstar-api curl -fsS http://localhost:8888/actuator/health >/dev/null 2>&1; then
-              echo "rollback healthy — previous release restored (run stays RED on purpose)"
+            --env-file .env up -d --no-build "${rollback_services[@]}"
+
+          for attempt in {1..90}; do
+            all_healthy=true
+            for container in "${rollback_containers[@]}"; do
+              status=$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{if .State.Running}}healthy{{else}}{{.State.Status}}{{end}}{{end}}' \
+                "$container" 2>/dev/null || echo missing)
+              if [[ "$status" != "healthy" ]]; then
+                all_healthy=false
+                break
+              fi
+            done
+            if [[ "$all_healthy" == true ]]; then
+              docker exec nginx-proxy-manager nginx -t
+              docker exec nginx-proxy-manager nginx -s reload
+              rm -f "$snapshot_marker" "$dump_marker"
+              echo "Previous topology restored; deployment run remains failed for investigation."
               exit 0
             fi
-            [[ $attempt -eq 60 ]] && { echo "::error::rollback did not become ready — check DB state (partial migration?) and restore the pre-deploy pg_dump if needed"; exit 1; }
+            [[ $attempt -eq 90 ]] && { echo "::error::Rollback topology did not become fully healthy; restore the pre-deploy database dump if required."; exit 1; }
             sleep 2
           done

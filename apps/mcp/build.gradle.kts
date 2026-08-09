@@ -1,5 +1,5 @@
 plugins {
-    id("northstar.spring-boot-app-conventions")
+    id("northstar.spring-library-conventions")
 }
 
 dependencies {
@@ -15,7 +15,7 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
-    // mcp does not run migrations in production (the api owns them), but the
+    // MCP is a production library (the server composition root owns migrations), but the
     // context-load test boots against an empty Testcontainers Postgres, so it
     // enables Flyway (from :core's classpath migrations) to satisfy ddl-auto: validate.
     testImplementation("org.springframework.boot:spring-boot-starter-flyway")

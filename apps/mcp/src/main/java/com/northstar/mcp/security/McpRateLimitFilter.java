@@ -14,11 +14,10 @@ import org.springframework.http.MediaType;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * Guards the public no-auth MCP endpoint: rejects oversized bodies (413) and
+ * Guards the token-authenticated MCP endpoint: rejects oversized bodies (413) and
  * rate-limited callers (429 + Retry-After), and logs every call (method, path,
- * client IP, status, duration) for audit — the "who hit my no-auth surface"
- * trail jmix-mcp-docs keeps. Registered only on the MCP paths, so the container
- * health check and other routes are untouched.
+ * client IP, status, duration) for transport audit. Registered only on the MCP
+ * paths, so the container health check and other routes are untouched.
  */
 @NullMarked
 public class McpRateLimitFilter extends OncePerRequestFilter {
@@ -45,7 +44,7 @@ public class McpRateLimitFilter extends OncePerRequestFilter {
         long length = request.getContentLengthLong();
         if (bodyExpected(request) && length < 0) {
             // No declared Content-Length (e.g. chunked) → the size cap can't be
-            // enforced up front, so require one on this no-auth write endpoint.
+            // enforced up front, so require one on this tool-capable endpoint.
             log.warn("MCP {} {} ip={} rejected: missing Content-Length", request.getMethod(), uri, ip);
             writeError(response, HttpStatus.LENGTH_REQUIRED, "length_required", 0);
             return;

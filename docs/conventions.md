@@ -7,8 +7,9 @@
 - Cross-module calls go through public module APIs or events, not another
   module's internals.
 - Java package root is `com.northstar`.
-- App classes are explicitly named `NorthstarApiApplication`,
-  `NorthstarMcpApplication`, and `NorthstarWorkerApplication`.
+- The only production application entry point is `NorthstarServerApplication`;
+  API, MCP and jobs remain separate packages and Gradle modules. Test-only
+  application classes may provide isolated module contexts.
 - Prefer existing local helpers and module patterns before adding new
   abstractions.
 - Bind application configuration with immutable `@ConfigurationProperties`
@@ -19,8 +20,9 @@
 
 - Add Flyway migrations in `core/src/main/resources/db/migration`.
 - Keep JPA mappings and migrations in lockstep; `ddl-auto: validate` must pass.
-- The API owns production migrations. MCP and worker validate the migrated
-  schema.
+- The unified server composition root owns the single production Flyway
+  lifecycle. MCP and worker remain library modules; their isolated tests may
+  run test-only migrations to validate mappings.
 
 ## Client Contract
 

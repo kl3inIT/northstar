@@ -16,9 +16,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Writing-feedback history — the persistence half of the writing tutor.
- * Grading itself (the LLM call) lives in {@link WritingGrader}, which only the
- * api app wires: this split keeps the history readable from every app (mcp has
- * no LLM) while grading stays where a ChatClient exists.
+ * Grading itself (the LLM call) lives in {@link WritingGrader}, which API
+ * delivery configuration wires. This split keeps history readable to every
+ * feature module while grading stays at the ChatClient boundary.
  */
 @Service
 public class WritingService {

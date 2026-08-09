@@ -8,9 +8,9 @@ import org.springframework.core.io.ByteArrayResource;
  * runs server-side, the user reviews the text in the composer before drafting,
  * and the recording itself is never stored.
  *
- * <p>Plain class like {@link CaptureService}: the delivering app provides the
- * {@link TranscriptionModel} bean (OpenAI Whisper via the api app), so apps
- * without an LLM never instantiate it and the provider stays swappable.
+ * <p>Plain class like {@link CaptureService}: API delivery configuration in the
+ * unified server provides the {@link TranscriptionModel} bean. Keeping that
+ * wiring outside core leaves the provider swappable.
  */
 public class VoiceTranscriber {
 

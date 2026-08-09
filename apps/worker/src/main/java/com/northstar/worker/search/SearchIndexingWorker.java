@@ -8,12 +8,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * The worker's job: keep the vector index in step with the corpus, off the api.
+ * Keeps the vector index in step with the corpus on a scheduler thread.
  *
- * <p>Embedding, Tika extraction and vision captioning are LLM/CPU-heavy, so per
- * CLAUDE.md they must not run on api request threads. Modulith's event registry
- * delivers in-process only (a note saved in the api never reaches this process),
- * so instead of consuming events the worker polls: {@link SearchService#reindexStale()}
+ * <p>Embedding, Tika extraction and vision captioning are LLM/CPU-heavy, so
+ * CLAUDE.md requires that they not run on request threads. The job deliberately polls
+ * instead of coupling indexing to an interactive write: {@link SearchService#reindexStale()}
  * is hash-idempotent — it embeds only notes/files whose content hash changed
  * (new saves, uploads, or an {@code INDEX_VERSION} bump) and drops orphaned
  * vectors, so an unchanged corpus costs a handful of indexed SQL lookups. A

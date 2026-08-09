@@ -1,6 +1,6 @@
 spring:
   application:
-    name: northstar-api
+    name: northstar-server
   threads:
     virtual:
       # Java 25 virtual threads for request handling — blocking LLM/DB calls park
@@ -19,6 +19,16 @@ spring:
     # Migrations ship on the classpath from :core (core/src/main/resources/db/migration).
     locations: classpath:db/migration
   ai:
+    mcp:
+      server:
+        name: northstar
+        version: 0.1.0
+        protocol: STREAMABLE
+        instructions: >-
+          Northstar is the user's personal knowledge base, task manager and
+          calendar. Search notes before answering questions about saved knowledge;
+          create notes, tasks, habits and calendar events through the appropriate
+          tools, and use finance and automation tools only for their stated domain.
     vectorstore:
       pgvector:
         # Flyway owns the schema (V14) — HNSW + cosine are the defaults.
@@ -59,10 +69,42 @@ spring:
       # RFC 9457 ProblemDetail too — one error shape everywhere.
       enabled: true
 
+# Durable automation work shares the process but not request threads. db-scheduler
+# owns its dedicated executor and drains in-flight work during graceful shutdown.
+db-scheduler:
+  polling-interval: 5s
+  heartbeat-interval: 30s
+  missed-heartbeats-limit: 4
+  threads: 4
+  delay-startup-until-context-ready: true
+  # db-scheduler may wait through two one-minute executor shutdowns. The outer
+  # container budget also reserves the separate two-minute Spring scheduler drain.
+  shutdown-max-wait: 1m
+
 # Assistant conversation auto-titling (background, best-effort). Point `model` at a
 # cheaper tier (e.g. a mini/nano model) to cut titling cost — no code change; set
 # `enabled: false` to switch titling off (the list falls back to the first message).
 northstar:
+  mcp:
+    auth:
+      # Required whenever web authentication is enabled. Streamable-HTTP clients
+      # send this value in X-Northstar-MCP-Token; never expose it in a URL.
+      token: ${NORTHSTAR_MCP_TOKEN:}
+    rate-limit:
+      enabled: true
+      global-capacity: 800
+      global-window: 1m
+      ip-capacity: 300
+      ip-window: 1h
+      max-body-bytes: 262144
+      max-tracked-ips: 50000
+  brief:
+    github:
+      token: ${GITHUB_TOKEN:}
+    firecrawl:
+      base-url: https://api.firecrawl.dev
+      api-key: ${FIRECRAWL_API_KEY:}
+      request-timeout: 30s
   artifacts:
     # Short-lived generated previews only. Durable attachments and applied speech
     # remain in PostgreSQL-backed domain stores.
@@ -168,7 +210,7 @@ northstar:
       request-timeout: 60s
 
 server:
-  port: ${NORTHSTAR_API_PORT:8888}
+  port: ${NORTHSTAR_SERVER_PORT:${NORTHSTAR_API_PORT:8888}}
 
 management:
   endpoints:

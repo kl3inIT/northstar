@@ -48,7 +48,7 @@ db-scheduler:
   missed-heartbeats-limit: 4
   threads: 4
   delay-startup-until-context-ready: true
-  shutdown-max-wait: 2m
+  shutdown-max-wait: 1m
 
 northstar:
   ai:

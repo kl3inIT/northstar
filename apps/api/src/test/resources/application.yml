@@ -6,6 +6,9 @@ northstar:
       http-only: true
       same-site: Lax
       secure: false
+  mcp:
+    auth:
+      token: test-mcp-token
 
 spring:
   datasource:

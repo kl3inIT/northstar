@@ -38,14 +38,14 @@ external agents.
 
 ## Architecture
 
-Northstar is a modular monolith with three backend deployables sharing one
-PostgreSQL database:
+Northstar is a modular monolith with one backend deployable and one PostgreSQL
+database:
 
 ```text
 core/                 domain library and Spring Modulith modules
-apps/api/             REST API, web auth, Flyway owner, OpenAPI emitter
-apps/mcp/             streamable HTTP MCP server
-apps/worker/          scheduled indexing and automation worker
+apps/api/             unified server composition root and REST delivery
+apps/mcp/             streamable HTTP MCP delivery library
+apps/worker/          scheduled indexing and automation jobs library
 integrations/         AI, web research, and speech provider adapters
 web/                  Vite + React + TypeScript SPA
 mobile/               adaptive Cupertino-first Flutter client
@@ -79,7 +79,7 @@ cp .env.example .env
 # PostgreSQL + pgvector
 docker compose up -d
 
-# API (the local profile imports .env)
+# Unified backend (the local profile imports .env)
 SPRING_PROFILES_ACTIVE=local ./gradlew :apps:api:bootRun
 
 # Web
@@ -98,13 +98,15 @@ Local URLs:
 
 - Web: `http://localhost:5173`
 - API: `http://localhost:8888`
-- MCP: `http://localhost:8081/mcp` when `apps/mcp` is running
+- MCP: `http://localhost:8888/mcp`
 - PostgreSQL: `localhost:5432`
 
 To exercise the web login locally, set `NORTHSTAR_AUTH_ENABLED=true` plus
 `NORTHSTAR_AUTH_USERNAME` and a bcrypt `NORTHSTAR_AUTH_PASSWORD_HASH` in
-`.env`. Production Compose always activates the `prod` profile and uses the
-server environment template under `docker/`.
+`.env`. Independently of REST login, every MCP client must send
+`X-Northstar-MCP-Token` with the configured `NORTHSTAR_MCP_TOKEN`. Production
+Compose always activates the `prod` profile and uses the server environment
+template under `docker/`.
 
 ## Verification
 

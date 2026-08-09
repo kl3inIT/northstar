@@ -29,9 +29,9 @@ active increment, not here.
 
 ```text
 core/                 domain library and Spring Modulith modules
-apps/api/             REST app, web delivery, Flyway owner, OpenAPI emitter
-apps/mcp/             streamable-http MCP server for external agents
-apps/worker/          headless scheduled worker for heavy background indexing
+apps/api/             unified server composition root and REST delivery
+apps/mcp/             streamable-http MCP delivery library
+apps/worker/          indexing, automation and scheduled-jobs library
 integrations/         provider adapters shared by delivery apps
 web/                  Vite React SPA
 mobile/               adaptive Flutter client for Android, iOS, and Web
@@ -41,21 +41,18 @@ build-logic/          Gradle convention plugins
 
 ## Deployables
 
-Northstar is one domain with three backend deployables:
+Northstar is one domain with one backend deployable:
 
 - `core` owns business logic, entities, repositories, services, migrations, and
   module boundaries under `com.northstar.core`.
-- `apps/api` exposes REST endpoints, runs Flyway migrations, serves actuator
-  endpoints, owns web session authentication, wires interactive AI delivery,
-  emits OpenAPI, and talks to the same PostgreSQL
-  database as the other apps.
-- `apps/mcp` exposes MCP tools over streamable HTTP at `/mcp`. It scans
-  `com.northstar.core`, reads the already-migrated schema, and does not carry
-  Flyway on its production runtime classpath.
-- `apps/worker` is a non-web process with scheduling enabled. It owns heavy
-  indexing work such as embeddings and image captions plus durable user
-  automation execution through db-scheduler. It uses the same schema and does
-  not carry Flyway on its production runtime classpath.
+- `apps/api` is the `northstar-server` composition root. It exposes REST and
+  actuator endpoints, runs Flyway, owns web session authentication, emits
+  OpenAPI and includes the MCP and jobs libraries in one Spring context.
+- `apps/mcp` exposes MCP tools over streamable HTTP at `/mcp` and owns the
+  transport's rate/body guard. It is a library, not a standalone application.
+- `apps/worker` owns heavy indexing, subscription checks and durable automation
+  execution through db-scheduler. It is a library whose schedulers run in the
+  server process on background executors, never request threads.
 - `integrations/ai-openai-compatible` owns the reusable Spring AI adapter,
   capability-specific catalog discovery, and runtime task router shared by API
   and worker. Chat, TTS, STT, image-generation, embedding, web-search, and
@@ -69,9 +66,9 @@ Northstar is one domain with three backend deployables:
   changing task routes. Provider credentials are resolved only when an AI call
   runs, so API and worker boot without a provider key.
 
-The app classes are explicitly named `NorthstarApiApplication`,
-`NorthstarMcpApplication`, and `NorthstarWorkerApplication`. The package root is
-`com.northstar`.
+The single application class is `NorthstarServerApplication`; delivery and jobs
+remain separated under `com.northstar.api`, `com.northstar.mcp`, and
+`com.northstar.worker`.
 
 ## Domain Modules
 
@@ -123,8 +120,8 @@ verification in `:core:test` is the boundary check.
 - PostgreSQL is the source of truth.
 - Flyway migrations live in `core/src/main/resources/db/migration` and travel on
   the `:core` classpath.
-- `apps/api` runs Flyway at startup. `apps/mcp` and `apps/worker` omit the
-  runtime Flyway dependency and validate the already-migrated schema.
+- `northstar-server` runs Flyway once at startup and owns the only production
+  datasource/Hikari pool.
 - JPA uses `ddl-auto: validate`; every mapped entity/column must match a Flyway
   migration.
 - Note bodies are Markdown in the database. Wiki links/backlinks and vector
@@ -151,8 +148,9 @@ verification in `:core:test` is the boundary check.
   connection plus a capability target; credentials are never duplicated in
   web-research settings or returned to clients.
 - `search_web` and `read_web_page` are in-app Assistant tools only. They are not
-  published by the public MCP app, so unauthenticated MCP traffic cannot spend
-  web-provider credits or use Northstar as a fetch proxy.
+  published by the MCP app, so MCP clients cannot spend web-provider credits or
+  use Northstar as a fetch proxy. MCP streamable HTTP requires its own constant-
+  time-checked shared token and does not inherit browser session authentication.
 - Assistant text history uses Spring AI's `spring_ai_chat_memory`; assistant
   tool workflow replay uses the Northstar-owned
   `northstar_assistant_tool_trace` projection table.
@@ -171,26 +169,27 @@ verification in `:core:test` is the boundary check.
   previews after 30 minutes with a 16 MiB per-item and 64 MiB total heap bound;
   polling returns references and Apply persists through Attachment/Speech only
   before post-commit cleanup. API restart deliberately loses unapplied content.
-- `apps/worker` wires OpenAI and pgvector for indexing jobs that should not
-  compete with API request threads.
+- The jobs module wires OpenAI and pgvector for indexing work on scheduler
+  threads so it does not compete on API request threads.
 - Search combines durable PostgreSQL data with derived keyword/vector indexes.
 
 ## Runtime Configuration
 
-- Each Spring Boot deployable owns `application.yml` for safe common behavior,
+- The unified server owns `application.yml` for safe common behavior,
   `application-local.yml` for developer-only `.env` imports and diagnostics,
   and `application-prod.yml` for production pool, logging, proxy, actuator, and
   shutdown policy.
 - IntelliJ run configurations activate `local`; production Compose activates
   `prod` explicitly. Tests activate neither unless a test is specifically
   exercising profile composition.
-- Production Hikari pools are process-budgeted and environment-overridable:
-  API 8/2, MCP 4/1, and worker 6/2 maximum/minimum connections by default.
-  Virtual-thread concurrency does not increase those database budgets.
+- Production has one environment-overridable Hikari pool with 10/2
+  maximum/minimum connections by default. Virtual-thread concurrency does not
+  increase that database budget.
 - Production emits ECS JSON to stdout, while Docker owns size-based retention.
   Full Spring AI prompt/response logging is disabled outside `local`.
-- Spring Boot graceful shutdown is paired with Compose stop grace periods; the
-  worker receives a longer drain window for in-flight db-scheduler jobs.
+- Spring scheduling can wait two minutes and db-scheduler can use two sequential
+  one-minute executor waits. Compose therefore grants the unified server a
+  five-minute stop grace period, including one minute of outer margin.
   Derived indexes are disposable and can be rebuilt from source records.
 
 ## Client Contract
