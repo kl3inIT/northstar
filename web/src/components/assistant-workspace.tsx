@@ -607,6 +607,11 @@ function AssistantChat({
   const updateModel = useUpdateAssistantConversationModel(conversationId)
   const { messages, sendMessage, status, stop } = useChat({
     messages: initialMessages,
+    // A failed turn used to end in silence: the stream emits one error frame and
+    // nothing rendered it, so a model that cannot serve this chat looked like a
+    // chat that had stopped working. The api already reduces the failure to one
+    // actionable sentence.
+    onError: (error) => toast.error(error.message || 'The assistant could not answer — try again.'),
     onFinish: () => {
       // A finished turn may have created/completed things and retitles the list.
       void queryClient.invalidateQueries({ queryKey: ['assistant-conversations'] })
