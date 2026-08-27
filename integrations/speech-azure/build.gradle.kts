@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     api(project(":core"))
-    implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.51.1@jar")
+    implementation("com.microsoft.cognitiveservices.speech:client-sdk:1.51.2@jar")
     implementation("tools.jackson.core:jackson-databind")
 
     testImplementation("org.junit.jupiter:junit-jupiter")
