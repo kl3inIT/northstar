@@ -35,7 +35,7 @@ dependencies {
     // auto-config, which can't see our @Qualifier'd ChatClient).
     implementation(libs.spring.ai.tool.search.advisor)
     implementation(libs.lucene.core)
-    implementation("org.jsoup:jsoup:1.23.1")
+    implementation("org.jsoup:jsoup:1.23.2")
     // PgVectorStore autoconfig — the route-aware EmbeddingModel comes from the AI integration.
     // Schema is Flyway's (V14): spring.ai.vectorstore.pgvector.initialize-schema=false.
     implementation(libs.spring.ai.starter.pgvector)
