@@ -7,7 +7,7 @@ java = "25"
 springBoot = "4.1.0"
 springDependencyManagement = "1.1.7"
 springModulith = "2.1.0"
-springdoc = "3.1.0"                 # OpenAPI 3 generation; 3.x is the Spring Boot 4 line (2.8.x = Boot 3.5)
+springdoc = "3.1.1"                 # OpenAPI 3 generation; 3.x is the Spring Boot 4 line (2.8.x = Boot 3.5)
 springAi = "2.0.0"                  # capture extraction now; embeddings + MCP tools later
 lucene = "10.5.0"                   # LuceneToolIndex backend (same pin as spring-ai-starter-tool-search-advisor)
 fsrs = "1.0.0"                      # Official Open Spaced Repetition Java FSRS-6 implementation
