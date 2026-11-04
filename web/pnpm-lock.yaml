@@ -3399,9 +3399,9 @@ packages:
     peerDependencies:
       seroval: ^1.0
 
-  seroval@1.6.2:
-    resolution: {integrity: sha512-mPT+SD2TrlB6wvte1KkYOYUkubaTbd6pZ/6Kk3C9nxzrHmCZyhxOO7XGAeL7f+yLKZglzGtM9odUVvg/EhO+vQ==}
-    engines: {node: '>=10'}
+  seroval@1.7.7:
+    resolution: {integrity: sha512-9OdYsqMLV5RSUNNtkgr6DT2bS/ncba6AqUJx8H7epNJNa0cKNWhQtF5GLRjkF/KuAdvAuRRitWrq86K/v1S/kg==}
+    engines: {node: '>=20'}
 
   shiki@3.23.0:
     resolution: {integrity: sha512-55Dj73uq9ZXL5zyeRPzHQsK7Nbyt6Y10k5s7OjuFZGMhpp4r/rsLBH0o/0fstIzX1Lep9VxefWljK/SKCzygIA==}
@@ -5184,8 +5184,8 @@ snapshots:
     dependencies:
       '@tanstack/history': 1.162.1
       cookie-es: 3.1.1
-      seroval: 1.6.2
-      seroval-plugins: 1.6.2(seroval@1.6.2)
+      seroval: 1.7.7
+      seroval-plugins: 1.6.2(seroval@1.7.7)
 
   '@tanstack/router-devtools-core@1.168.0(@tanstack/router-core@1.171.19)(csstype@3.2.3)':
     dependencies:
@@ -7195,11 +7195,11 @@ snapshots:
 
   semver@7.8.5: {}
 
-  seroval-plugins@1.6.2(seroval@1.6.2):
+  seroval-plugins@1.6.2(seroval@1.7.7):
     dependencies:
-      seroval: 1.6.2
+      seroval: 1.7.7
 
-  seroval@1.6.2: {}
+  seroval@1.7.7: {}
 
   shiki@3.23.0:
     dependencies:
